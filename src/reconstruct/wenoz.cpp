@@ -7,8 +7,8 @@
 //  \brief WENO-Z reconstruction for a Cartesian-like coordinate with uniform spacing.
 //
 // REFERENCES:
-// (CW) P. Colella & P. Woodward, "The Piecewise Parabolic Method (PPM) for Gas-Dynamical
-// Simulations", JCP, 54, 174 (1984)
+// Borges R., Carmona M., Costa B., Don W.S. , "An improved weighted essentially non-oscillatory scheme 
+// for hyperbolic conservation laws" , JCP, 227, 3191 (2008)
 
 #include <algorithm>    // max()
 #include <math.h>
