@@ -18,7 +18,7 @@ class Driver;
 class EquationOfState;
 
 // constants that enumerate MHD Riemann Solver options
-enum class MHD_RSolver {advect, llf, hlld, roe};
+enum class MHD_RSolver {advect, llf, hlld, roe, llf_rel};
 
 namespace mhd {
 
