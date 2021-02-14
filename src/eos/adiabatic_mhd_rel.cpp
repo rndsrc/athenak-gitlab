@@ -9,7 +9,7 @@
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
-#include "hydro/hydro.hpp"
+#include "mhd/mhd.hpp"
 #include "eos.hpp"
 
 //----------------------------------------------------------------------------------------
@@ -36,8 +36,8 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
   int n1 = ncells.nx1 + 2*ng;
   int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
   int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
-  int &nhyd  = pmy_pack->phydro->nhydro;
-  int &nscal = pmy_pack->phydro->nscalars;
+  int &nmhd  = pmy_pack->pmhd->nmhd;
+  int &nscal = pmy_pack->pmhd->nscalars;
   int &nmb = pmy_pack->nmb_thispack;
   Real gm1 = eos_data.gamma - 1.0;
   Real gamma_adi = eos_data.gamma;
@@ -230,7 +230,7 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
       }
 
       // convert scalars (if any)
-      for (int n=nhyd; n<(nhyd+nscal); ++n) {
+      for (int n=nmhd; n<(nmhd+nscal); ++n) {
         prim(m,n,k,j,i) = cons(m,n,k,j,i)/u_d;
       }
     }
