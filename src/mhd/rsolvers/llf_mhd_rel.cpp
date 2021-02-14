@@ -77,8 +77,8 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     Real b2r = ((bxi*bxi + wr_iby*wr_iby + wr_ibz*wr_ibz) + b0r*b0r) / (1.+u2r);
 
     // FIXME ERM: Ideal fluid for now
-    Real wgas_l = wl_idn + (eos.gamma/gm1) * wl_ipr + b2l;
-    Real wgas_r = wr_idn + (eos.gamma/gm1) * wr_ipr + b2r;
+    Real wgas_l = wl_idn + (eos.gamma/gm1) * wl_ipr;
+    Real wgas_r = wr_idn + (eos.gamma/gm1) * wr_ipr;
 
     Real pl = wl_ipr + 0.5*b2l;
     Real pr = wr_ipr + 0.5*b2r;
@@ -93,6 +93,11 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
 //    }
     qa = fmax(-fmin(lm,qa), 0.);
     Real const a = fmax(fmax(lp,qb), qa);
+
+//    Real const a = 1.;
+
+    wgas_l += b2l;
+    wgas_r += b2r;
     
 
     //--- Step 3.  Compute L/R fluxes
@@ -120,7 +125,7 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fr[IDN] = wr_idn * wr_ivx;
     qa = wgas_r * wr_ivx;
     qb = (bxi + b0r*wr_ivx)/u0r;
-    fr[IVX] = qa*wr_ivx - (qb * bxi) + pr;
+    fr[IVX] = qa*wr_ivx - (qb * qb) + pr;
     fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r);
     fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r);
 
