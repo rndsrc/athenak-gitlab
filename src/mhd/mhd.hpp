@@ -51,6 +51,7 @@ class MHD
   DvceFaceFld5D<Real> uflx;   // fluxes of conserved quantities on cell faces
   DvceEdgeFld4D<Real> efld;   // edge-centered electric fields (fluxes of B)
   Real dtnew;
+  bool relativistic {false};
 
   // functions
   void MHDStageStartTasks(TaskList &tl, TaskID start);

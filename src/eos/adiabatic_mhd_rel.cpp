@@ -90,15 +90,15 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
 
       Real ee = u_d + u_e;
 
-      Real m2 = SQR(cons(m, IM1,k,j,i)) + SQR(cons(m, IM2,k,j,i)) + SQR(cons(m, IM3,k,j,i));
+      Real mm_sq = SQR(cons(m, IM1,k,j,i)) + SQR(cons(m, IM2,k,j,i)) + SQR(cons(m, IM3,k,j,i));
 
       Real bb_sq = w_bx*w_bx + w_by*w_by + w_bz*w_bz;
 
       Real tt = cons(m, IM1,k,j,i) * w_bx + cons(m, IM2,k,j,i) * w_by + cons(m, IM2,k,j,i) * w_bz;
 
       Real m2_max = mm_sq_ee_sq_max * SQR(ee);
-      if( m2 > m2_max){
-	Real factor = std::sqrt(m2_max/m2);
+      if( mm_sq > m2_max){
+	Real factor = std::sqrt(m2_max/mm_sq);
 	u_m1*= factor;
 	u_m2*= factor;
 	u_m3*= factor;
@@ -131,7 +131,7 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
       Real phi, eee, ll, v_sq;
       if (n%3 != 2) {
 	phi = acos(1.0/a * sqrt(27.0*d/(4.0*a)));                     // (NH 5.10)
-	eee = a/3.0 - 2.0/3.0 * a * cos(2.0/3.0 * (phi+PI));               // (NH 5.11)
+	eee = a/3.0 - 2.0/3.0 * a * cos(2.0/3.0 * (phi+M_PI));               // (NH 5.11)
 	ll = eee - bb_sq;                                                       // (NH 5.5)
 	v_sq = ll * (bb_sq+ll);
 	v_sq = (mm_sq*ll*ll + tt*tt*(bb_sq+2.0*ll)) / (v_sq*v_sq); // (NH 5.2)
@@ -139,7 +139,7 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
 	Real gamma_sq = 1.0/(1.0-v_sq);                                         // (NH 3.1)
 	Real gamma = sqrt(gamma_sq);                                       // (NH 3.1)
 	Real wgas = ll/gamma_sq;                                                // (NH 5.1)
-	Real rho = dd/gamma;                                                    // (NH 4.5)
+	Real rho = u_d/gamma;                                                    // (NH 4.5)
 	pgas[(n+1)%3] = (gamma_adi-1.0)/gamma_adi * (wgas - rho);               // (NH 4.1)
 	pgas[(n+1)%3] = std::max(pgas[(n+1)%3], pgas_min);
       }
@@ -173,10 +173,10 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
 //    if (!std::isfinite(w_p)) {
 //      failed=true;
 //    }
-    Real a = ee + prim(IPR,k,j,i) + 0.5*bb_sq;                      // (NH 5.7)
+    Real a = ee + prim(m,IPR,k,j,i) + 0.5*bb_sq;                      // (NH 5.7)
     a = std::max(a, a_min);
     Real phi = std::acos(1.0/a * std::sqrt(27.0*d/(4.0*a)));        // (NH 5.10)
-    Real eee = a/3.0 - 2.0/3.0 * a * std::cos(2.0/3.0 * (phi+PI));  // (NH 5.11)
+    Real eee = a/3.0 - 2.0/3.0 * a * std::cos(2.0/3.0 * (phi+M_PI));  // (NH 5.11)
     Real ll = eee - bb_sq;                                          // (NH 5.5)
     Real v_sq = (mm_sq*SQR(ll) + SQR(tt)*(bb_sq+2.0*ll))
 		/ SQR(ll * (bb_sq+ll));                             // (NH 5.2)
@@ -189,9 +189,9 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
 //      failed=true;
 //    }
     Real ss = tt/ll;                          // (NH 4.8)
-    w_vx = (mm1 + ss*w_bx) / (ll + bb_sq);  // (NH 4.6)
-    w_vy = (mm2 + ss*w_by) / (ll + bb_sq);  // (NH 4.6)
-    w_vz = (mm3 + ss*w_bz) / (ll + bb_sq);  // (NH 4.6)
+    w_vx = (u_m1 + ss*w_bx) / (ll + bb_sq);  // (NH 4.6)
+    w_vy = (u_m2 + ss*w_by) / (ll + bb_sq);  // (NH 4.6)
+    w_vz = (u_m3 + ss*w_bz) / (ll + bb_sq);  // (NH 4.6)
     w_vx *= gamma;           // (NH 4.6)
     w_vy *= gamma;           // (NH 4.6)
     w_vz *= gamma;           // (NH 4.6)

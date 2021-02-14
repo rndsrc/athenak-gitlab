@@ -143,7 +143,7 @@ class AdiabaticMHD : public EquationOfState
 class AdiabaticMHDRel : public EquationOfState
 {
  public:
-  AdiabaticMHD(MeshBlockPack *pp, ParameterInput *pin);
+  AdiabaticMHDRel(MeshBlockPack *pp, ParameterInput *pin);
   // prototype for Hydro conversion function (never used)
   void ConsToPrim(const DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
   // prototype for MHD conversion function

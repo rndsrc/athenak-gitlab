@@ -85,8 +85,8 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
 
     Real qa,qb, lm,lp;
 //    if (eos.is_adiabatic) {
-    eos.FastMagnetosonicSpeedSR(wgas_l,b2l, wli[IPR], wli[IVX]/u0l, 1.+u2l, lp, lm);
-    eos.FastMagnetosonicSpeedSR(wgas_r,b2r, wri[IPR], wri[IVX]/u0r, 1.+u2r, qb,qa);
+    eos.FastMagnetosonicSpeedSR(wgas_l,b2l, wl_ipr, wl_ivx/u0l, 1.+u2l, lp, lm);
+    eos.FastMagnetosonicSpeedSR(wgas_r,b2r, wr_ipr, wr_ivx/u0r, 1.+u2r, qb,qa);
 //    } else {
 //      qa = eos.FastMagnetosonicSpeed(wl_idn,bxi,wl_iby,wl_ibz);
 //      qb = eos.FastMagnetosonicSpeed(wr_idn,bxi,wr_iby,wr_ibz);
@@ -100,9 +100,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fl[IDN] = wl_idn * wl_ivx;
     qa = wgas_l * wl_ivx;
     qb = (bxi + b0l)*wl_ivx/u0l;
-    fl[IVX] = qa*wl_ivx - (qb * qb)) + pl;
-    fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0l*wl_ivy)/u0l));
-    fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0l*wl_ivz)/u0l));
+    fl[IVX] = qa*wl_ivx - (qb * qb) + pl;
+    fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0l*wl_ivy)/u0l);
+    fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0l*wl_ivz)/u0l);
 
     Real el = wgas_l*u0l*u0l - pl - wl_idn*u0l;
     fl[IEN] = (el + pl)*wl_ivx/u0l - b0l*qb;
@@ -115,12 +115,12 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fr[IDN] = wr_idn * wr_ivx;
     qa = wgas_r * wr_ivx;
     qb = (bxi + b0r)*wr_ivx/u0r;
-    fr[IVX] = qa*wr_ivx - (qb * bx)) + pr;
-    fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r));
-    fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r));
+    fr[IVX] = qa*wr_ivx - (qb * bxi) + pr;
+    fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r);
+    fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r);
 
     Real er = wgas_r*u0r*u0r - pr - wr_idn*u0r;
-    fr[IEN] = (er + pr)*wr_ivx/u0r - b0 * qb;
+    fr[IEN] = (er + pr)*wr_ivx/u0r - b0r * qb;
 
     er -= b0r*b0r;
 
