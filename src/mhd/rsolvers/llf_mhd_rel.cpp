@@ -92,14 +92,14 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
 //      qb = eos.FastMagnetosonicSpeed(wr_idn,bxi,wr_iby,wr_ibz);
 //    }
     qa = fmax(-fmin(lm,qa), 0.);
-    Real a = fmax(fmax(lp,qb), qa);
+    Real const a = fmax(fmax(lp,qb), qa);
     
 
     //--- Step 3.  Compute L/R fluxes
 
     fl[IDN] = wl_idn * wl_ivx;
     qa = wgas_l * wl_ivx;
-    qb = (bxi + b0l)*wl_ivx/u0l;
+    qb = (bxi + b0l*wl_ivx)/u0l;
     fl[IVX] = qa*wl_ivx - (qb * qb) + pl;
     fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0l*wl_ivy)/u0l);
     fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0l*wl_ivz)/u0l);
@@ -112,9 +112,14 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fl[6  ] = (wl_ibz*wl_ivx - bxi*wl_ivz)/u0l;
 
 
+    du[IVX] = -qa*u0l + b0l*qb;
+    du[IVY] = -wgas_l*u0l*wl_ivy + b0l*(wl_iby + b0l*wl_ivy)/u0l;
+    du[IVZ] = -wgas_l*u0l*wl_ivz + b0l*(wl_ibz + b0l*wl_ivz)/u0l;
+
+
     fr[IDN] = wr_idn * wr_ivx;
     qa = wgas_r * wr_ivx;
-    qb = (bxi + b0r)*wr_ivx/u0r;
+    qb = (bxi + b0r*wr_ivx)/u0r;
     fr[IVX] = qa*wr_ivx - (qb * bxi) + pr;
     fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r);
     fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r);
@@ -123,6 +128,10 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fr[IEN] = (er + pr)*wr_ivx/u0r - b0r * qb;
 
     er -= b0r*b0r;
+
+    du[IVX] -= -qa*u0r + b0r*qb;
+    du[IVY] -= -wgas_r*u0r*wr_ivy + b0r*(wr_iby + b0r*wr_ivy)/u0r;
+    du[IVZ] -= -wgas_r*u0r*wr_ivz + b0r*(wr_ibz + b0r*wr_ivz)/u0r;
 
 
     fr[5  ] = (wr_iby*wr_ivx - bxi*wr_ivy)/u0r;
@@ -135,9 +144,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
 //    fr[IEN] = (((wr_ipr / gm1) + wr_ipr) * u0r + (wr_idn/(1.+ u0r)*u2r))*wr_ivx;
 
     du[IDN] = wr_idn*u0r          - wl_idn * u0l;
-    du[IVX] = wgas_r*u0r*wr_ivx - wgas_l*u0l*wl_ivx;
-    du[IVY] = wgas_r*u0r*wr_ivy - wgas_l*u0l*wl_ivy;
-    du[IVZ] = wgas_r*u0r*wr_ivz - wgas_l*u0l*wl_ivz;
+//    du[IVX] = wgas_r*u0r*wr_ivx - wgas_l*u0l*wl_ivx;
+//    du[IVY] = wgas_r*u0r*wr_ivy - wgas_l*u0l*wl_ivy;
+//    du[IVZ] = wgas_r*u0r*wr_ivz - wgas_l*u0l*wl_ivz;
 //    du[IEN] = (wr_ipr / gm1) * u0r*u0r + ( wr_ipr + wr_idn*u0r / (1.+ u0r))*u2r;
 //    du[IEN]-= (wl_ipr / gm1) * u0l*u0l + ( wl_ipr + wl_idn*u0l / (1.+ u0l))*u2l;
     du[IEN] = er - el;
