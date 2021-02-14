@@ -17,6 +17,7 @@
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
+#include "mhd/mhd.hpp"
 #include "utils/grid_locations.hpp"
 #include "pgen.hpp"
 
@@ -150,8 +151,9 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // Initialize MHD variables -------------------------------
   if (pmbp->pmhd != nullptr) {
-    int &nmhd = pmbp->pmhd->nmhd;
-  
+
+    auto& eos = pmbp->pmhd->peos->eos_data;
+
     // Parse left state read from input file: dl,ul,vl,wl,[pl]
     Real wl[5];
     wl[IDN] = pin->GetReal("problem","dl");
@@ -230,10 +232,6 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
 	  Real gamma_sq = 1./(1.-v_sq);
 	  Real gamma = sqrt(gamma_sq);
 
-	  Real b0r = bxr * wr[IVX] + byr * wr[IVY] + bzr * wr[IVZ];
-	  b0r *=gamma;
-	  Real b2r = ((bxr*bxr + byr*byr + bzr*bzr) + b0r*b0r) / gamma_sq;
-	  wgas += b2r;
 
 	  auto const& rho = wr[IDN];
 	  auto const& pgas = wr[IPR];
@@ -241,6 +239,11 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
 	  Real rho_eps = pgas / gm1;
 	  //FIXME ERM: Only ideal fluid for now
 	  Real wgas = rho + gamma_adi / gm1 * pgas;
+
+	  Real b0r = bxr * wr[IVX] + byr * wr[IVY] + bzr * wr[IVZ];
+	  b0r *=gamma;
+	  Real b2r = ((bxr*bxr + byr*byr + bzr*bzr) + b0r*b0r) / gamma_sq;
+	  wgas += b2r;
 
 	  u0(m,IDN,k,j,i) = rho * gamma;
 	  u0(m,IM1,k,j,i) = wgas * gamma_sq * wr[IVX] - b0r*((bxr/gamma + b0r*wr[IVX]));
