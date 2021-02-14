@@ -109,9 +109,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0l*wl_ivy)/u0l);
     fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0l*wl_ivz)/u0l);
 
-    Real el = wgas_l*u0l*u0l - pl - wl_idn*u0l;
-    fl[IEN] = (el + pl)*wl_ivx/u0l - b0l*qb;
-    el -= b0l*b0l;
+    Real el = wgas_l*u0l*u0l - wl_idn*u0l;
+    fl[IEN] = el *wl_ivx/u0l - b0l*qb;
+    el -= b0l*b0l + pl;
 
     fl[5  ] = (wl_iby*wl_ivx - bxi*wl_ivy)/u0l;
     fl[6  ] = (wl_ibz*wl_ivx - bxi*wl_ivz)/u0l;
@@ -129,14 +129,14 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r);
     fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r);
 
-    Real er = wgas_r*u0r*u0r - pr - wr_idn*u0r;
-    fr[IEN] = (er + pr)*wr_ivx/u0r - b0r * qb;
+    Real er = wgas_r*u0r*u0r - wr_idn*u0r;
+    fr[IEN] = er*wr_ivx/u0r - b0r * qb;
 
-    er -= b0r*b0r;
+    er -= b0r*b0r + pr;
 
-    du[IVX] -= -qa*u0r + b0r*qb;
-    du[IVY] -= -wgas_r*u0r*wr_ivy + b0r*(wr_iby + b0r*wr_ivy)/u0r;
-    du[IVZ] -= -wgas_r*u0r*wr_ivz + b0r*(wr_ibz + b0r*wr_ivz)/u0r;
+    du[IVX] += qa*u0r            - b0r*qb;
+    du[IVY] += wgas_r*u0r*wr_ivy - b0r*(wr_iby + b0r*wr_ivy)/u0r;
+    du[IVZ] += wgas_r*u0r*wr_ivz - b0r*(wr_ibz + b0r*wr_ivz)/u0r;
 
 
     fr[5  ] = (wr_iby*wr_ivx - bxi*wr_ivy)/u0r;

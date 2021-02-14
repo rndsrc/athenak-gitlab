@@ -90,11 +90,11 @@ void AdiabaticMHDRel::ConsToPrim(const DvceArray5D<Real> &cons,
 
       Real ee = u_d + u_e;
 
-      Real mm_sq = SQR(cons(m, IM1,k,j,i)) + SQR(cons(m, IM2,k,j,i)) + SQR(cons(m, IM3,k,j,i));
+      Real mm_sq = SQR(u_m1) + SQR(u_m2) + SQR(u_m3);
 
       Real bb_sq = w_bx*w_bx + w_by*w_by + w_bz*w_bz;
 
-      Real tt = cons(m, IM1,k,j,i) * w_bx + cons(m, IM2,k,j,i) * w_by + cons(m, IM2,k,j,i) * w_bz;
+      Real tt = u_m1 * w_bx + u_m2 * w_by + u_m3 * w_bz;
 
       Real m2_max = mm_sq_ee_sq_max * SQR(ee);
       if( mm_sq > m2_max){
