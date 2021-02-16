@@ -64,97 +64,95 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     //--- Step 2.  Compute wave speeds in L,R states (see Toro eq. 10.43)
 
 
-    Real b0l = bxi * wl_ivx + wl_iby * wl_ivy + wl_ibz * wl_ivz;
-    Real b0r = bxi * wr_ivx + wr_iby * wr_ivy + wr_ibz * wr_ivz;
+    Real b0 = bxi * wl_ivx + wl_iby * wl_ivy + wl_ibz * wl_ivz;
 
-    Real u2l = SQR(wl_ivz) + SQR(wl_ivy) + SQR(wl_ivx);
-    Real u2r = SQR(wr_ivz) + SQR(wr_ivy) + SQR(wr_ivx);
+    Real u2 = SQR(wl_ivz) + SQR(wl_ivy) + SQR(wl_ivx);
 
-    Real u0l  = sqrt(1. + u2l);
-    Real u0r  = sqrt(1. + u2r);
+    Real u0  = sqrt(1. + u2);
 
-    Real b2l = ((bxi*bxi + wl_iby*wl_iby + wl_ibz*wl_ibz) + b0l*b0l) / (1.+u2l);
-    Real b2r = ((bxi*bxi + wr_iby*wr_iby + wr_ibz*wr_ibz) + b0r*b0r) / (1.+u2r);
+    Real b2 = ((bxi*bxi + wl_iby*wl_iby + wl_ibz*wl_ibz) + b0*b0) / (1.+u2);
 
     // FIXME ERM: Ideal fluid for now
-    Real wgas_l = wl_idn + (eos.gamma/gm1) * wl_ipr;
-    Real wgas_r = wr_idn + (eos.gamma/gm1) * wr_ipr;
+    Real wgas = wl_idn + (eos.gamma/gm1) * wl_ipr;
 
-    Real pl = wl_ipr + 0.5*b2l;
-    Real pr = wr_ipr + 0.5*b2r;
+    Real p = wl_ipr + 0.5*b2;
 
-    Real qa,qb, lm,lp;
+    Real llm,llp, lm,lp;
 //    if (eos.is_adiabatic) {
-    eos.FastMagnetosonicSpeedSR(wgas_l,b2l, wl_ipr, wl_ivx/u0l, 1.+u2l, lp, lm);
-    eos.FastMagnetosonicSpeedSR(wgas_r,b2r, wr_ipr, wr_ivx/u0r, 1.+u2r, qb,qa);
+    eos.FastMagnetosonicSpeedSR(wgas,b2, wl_ipr, wl_ivx/u0, 1.+u2, lp, lm);
+
+    wgas += b2;
+
+    Real &qa = llp;
+    Real &qb = llm;
+
+    fl[IDN] = wl_idn * wl_ivx;
+    qa = wgas * wl_ivx;
+    qb = (bxi + b0*wl_ivx)/u0;
+    fl[IVX] = qa*wl_ivx - (qb * qb) + p;
+    fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0*wl_ivy)/u0);
+    fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0*wl_ivz)/u0);
+
+    Real e = wgas*u0*u0 - wl_idn*u0;
+    fl[IEN] = e *wl_ivx/u0 - b0*qb;
+    e -= b0*b0 + p;
+
+    du[IEN] = -e;
+    du[IDN] = - wl_idn * u0;
+
+    fl[5  ] = (wl_iby*wl_ivx - bxi*wl_ivy)/u0;
+    fl[6  ] = (wl_ibz*wl_ivx - bxi*wl_ivz)/u0;
+
+
+    du[IVX] = -qa*u0 + b0*qb;
+    du[IVY] = -wgas*u0*wl_ivy + b0*(wl_iby + b0*wl_ivy)/u0;
+    du[IVZ] = -wgas*u0*wl_ivz + b0*(wl_ibz + b0*wl_ivz)/u0;
+
+
+    b0 = bxi * wr_ivx + wr_iby * wr_ivy + wr_ibz * wr_ivz;
+    u2 = SQR(wr_ivz) + SQR(wr_ivy) + SQR(wr_ivx);
+    u0  = sqrt(1. + u2);
+    b2 = ((bxi*bxi + wr_iby*wr_iby + wr_ibz*wr_ibz) + b0*b0) / (1.+u2);
+    wgas = wr_idn + (eos.gamma/gm1) * wr_ipr;
+    p = wr_ipr + 0.5*b2;
+
+    eos.FastMagnetosonicSpeedSR(wgas,b2, wr_ipr, wr_ivx/u0, 1.+u2, llp,llm);
 //    } else {
 //      qa = eos.FastMagnetosonicSpeed(wl_idn,bxi,wl_iby,wl_ibz);
 //      qb = eos.FastMagnetosonicSpeed(wr_idn,bxi,wr_iby,wr_ibz);
 //    }
-    qa = fmax(-fmin(lm,qa), 0.);
-    Real const a = fmax(fmax(lp,qb), qa);
+    qa = fmax(-fmin(lm,llm), 0.);
+    Real a = fmax(fmax(lp,llp), llm);
 
-//    Real const a = 1.;
+    wgas += b2;
 
-    wgas_l += b2l;
-    wgas_r += b2r;
     
 
     //--- Step 3.  Compute L/R fluxes
-
-    fl[IDN] = wl_idn * wl_ivx;
-    qa = wgas_l * wl_ivx;
-    qb = (bxi + b0l*wl_ivx)/u0l;
-    fl[IVX] = qa*wl_ivx - (qb * qb) + pl;
-    fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0l*wl_ivy)/u0l);
-    fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0l*wl_ivz)/u0l);
-
-    Real el = wgas_l*u0l*u0l - wl_idn*u0l;
-    fl[IEN] = el *wl_ivx/u0l - b0l*qb;
-    el -= b0l*b0l + pl;
-
-    fl[5  ] = (wl_iby*wl_ivx - bxi*wl_ivy)/u0l;
-    fl[6  ] = (wl_ibz*wl_ivx - bxi*wl_ivz)/u0l;
-
-
-    du[IVX] = -qa*u0l + b0l*qb;
-    du[IVY] = -wgas_l*u0l*wl_ivy + b0l*(wl_iby + b0l*wl_ivy)/u0l;
-    du[IVZ] = -wgas_l*u0l*wl_ivz + b0l*(wl_ibz + b0l*wl_ivz)/u0l;
-
-
+    //
     fr[IDN] = wr_idn * wr_ivx;
-    qa = wgas_r * wr_ivx;
-    qb = (bxi + b0r*wr_ivx)/u0r;
-    fr[IVX] = qa*wr_ivx - (qb * qb) + pr;
-    fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0r*wr_ivy)/u0r);
-    fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0r*wr_ivz)/u0r);
+    qa = wgas * wr_ivx;
+    qb = (bxi + b0*wr_ivx)/u0;
+    fr[IVX] = qa*wr_ivx - (qb * qb) + p;
+    fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0*wr_ivy)/u0);
+    fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0*wr_ivz)/u0);
 
-    Real er = wgas_r*u0r*u0r - wr_idn*u0r;
-    fr[IEN] = er*wr_ivx/u0r - b0r * qb;
+    e = wgas*u0*u0 - wr_idn*u0;
+    fr[IEN] = e*wr_ivx/u0 - b0 * qb;
 
-    er -= b0r*b0r + pr;
+    e -= b0*b0 + p;
 
-    du[IVX] += qa*u0r            - b0r*qb;
-    du[IVY] += wgas_r*u0r*wr_ivy - b0r*(wr_iby + b0r*wr_ivy)/u0r;
-    du[IVZ] += wgas_r*u0r*wr_ivz - b0r*(wr_ibz + b0r*wr_ivz)/u0r;
+    du[IVX] += qa*u0            - b0*qb;
+    du[IVY] += wgas*u0*wr_ivy - b0*(wr_iby + b0*wr_ivy)/u0;
+    du[IVZ] += wgas*u0*wr_ivz - b0*(wr_ibz + b0*wr_ivz)/u0;
+
+    du[IDN] +=  wr_idn * u0;
+    du[IEN] += e;
 
 
-    fr[5  ] = (wr_iby*wr_ivx - bxi*wr_ivy)/u0r;
-    fr[6  ] = (wr_ibz*wr_ivx - bxi*wr_ivz)/u0r;
+    fr[5  ] = (wr_iby*wr_ivx - bxi*wr_ivy)/u0;
+    fr[6  ] = (wr_ibz*wr_ivx - bxi*wr_ivz)/u0;
 
-
-//    fl[IEN] = (((wl_ipr / gm1) + wl_ipr) * u0l + (wl_idn/(1.+ u0l)*u2l))*wl_ivx;
-//    fr[IEN] = (((wr_ipr / gm1) + wr_ipr) * u0r + (wr_idn/(1.+ u0r)*u2r))*wr_ivx;
-//    fl[IEN] = (((wl_ipr / gm1) + wl_ipr) * u0l + (wl_idn/(1.+ u0l)*u2l))*wl_ivx;
-//    fr[IEN] = (((wr_ipr / gm1) + wr_ipr) * u0r + (wr_idn/(1.+ u0r)*u2r))*wr_ivx;
-
-    du[IDN] = wr_idn*u0r          - wl_idn * u0l;
-//    du[IVX] = wgas_r*u0r*wr_ivx - wgas_l*u0l*wl_ivx;
-//    du[IVY] = wgas_r*u0r*wr_ivy - wgas_l*u0l*wl_ivy;
-//    du[IVZ] = wgas_r*u0r*wr_ivz - wgas_l*u0l*wl_ivz;
-//    du[IEN] = (wr_ipr / gm1) * u0r*u0r + ( wr_ipr + wr_idn*u0r / (1.+ u0r))*u2r;
-//    du[IEN]-= (wl_ipr / gm1) * u0l*u0l + ( wl_ipr + wl_idn*u0l / (1.+ u0l))*u2l;
-    du[IEN] = er - el;
 
     du[5  ] = wr_iby - wl_iby;
     du[6  ] = wr_ibz - wl_ibz;

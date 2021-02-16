@@ -164,7 +164,7 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
     Real wl_bx = pin->GetReal("problem","bxl");
     Real wl_by = pin->GetReal("problem","byl");
     Real wl_bz = pin->GetReal("problem","bzl");
-    
+
     // Parse right state read from input file: dr,ur,vr,wr,[pr]
     Real wr[5];
     wr[IDN] = pin->GetReal("problem","dr");
@@ -175,7 +175,7 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
     Real wr_bx = pin->GetReal("problem","bxr");
     Real wr_by = pin->GetReal("problem","byr");
     Real wr_bz = pin->GetReal("problem","bzr");
-    
+
     Real gm1 = pmbp->pmhd->peos->eos_data.gamma - 1.0;
     auto &u0 = pmbp->pmhd->u0;
     auto &b0 = pmbp->pmhd->b0;
@@ -207,7 +207,7 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
 	  auto const& gamma_adi = eos.gamma;
 	  Real rho_eps = pgas / gm1;
 	  //FIXME ERM: Only ideal fluid for now
-	  Real wgas = rho + gamma_adi / gm1 * pgas;
+	  Real wgas = rho + rho_eps + pgas/rho;
 
 	  Real b0l = bxl * wl[IVX] + byl * wl[IVY] + bzl * wl[IVZ];
 	  b0l*=gamma;
@@ -238,7 +238,7 @@ void ProblemGenerator::ShockTube_Rel_(MeshBlockPack *pmbp, ParameterInput *pin)
 	  auto const& gamma_adi = eos.gamma;
 	  Real rho_eps = pgas / gm1;
 	  //FIXME ERM: Only ideal fluid for now
-	  Real wgas = rho + gamma_adi / gm1 * pgas;
+	  Real wgas = rho + rho_eps + pgas/rho;
 
 	  Real b0r = bxr * wr[IVX] + byr * wr[IVY] + bzr * wr[IVZ];
 	  b0r *=gamma;
