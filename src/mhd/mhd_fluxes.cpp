@@ -22,7 +22,7 @@
 #include "mhd/rsolvers/advect_mhd.cpp"
 #include "mhd/rsolvers/llf_mhd.cpp"
 #include "mhd/rsolvers/llf_mhd_rel.cpp"
-//#include "mhd/rsolvers/hlld.cpp"
+#include "mhd/rsolvers/hlld.cpp"
 //#include "mhd/rsolvers/roe_mhd.cpp"
 
 namespace mhd {
@@ -41,8 +41,8 @@ TaskStatus MHD::CalcFluxes(Driver *pdriver, int stage)
   int &nmhd_  = nmhd;
   int nvars = nmhd + nscalars;
   int nmb1 = pmy_pack->nmb_thispack - 1;
-  auto recon_method = recon_method_;
-  auto rsolver_method = rsolver_method_;
+  const auto recon_method = recon_method_;
+  const auto rsolver_method = rsolver_method_;
   auto &w0_ = w0;
   auto &b0_ = bcc0;
   auto &eos = peos->eos_data;
@@ -117,9 +117,9 @@ TaskStatus MHD::CalcFluxes(Driver *pdriver, int stage)
         case MHD_RSolver::llf_rel:
           LLF_rel(member,eos,m,k,j,is,ie+1,IVX,wl,wr,bl,br,bx,flx1,e3x1_,e2x1_);
           break;
-//        case MHD_RSolver::hllc:
-//          HLLC(member, eos, is, ie+1, IVX, wl, wr, uflux);
-//          break;
+        case MHD_RSolver::hlld:
+          HLLD(member,eos,m,k,j,is,ie+1,IVX,wl,wr,bl,br,bx,flx1,e3x1_,e2x1_);
+          break;
 //        case MHD_RSolver::roe:
 //          Roe(member, eos, is, ie+1, IVX, wl, wr, uflux);
 //          break;
@@ -227,9 +227,9 @@ TaskStatus MHD::CalcFluxes(Driver *pdriver, int stage)
             case MHD_RSolver::llf_rel:
               LLF_rel(member,eos,m,k,j,is-1,ie+1,IVY,wl,wr,bl,br,by,flx2,e1x2_,e3x2_);
               break;
-//            case MHD_RSolver::hllc:
-//              HLLC(member, eos, is, ie, IVY, wl, wr, uf);
-//              break;
+            case MHD_RSolver::hlld:
+              HLLD(member,eos,m,k,j,is-1,ie+1,IVY,wl,wr,bl,br,by,flx2,e1x2_,e3x2_);
+              break;
 //            case MHD_RSolver::roe:
 //              Roe(member, eos, is, ie, IVY, wl, wr, uf);
 //              break;
@@ -332,9 +332,9 @@ TaskStatus MHD::CalcFluxes(Driver *pdriver, int stage)
             case MHD_RSolver::llf_rel:
               LLF_rel(member,eos,m,k,j,is-1,ie+1,IVZ,wl,wr,bl,br,bz,flx3,e2x3_,e1x3_);
               break;
-//            case MHD_RSolver::hllc:
-//              HLLC(member, eos, is, ie, IVZ, wl, wr, uf);
-//              break;
+            case MHD_RSolver::hlld:
+              HLLD(member,eos,m,k,j,is-1,ie+1,IVZ,wl,wr,bl,br,bz,flx3,e2x3_,e1x3_);
+              break;
 //            case MHD_RSolver::roe:
 //              Roe(member, eos, is, ie, IVZ, wl, wr, uf);
 //              break;
