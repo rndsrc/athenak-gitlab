@@ -122,7 +122,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
 //      qb = eos.FastMagnetosonicSpeed(wr_idn,bxi,wr_iby,wr_ibz);
 //    }
     qa = fmax(-fmin(lm,llm), 0.);
-    Real a = fmax(fmax(lp,llp), llm);
+    Real a = 0.5*fmax(fmax(lp,llp), llm);
+
+    a =0.5;
 
     wgas += b2;
 
