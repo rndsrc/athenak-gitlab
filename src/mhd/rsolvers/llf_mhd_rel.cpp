@@ -89,9 +89,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fl[IDN] = wl_idn * wl_ivx;
     qa = wgas * wl_ivx;
     qb = (bxi + b0*wl_ivx)/u0;
-    fl[IVX] = qa*wl_ivx - (qb * qb) + p;
-    fl[IVY] = qa*wl_ivy - (qb * (wl_iby + b0*wl_ivy)/u0);
-    fl[IVZ] = qa*wl_ivz - (qb * (wl_ibz + b0*wl_ivz)/u0);
+    fl[ivx] = qa*wl_ivx - (qb * qb) + p;
+    fl[ivy] = qa*wl_ivy - (qb * (wl_iby + b0*wl_ivy)/u0);
+    fl[ivz] = qa*wl_ivz - (qb * (wl_ibz + b0*wl_ivz)/u0);
 
     Real e = wgas*u0*u0 - wl_idn*u0;
     fl[IEN] = e *wl_ivx/u0 - b0*qb;
@@ -104,9 +104,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fl[6  ] = (wl_ibz*wl_ivx - bxi*wl_ivz)/u0;
 
 
-    du[IVX] = -qa*u0 + b0*qb;
-    du[IVY] = -wgas*u0*wl_ivy + b0*(wl_iby + b0*wl_ivy)/u0;
-    du[IVZ] = -wgas*u0*wl_ivz + b0*(wl_ibz + b0*wl_ivz)/u0;
+    du[ivx] = -qa*u0 + b0*qb;
+    du[ivy] = -wgas*u0*wl_ivy + b0*(wl_iby + b0*wl_ivy)/u0;
+    du[ivz] = -wgas*u0*wl_ivz + b0*(wl_ibz + b0*wl_ivz)/u0;
 
 
     b0 = bxi * wr_ivx + wr_iby * wr_ivy + wr_ibz * wr_ivz;
@@ -133,18 +133,18 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     fr[IDN] = wr_idn * wr_ivx;
     qa = wgas * wr_ivx;
     qb = (bxi + b0*wr_ivx)/u0;
-    fr[IVX] = qa*wr_ivx - (qb * qb) + p;
-    fr[IVY] = qa*wr_ivy - (qb * (wr_iby + b0*wr_ivy)/u0);
-    fr[IVZ] = qa*wr_ivz - (qb * (wr_ibz + b0*wr_ivz)/u0);
+    fr[ivx] = qa*wr_ivx - (qb * qb) + p;
+    fr[ivy] = qa*wr_ivy - (qb * (wr_iby + b0*wr_ivy)/u0);
+    fr[ivz] = qa*wr_ivz - (qb * (wr_ibz + b0*wr_ivz)/u0);
 
     e = wgas*u0*u0 - wr_idn*u0;
     fr[IEN] = e*wr_ivx/u0 - b0 * qb;
 
     e -= b0*b0 + p;
 
-    du[IVX] += qa*u0            - b0*qb;
-    du[IVY] += wgas*u0*wr_ivy - b0*(wr_iby + b0*wr_ivy)/u0;
-    du[IVZ] += wgas*u0*wr_ivz - b0*(wr_ibz + b0*wr_ivz)/u0;
+    du[ivx] += qa*u0            - b0*qb;
+    du[ivy] += wgas*u0*wr_ivy - b0*(wr_iby + b0*wr_ivy)/u0;
+    du[ivz] += wgas*u0*wr_ivz - b0*(wr_ibz + b0*wr_ivz)/u0;
 
     du[IDN] +=  wr_idn * u0;
     du[IEN] += e;
@@ -160,9 +160,9 @@ void LLF_rel(TeamMember_t const &member, const EOS_Data &eos,
     //--- Step 5. Store results into 3D array of fluxes
 
     flx(m,IDN,k,j,i) = 0.5*(fl[IDN] + fr[IDN]) - a*du[IDN];
-    flx(m,ivx,k,j,i) = 0.5*(fl[IVX] + fr[IVX]) - a*du[IVX];
-    flx(m,ivy,k,j,i) = 0.5*(fl[IVY] + fr[IVY]) - a*du[IVY];
-    flx(m,ivz,k,j,i) = 0.5*(fl[IVZ] + fr[IVZ]) - a*du[IVZ];
+    flx(m,ivx,k,j,i) = 0.5*(fl[ivx] + fr[ivx]) - a*du[ivx];
+    flx(m,ivy,k,j,i) = 0.5*(fl[ivy] + fr[ivy]) - a*du[ivy];
+    flx(m,ivz,k,j,i) = 0.5*(fl[ivz] + fr[ivz]) - a*du[ivz];
     flx(m,IEN,k,j,i) = 0.5*(fl[IEN] + fr[IEN]) - a*du[IEN];
 
 
