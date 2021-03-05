@@ -32,7 +32,7 @@ class SourceTerms
   bool operatorsplit_terms, stagerun_terms;   // flags as to whether source terms exist
 
   // functions
-  void ApplySrcTermsStageRunTL(DvceArray5D<Real> &u);
+  void ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, int stage);
   void ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u);
 
  private:

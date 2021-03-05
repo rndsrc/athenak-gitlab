@@ -21,7 +21,8 @@
 // constructor, initializes data structures and parameters
 
 TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
-  pmy_pack(pp), first_time_(true),
+  ImEx(pp,pin),
+  first_time_(true),
   force("force",1,1,1,1,1),
   force_tmp("force_tmp",1,1,1,1,1),
   x1sin("x1sin",1,1,1),
@@ -44,6 +45,19 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
 
   Kokkos::realloc(force, nmb, 3, ncells3, ncells2, ncells1);
   Kokkos::realloc(force_tmp, nmb, 3, ncells3, ncells2, ncells1);
+
+  // Implicit or explicit sources?
+
+
+  std::string evolution_t = pin->GetString("forcing","sources");
+  // Default is explicit integration
+  if(evolution_t != "implicit"){
+    ImEx::this_imex = ImEx::method::RKexplicit;
+  }else{
+    ImEx::allocate_storage(0,5);
+  }
+
+
 
   // range of modes including, corresponding to kmin and kmax
   nlow = pin->GetOrAddInteger("forcing","nlow",1);
@@ -77,13 +91,6 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   Kokkos::realloc(amp3, nmb, ntot, nwave);
 
   Kokkos::realloc(seeds, nmb, ntot);
-}
-
-//----------------------------------------------------------------------------------------
-// destructor
-  
-TurbulenceDriver::~TurbulenceDriver()
-{
 }
 
 //----------------------------------------------------------------------------------------
@@ -438,6 +445,43 @@ void TurbulenceDriver::ApplyForcing(DvceArray5D<Real> &u)
   );
 
 
+  if(implicit_update){
+	  ApplyForcingSourceTermsImplicit(u);
+  }else{
+	  ApplyForcingSourceTermsExplicit(u);
+  };
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  apply forcing (explicit version)
+
+void TurbulenceDriver::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u)
+{
+  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
+  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
+  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &nx1 = pmy_pack->mb_cells.nx1;
+  int &nx2 = pmy_pack->mb_cells.nx2;
+  int &nx3 = pmy_pack->mb_cells.nx3;
+  auto &ncells = pmy_pack->mb_cells;
+  int ncells1 = ncells.nx1 + 2*(ncells.ng);
+  int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
+  int ncells3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*(ncells.ng)) : 1;
+
+  Real lx = pmy_pack->pmesh->mesh_size.x1max - pmy_pack->pmesh->mesh_size.x1min;
+  Real ly = pmy_pack->pmesh->mesh_size.x2max - pmy_pack->pmesh->mesh_size.x2min;
+  Real lz = pmy_pack->pmesh->mesh_size.x3max - pmy_pack->pmesh->mesh_size.x3min;
+  Real dkx = 2.0*M_PI/lx;
+  Real dky = 2.0*M_PI/ly;
+  Real dkz = 2.0*M_PI/lz;
+
+  int &nt = ntot;
+  int &nw = nwave;
+
+  int &nmb = pmy_pack->nmb_thispack;
+
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
@@ -456,9 +500,9 @@ void TurbulenceDriver::ApplyForcing(DvceArray5D<Real> &u)
 
       array_sum::GlobalSum fsum;
       fsum.the_array[IDN] = 1.0;
-      fsum.the_array[IM1] = force_tmp_(m,0,k,j,i);
-      fsum.the_array[IM2] = force_tmp_(m,1,k,j,i);
-      fsum.the_array[IM3] = force_tmp_(m,2,k,j,i);
+      fsum.the_array[IM1] = u(m,IDN,k,j,i)*force_tmp_(m,0,k,j,i);
+      fsum.the_array[IM2] = u(m,IDN,k,j,i)*force_tmp_(m,1,k,j,i);
+      fsum.the_array[IM3] = u(m,IDN,k,j,i)*force_tmp_(m,2,k,j,i);
 
       mb_sum += fsum;
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
@@ -588,3 +632,136 @@ void TurbulenceDriver::ApplyForcing(DvceArray5D<Real> &u)
 
   return;
 }
+
+void TurbulenceDriver::ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
+{
+
+    //switch stages:
+    //
+    //
+      int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
+      int nmb = pmy_pack->nmb_thispack;
+      int nvar = nimplicit;
+      auto &mbsize = pmy_pack->pmb->mbsize;
+      auto u0_ = u;
+
+      auto Ru1_ = Ru1;
+      auto Ru2_ = Ru2;
+      auto Ru3_ = Ru3;
+
+      double const alphaI = 0.24169426078821; // 1./3.;
+      double const betaI = 0.06042356519705;
+      double const etaI = 0.12915286960590;
+
+      double dtI = (pmy_pack->pmesh->dt); 
+
+      int is = pmy_pack->mb_cells.is; int ie = pmy_pack->mb_cells.ie;
+      int js = pmy_pack->mb_cells.js; int je = pmy_pack->mb_cells.je;
+      int ks = pmy_pack->mb_cells.ks; int ke = pmy_pack->mb_cells.ke;
+
+      auto ncells = pmy_pack->mb_cells;
+      int ng = ncells.ng;
+      int n1 = ncells.nx1 + 2*ng;
+      int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
+      int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
+
+      int nimplicit = 5;
+    
+    //FIXME Hard wired to RK3 for now
+    //
+    //
+
+      ImplicitKernel(u,w,alphaI*dtI,Ru1);
+
+	par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	  KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	  {
+	    u0_(m,n,k,j,i) = u0_(m,n,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
+	  });
+      ImplicitKernel(u,w,alphaI*dtI,Ru2);
+};
+
+void TurbulenceDriver::ApplyForcingSourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
+{
+
+    //switch stages:
+    //
+    //
+      int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
+      int nmb = pmy_pack->nmb_thispack;
+      int nvar = nimplicit;
+      auto &mbsize = pmy_pack->pmb->mbsize;
+      auto u0_ = u0;
+      auto u1_ = u1;
+
+      auto Ru1_ = Ru1;
+      auto Ru2_ = Ru2;
+      auto Ru3_ = Ru3;
+
+      double const alphaI = 0.24169426078821; // 1./3.;
+      double const betaI = 0.06042356519705;
+      double const etaI = 0.12915286960590;
+
+      double dtI = (pmy_pack->pmesh->dt); 
+
+      int is = pmy_pack->mb_cells.is; int ie = pmy_pack->mb_cells.ie;
+      int js = pmy_pack->mb_cells.js; int je = pmy_pack->mb_cells.je;
+      int ks = pmy_pack->mb_cells.ks; int ke = pmy_pack->mb_cells.ke;
+
+      auto ncells = pmy_pack->mb_cells;
+      int ng = ncells.ng;
+      int n1 = ncells.nx1 + 2*ng;
+      int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
+      int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
+
+    
+    //FIXME Hard wired to RK3 for now
+    //
+    //
+
+    switch(stage){
+
+      case 1:
+	  par_for("implicit_stage3", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      u0_(m,n+ISIndex::IPIXX,k,j,i) = u0_(m,n+ISIndex::IPIXX,k,j,i) + 
+	      				  (1.-2.*alphaI) * dtI * Ru2_(m,n,k,j,i) + alphaI*dtI* Ru1_(m,n,k,j,i);
+	    });
+	peosIS->ConsToPrimImplicit(u0,w0,alphaI*dtI, Ru3);
+	break;
+
+      case 2:
+	  par_for("implicit_stage4a", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      u0_(m,n+ISIndex::IPIXX,k,j,i) = u0_(m,n+ISIndex::IPIXX,k,j,i) + 
+		betaI*dtI * Ru1_(m,n,k,j,i) + (etaI- 0.25*(1.-alphaI)) * dtI * Ru2_(m,n,k,j,i) 
+		+ (0.5 - betaI - etaI - 1.25*alphaI)*dtI* Ru3_(m,n,k,j,i);
+	    });
+
+	  par_for("implicit_stage4b", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      Ru2_(m,n,k,j,i) = - (2./3.) *betaI*dtI * Ru1_(m,n,k,j,i) + ((1.-4.*etaI)/6.) * dtI * Ru2_(m,n,k,j,i);
+	    });
+
+	peosIS->ConsToPrimImplicit(u0,w0,alphaI*dtI,Ru1);
+	break;
+
+      case 3:
+	  par_for("implicit_stage5", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      u0_(m,n+ISIndex::IPIXX,k,j,i) = u0_(m,n+ISIndex::IPIXX,k,j,i) 
+	      			+ Ru2_(m,n,k,j,i) + (-1.0 + 4.*(betaI + etaI +alphaI))/6.*dtI* Ru3_(m,n,k,j,i)
+	                                      + (2./3.)*(1.-alphaI) *dtI * Ru1_(m,n,k,j,i);
+	    });
+	peosIS->ConsToPrim(u0,w0);
+	break;
+
+    };
+};
+
+
+

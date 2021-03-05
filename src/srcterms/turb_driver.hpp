@@ -16,11 +16,11 @@
 //----------------------------------------------------------------------------------------
 //! \class TurbulenceDriver
 
-class TurbulenceDriver
+class TurbulenceDriver : protected ImEx
 {
  public:
   TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin);
-  ~TurbulenceDriver();
+  ~TurbulenceDriver() = default;
 
   // data
   DvceArray5D<Real> force;        // forcing for driving hydro variables
@@ -47,9 +47,12 @@ class TurbulenceDriver
   // function to compute/apply forcing
   void ApplyForcing(DvceArray5D<Real> &u);
 
+  // function to compute/apply forcing
+  void ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u);
+  void ImplicitKernel(DvceArray5D<Real> &u) override;
+
  private:
-  MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this TurbulenceDriver
-  bool first_time_;
+  bool first_time_ = true;
 };
 
 
