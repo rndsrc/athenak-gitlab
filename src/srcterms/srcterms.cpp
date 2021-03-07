@@ -34,8 +34,10 @@ SourceTerms::~SourceTerms()
 //! \fn ApplySrcTermsStageRunTL()
 // apply unsplit source terms added in EACH stage of the stage run task list
 
-void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u)
+void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
 {
+  if (pmy_pack->pturb_driver != nullptr) {
+  }
   return;
 }
 
@@ -47,6 +49,7 @@ void SourceTerms::ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u)
 {
   if (pmy_pack->pturb_driver != nullptr) {
     pmy_pack->pturb_driver->ApplyForcing(u);
+    static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicitPre(u,w);
   }
   return;
 }

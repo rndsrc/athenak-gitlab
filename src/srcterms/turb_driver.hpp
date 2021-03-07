@@ -12,6 +12,7 @@
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
+#include "imex.hpp"
 
 //----------------------------------------------------------------------------------------
 //! \class TurbulenceDriver

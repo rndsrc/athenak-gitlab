@@ -69,6 +69,7 @@ add_executable(
         pgen/shock_tube.cpp
 
         srcterms/srcterms.cpp
+        srcterms/imex.cpp
         srcterms/turb_driver.cpp
 
         utils/change_rundir.cpp
