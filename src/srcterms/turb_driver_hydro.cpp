@@ -691,14 +691,13 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
 
   //force normalization
-  auto s = tmp + sqrt(tmp*tmp+ dedt*rhoV/(dtI*F2));
+  auto s = tmp + sqrt(tmp*tmp+ dedt/(dtI*F2));
   if ( F2 == 0.) s=0.;
 
 
   par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      Real den = u(m,IDN,k,j,i);
       w(m,IVX,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,0,k,j,i) *s;
       w(m,IVY,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,1,k,j,i) *s;
       w(m,IVZ,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,2,k,j,i) *s;
