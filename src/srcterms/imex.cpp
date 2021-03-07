@@ -71,9 +71,9 @@ void ImEx::ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u, DvceArray5D<Re
 //      ApplySourceTermsImplicitPreStageRK1(u,w);
 //      break;
 
-//    case method::RK2:
-//      ApplySourceTermsImplicitPreStageRK2(u,w);
-//      break;
+    case method::RK2:
+      ApplySourceTermsImplicitPreStageRK2(u,w);
+      break;
     case method::RK3:
       ApplySourceTermsImplicitPreStageRK3(u,w);
       break;
@@ -87,13 +87,106 @@ void ImEx::ApplySourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, 
 //    case method::RK1:
 //      ApplySourceTermsImplicitRK2(u,w,stage);
 //      break;
-//    case method::RK2:
-//      ApplySourceTermsImplicitRK2(u,w,stage);
-//      break;
+    case method::RK2:
+      ApplySourceTermsImplicitRK2(u,w,stage);
+      break;
     case method::RK3:
       ApplySourceTermsImplicitRK3(u,w,stage);
       break;
   }
+};
+
+void ImEx::ApplySourceTermsImplicitPreStageRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
+{
+
+    //switch stages:
+    //
+    //
+      int nmb = pmy_pack->nmb_thispack;
+      int nvar = nimplicit;
+      auto u0_ = u;
+
+      auto Ru1_ = Ru1;
+      auto Ru2_ = Ru2;
+
+      double const alphaI = 0.5;
+
+      double dtI = (pmy_pack->pmesh->dt); 
+
+      auto ncells = pmy_pack->mb_cells;
+      int ng = ncells.ng;
+      int n1 = ncells.nx1 + 2*ng;
+      int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
+      int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
+
+      int noff_ = noff;
+    
+      current_stage = 0;
+
+      ImplicitEquation(u,w,alphaI*dtI,Ru1);
+
+      par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nvar-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	  KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	  {
+	    u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) - dtI * Ru1_(m,n,k,j,i);
+	  });
+
+      ++current_stage;
+      ImplicitEquation(u,w,alphaI*dtI,Ru2);
+
+
+};
+
+void ImEx::ApplySourceTermsImplicitRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
+{
+
+    //switch stages:
+    //
+    //
+      int nmb = pmy_pack->nmb_thispack;
+      auto u0_ = u;
+
+      int noff_ = noff;
+
+      auto Ru1_ = Ru1;
+      auto Ru2_ = Ru2;
+      auto Ru3_ = Ru3;
+
+      double const alphaI = 0.5;
+
+      double dtI = (pmy_pack->pmesh->dt); 
+
+      auto ncells = pmy_pack->mb_cells;
+      int ng = ncells.ng;
+      int n1 = ncells.nx1 + 2*ng;
+      int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
+      int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
+
+      // Increment internal counter
+      ++current_stage;
+
+    switch(stage){
+
+      case 1:
+	  par_for("implicit_stage3", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) + alphaI * dtI * Ru1_(m,n,k,j,i);
+	    });
+	ImplicitEquation(u,w,alphaI*dtI, Ru1);
+	break;
+
+      case 2:
+	  par_for("implicit_stage4", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	    {
+	      u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) + 0.25 * dtI * ( Ru1_(m,n,k,j,i) + Ru2_(m,n,k,j,i));
+	    });
+
+	ImplicitEquation(u,w,0.,Ru1);
+	break;
+
+    };
 };
 
 void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
@@ -120,7 +213,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
       int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
 
     
-    //FIXME Hard wired to RK3 for now
+      int noff_ = noff;
     
       current_stage = 0;
 
@@ -129,7 +222,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
 	par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nvar-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	  KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	  {
-	    u0_(m,n,k,j,i) = u0_(m,n,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
+	    u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
 	  });
 
       ++current_stage;
@@ -164,9 +257,6 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
       int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
 
     
-    //FIXME Hard wired to RK3 for now
-    //
-   
       // Increment internal counter
       ++current_stage;
 

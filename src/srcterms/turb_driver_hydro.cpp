@@ -38,6 +38,24 @@ void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
   return;
 }
 
+void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
+{
+  switch (this_imex){
+
+//    case method::RK1:
+//      ImplicitEquationRK1(u,w,dtI,Ru);
+//      break;
+
+    case method::RK2:
+      ImplicitEquationRK2(u,w,dtI,Ru);
+      break;
+    case method::RK3:
+      ImplicitEquationRK3(u,w,dtI,Ru);
+      break;
+  }
+
+}
+
 array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp)
 {
   int &is = pmy_pack->mb_cells.is;
@@ -366,7 +384,7 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   return;
 }
 
-void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
+void TurbulenceDriverHydro::ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
 {
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
@@ -471,6 +489,98 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
     break;
 
     case 4:
+      // Here dt is zero, so nothing really happens
+      pmy_pack->phydro->peos->ConsToPrim(u,w);
+      return; // No implicit source term
+
+    break;
+
+  };
+
+  ComputeImplicitSources(u,w,dtI,Ru);
+}
+
+void TurbulenceDriverHydro::ImplicitEquationRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
+{
+  auto &ncells = pmy_pack->mb_cells;
+  int ncells1 = ncells.nx1 + 2*(ncells.ng);
+  int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
+  int ncells3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*(ncells.ng)) : 1;
+
+
+  int &nmb = pmy_pack->nmb_thispack;
+
+
+  auto force_tmp_ = force_tmp;
+  auto force_ = force;
+
+  // This is complicated because it depends on the RK method...
+
+  // RK3 evaluates the stiff sources at four different times
+  // alpha ~ 0.5, 0., 1. (in units of delta_t)
+  
+  //The first two can be constructed on after another.
+  //but then need to construct (and store!) 0.5 first.
+  
+  // TODO only RK3 for now
+  //
+  Real fcorr=0.0;
+  Real gcorr=1.0;
+  
+  switch(ImEx::current_stage){
+
+    case 0:
+      //Advance force to 0.5
+
+      NewRandomForce(force_tmp);
+
+      // Correlation coefficients for Ornstein-Uhlenbeck
+      if ((tcorr > 0.0)) {
+	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage]*(pmy_pack->pmesh->dt)/tcorr));
+	  gcorr=sqrt(1.0-fcorr*fcorr);
+      }
+
+      par_for("OU_process", DevExeSpace(), 0, nmb-1, 0, 2, 0, ncells3-1, 0, ncells2-1,
+	0, ncells1-1, KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	{
+	  force_tmp_(m,n,k,j,i) = fcorr*force_(m,n,k,j,i) + gcorr*force_tmp_(m,n,k,j,i);
+	}
+      );
+
+     ApplyForcingImplicit(force_tmp, u,w,dtI); 
+      
+    break;
+
+    case 1:
+      // Use previous force -- Nothing to do here
+      ApplyForcingImplicit(force, u,w,dtI); 
+    break;
+
+    case 2:
+      //Advance force to 0.5
+      
+      NewRandomForce(force);
+
+      // Correlation coefficients for Ornstein-Uhlenbeck
+      fcorr=0.0;
+      gcorr=1.0;
+      if ((tcorr > 0.0)) {
+	  fcorr=exp(-(ImEx::ceff[2] - ImEx::ceff[0])*(pmy_pack->pmesh->dt)/tcorr);
+	  gcorr=sqrt(1.0-fcorr*fcorr);
+      }
+
+      par_for("OU_process", DevExeSpace(), 0, nmb-1, 0, 2, 0, ncells3-1, 0, ncells2-1,
+	0, ncells1-1, KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+	{
+	  force_(m,n,k,j,i) = fcorr*force_tmp_(m,n,k,j,i) + gcorr*force_(m,n,k,j,i);
+	}
+      );
+
+      ApplyForcingImplicit(force_, u,w,dtI); 
+      
+    break;
+
+    case 3:
       // Here dt is zero, so nothing really happens
       pmy_pack->phydro->peos->ConsToPrim(u,w);
       return; // No implicit source term

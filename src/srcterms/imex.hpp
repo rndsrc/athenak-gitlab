@@ -38,6 +38,9 @@ class ImEx
       DvceArray5D<Real> &Ru) =0;
 
   // function to compute/apply forcing
+  void ApplySourceTermsImplicitRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
+  void ApplySourceTermsImplicitPreStageRK2(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
+
   void ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
   void ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
 

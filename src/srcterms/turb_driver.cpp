@@ -48,7 +48,7 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   // Implicit or explicit sources?
 
 
-  std::string evolution_t = pin->GetString("forcing","sources");
+  std::string evolution_t = pin->GetOrAddString("forcing","sources","explicit");
   // Default is explicit integration
   if(evolution_t != "implicit"){
     ImEx::this_imex = ImEx::method::RKexplicit;

@@ -32,6 +32,12 @@ class TurbulenceDriverHydro : public TurbulenceDriver
   virtual void ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
       DvceArray5D<Real> &Ru) override;
 
+  void ImplicitEquationRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+      DvceArray5D<Real> &Ru);
+
+  void ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+      DvceArray5D<Real> &Ru);
+
   void ApplyForcingImplicit(DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI);
   void ComputeImplicitSources(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru);
 
