@@ -53,7 +53,8 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   if(evolution_t != "implicit"){
     ImEx::this_imex = ImEx::method::RKexplicit;
   }else{
-    ImEx::allocate_storage(1,5);
+    // Only momentum and energy densities have stiff sources
+    ImEx::allocate_storage(1,4);
   }
 
 

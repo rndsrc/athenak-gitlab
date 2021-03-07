@@ -335,7 +335,7 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   // new normalization: assume constant energy injection per unit mass
   // explicit solution of <sF . (v + sF dt)> = dedt
   
-  Real dvol = 1.0; // /(nx1*nx2*nx3); // old: Lx*Ly*Lz/nx1/nx2/nx3;
+  Real dvol = 1. /(nx1*nx2*nx3); // old: Lx*Ly*Lz/nx1/nx2/nx3;
   m0 = m0*dvol*(pmy_pack->pmesh->dt);
   m1 = m1*dvol;
 
@@ -702,7 +702,7 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
       w(m,IVY,k,j,i) += dtI * force_(m,1,k,j,i) *s;
       w(m,IVZ,k,j,i) += dtI * force_(m,2,k,j,i) *s;
 
-      w(m,IPR,k,j,i) += dtI*dtI * s * s * (
+      w(m,IPR,k,j,i) += 0.5*dtI*dtI * s * s * (
 	  +force_(m,0,k,j,i)*force_(m,0,k,j,i) 
 	  +force_(m,1,k,j,i)*force_(m,1,k,j,i) 
 	  +force_(m,2,k,j,i)*force_(m,2,k,j,i) )*gm1;
