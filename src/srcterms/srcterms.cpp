@@ -37,8 +37,6 @@ SourceTerms::~SourceTerms()
 
 void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
 {
-  if (pmy_pack->pturb_driver != nullptr) {
-  }
   return;
 }
 

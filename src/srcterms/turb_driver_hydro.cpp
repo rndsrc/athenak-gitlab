@@ -692,7 +692,9 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
 
   //force normalization
-  auto const s = tmp + sqrt(tmp*tmp+ dedt*rhoV/(dtI*F2));
+  auto s = tmp + sqrt(tmp*tmp+ dedt*rhoV/(dtI*F2));
+  if ( F2 == 0.) s=0.;
+
 
   par_for("push", DevExeSpace(),0,(pmy_pack->nmb_thispack-1),
     ks,ke,js,je,is,ie,KOKKOS_LAMBDA(int m, int k, int j, int i)
