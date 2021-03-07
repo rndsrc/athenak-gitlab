@@ -99,9 +99,9 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5
 			    )*w(m,IDN,k,j,i)*dsum;
 
       fsum.the_array[IM1] = (
-			    +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-			    +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-			    +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
+			    +force_tmp_(m, 0, k,j,i)*force_tmp_(m,0,k,j,i)
+			    +force_tmp_(m, 1, k,j,i)*force_tmp_(m,1,k,j,i)
+			    +force_tmp_(m, 2, k,j,i)*force_tmp_(m,2,k,j,i)
 			    )*w(m,IDN,k,j,i)*dsum;
       mb_sum += fsum;
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
