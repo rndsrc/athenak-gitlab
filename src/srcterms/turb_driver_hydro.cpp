@@ -148,6 +148,57 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real>
   return sum_this_mb;
 };
 
+array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetForce(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp)
+{
+  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
+  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
+  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &nx1 = pmy_pack->mb_cells.nx1;
+  int &nx2 = pmy_pack->mb_cells.nx2;
+  int &nx3 = pmy_pack->mb_cells.nx3;
+
+  int &nmb = pmy_pack->nmb_thispack;
+
+  auto &mbsize = pmy_pack->pmb->mbsize;
+
+  const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
+  const int nkji = nx3*nx2*nx1;
+  const int nji  = nx2*nx1;
+
+  auto &force_tmp_ = ftmp;
+
+  bool &two_d   = pmy_pack->pmesh->nx2gt1;
+  bool &three_d = pmy_pack->pmesh->nx3gt1;
+
+  array_sum::GlobalSum sum_this_mb;
+
+
+  Kokkos::parallel_reduce("net_mom_3d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
+    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
+    {
+      // compute n,k,j,i indices of thread
+      int m = (idx)/nkji;
+      int k = (idx - m*nkji)/nji;
+      int j = (idx - m*nkji - k*nji)/nx1;
+      int i = (idx - m*nkji - k*nji - j*nx1) + is;
+      k += ks;
+      j += js;
+
+      auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m) * mbsize.dx3.d_view(m);
+
+      array_sum::GlobalSum fsum;
+      fsum.the_array[IDN] = 1.0 * dsum;
+      fsum.the_array[IM1] = force_tmp_(m,0,k,j,i)*dsum;
+      fsum.the_array[IM2] = force_tmp_(m,1,k,j,i)*dsum;
+      fsum.the_array[IM3] = force_tmp_(m,2,k,j,i)*dsum;
+
+      mb_sum += fsum;
+    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
+  );
+
+  return sum_this_mb;
+};
+
 //----------------------------------------------------------------------------------------
 //! \fn  apply forcing (explicit version)
 
@@ -183,8 +234,8 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   const int nji  = nx2*nx1;
 
   auto force_tmp_ = force_tmp;
-  // Compute net momentum
-  auto sum_this_mb = ComputeNetMomentum(u,force_tmp);
+  // Compute net force
+  auto sum_this_mb = ComputeNetForce(u,force_tmp);
 
   Real m0 = sum_this_mb.the_array[IDN];
   Real m1 = sum_this_mb.the_array[IM1];
@@ -311,7 +362,7 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   return;
 }
 
-void TurbulenceDriverHydro::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
+void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
 {
   int &nx1 = pmy_pack->mb_cells.nx1;
   int &nx2 = pmy_pack->mb_cells.nx2;

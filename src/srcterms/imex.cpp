@@ -125,7 +125,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
     
       current_stage = 0;
 
-      ImplicitKernel(u,w,alphaI*dtI,Ru1);
+      ImplicitEquation(u,w,alphaI*dtI,Ru1);
 
 	par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	  KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
@@ -134,7 +134,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
 	  });
 
       ++current_stage;
-      ImplicitKernel(u,w,alphaI*dtI,Ru2);
+      ImplicitEquation(u,w,alphaI*dtI,Ru2);
 };
 
 void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
@@ -180,7 +180,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) + 
 	      				  (1.-2.*alphaI) * dtI * Ru2_(m,n,k,j,i) + alphaI*dtI* Ru1_(m,n,k,j,i);
 	    });
-	ImplicitKernel(u,w,alphaI*dtI, Ru3);
+	ImplicitEquation(u,w,alphaI*dtI, Ru3);
 	break;
 
       case 2:
@@ -198,7 +198,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      Ru2_(m,n,k,j,i) = - (2./3.) *betaI*dtI * Ru1_(m,n,k,j,i) + ((1.-4.*etaI)/6.) * dtI * Ru2_(m,n,k,j,i);
 	    });
 
-	ImplicitKernel(u,w,alphaI*dtI,Ru1);
+	ImplicitEquation(u,w,alphaI*dtI,Ru1);
 	break;
 
       case 3:
@@ -209,7 +209,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      			+ Ru2_(m,n,k,j,i) + (-1.0 + 4.*(betaI + etaI +alphaI))/6.*dtI* Ru3_(m,n,k,j,i)
 	                                      + (2./3.)*(1.-alphaI) *dtI * Ru1_(m,n,k,j,i);
 	    });
-	ImplicitKernel(u,w,0.,Ru1);
+	ImplicitEquation(u,w,0.,Ru1);
 	break;
 
     };

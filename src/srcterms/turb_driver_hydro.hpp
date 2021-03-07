@@ -30,7 +30,7 @@ class TurbulenceDriverHydro : public TurbulenceDriver
   virtual void ApplyForcing(DvceArray5D<Real> &u) override;
 
 protected:
-  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+  virtual void ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
       DvceArray5D<Real> &Ru) override;
 
   void ApplyForcingImplicit(DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI);
@@ -38,6 +38,7 @@ protected:
 
   void ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u);
   array_sum::GlobalSum ComputeNetMomentum(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp);
+  array_sum::GlobalSum ComputeNetForce(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp);
   array_sum::GlobalSum ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp);
 
 };

@@ -34,7 +34,7 @@ class ImEx
   void ApplySourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
   void ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
 
-  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+  virtual void ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
       DvceArray5D<Real> &Ru) =0;
 
   // function to compute/apply forcing
