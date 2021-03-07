@@ -265,7 +265,7 @@ TaskStatus Hydro::UpdateImplicitSourceTerms(Driver *pdrive, int stage)
 
 TaskStatus Hydro::UpdateOperatorSplitSourceTerms(Driver *pdrive, int stage)
 {
-  psrc->ApplySrcTermsOperatorSplitTL(u0);
+  psrc->ApplySrcTermsOperatorSplitTL(u0,w0);
   return TaskStatus::complete;
 }
 

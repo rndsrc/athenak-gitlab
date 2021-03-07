@@ -36,7 +36,7 @@ class SourceTerms
   // functions
   void ApplySrcTermsStageRunTL(DvceArray5D<Real> &u,DvceArray5D<Real> &w, int stage);
   void ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
-  void ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u);
+  void ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w);
 
  private:
   MeshBlockPack* pmy_pack;

@@ -307,7 +307,7 @@ TaskStatus MHD::UpdateUnsplitSourceTerms(Driver *pdrive, int stage)
 
 TaskStatus MHD::UpdateOperatorSplitSourceTerms(Driver *pdrive, int stage)
 {
-  psrc->ApplySrcTermsOperatorSplitTL(u0);
+  psrc->ApplySrcTermsOperatorSplitTL(u0,w0);
   return TaskStatus::complete;
 }
 

@@ -58,11 +58,11 @@ void SourceTerms::ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArra
 //! \fn ApplySrcTermsStageRunTL()
 // apply operator split source terms added in the operator split task list
 
-void SourceTerms::ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u)
+void SourceTerms::ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
 {
   if (pmy_pack->pturb_driver != nullptr) {
     pmy_pack->pturb_driver->ApplyForcing(u);
-    static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicitPre(u,w);
+    static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicitPreStage(u,w);
   }
   return;
 }

@@ -1,20 +1,20 @@
-#ifndef IMEX_HPP_
-#define IMEX_HPP_
+#ifndef SRCTERMS_IMEX_HPP_
+#define SRCTERMS_IMEX_HPP_
 //========================================================================================
 // AthenaXXX astrophysical plasma code
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file turb_driver.hpp
-//  \brief defines turbulence driver class, which implements data and functions for
-//  randomly forced turbulence which evolves via an Ornstein-Uhlenbeck stochastic process
+//  \brief defines a RK-ImEx class, which implements the implicit part of
+//  SSP-RK methods following Pareschi & Russo (2005)
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
 
 //----------------------------------------------------------------------------------------
-//! \class TurbulenceDriver
+//! \class ImEx
 
 class ImEx
 {
@@ -25,9 +25,9 @@ class ImEx
 
 
   // Implicit source terms
-  DvceArray3D<Real> Ru1;
-  DvceArray3D<Real> Ru2;
-  DvceArray3D<Real> Ru3;
+  DvceArray5D<Real> Ru1;
+  DvceArray5D<Real> Ru2;
+  DvceArray5D<Real> Ru3;
 
 
   // function to compute/apply forcing
@@ -55,10 +55,9 @@ protected:
 
   void allocate_storage(int _noff, int _nimplicit);
 
- private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this TurbulenceDriver
 
 };
 
 
-#endif // SRCTERMS_TURB_DRIVER_HPP_
+#endif // SRCTERMS_IMEX_HPP_

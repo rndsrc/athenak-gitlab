@@ -12,6 +12,8 @@
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
+#include "hydro/hydro.hpp"
+#include "eos/eos.hpp"
 #include "imex.hpp"
 
 //----------------------------------------------------------------------------------------

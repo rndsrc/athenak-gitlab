@@ -105,7 +105,6 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
       int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
       int nmb = pmy_pack->nmb_thispack;
       int nvar = nimplicit;
-      auto &mbsize = pmy_pack->pmb->mbsize;
       auto u0_ = u;
 
       auto Ru1_ = Ru1;
@@ -114,10 +113,6 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
       double const alphaI = 0.24169426078821; // 1./3.;
 
       double dtI = (pmy_pack->pmesh->dt); 
-
-      int is = pmy_pack->mb_cells.is; int ie = pmy_pack->mb_cells.ie;
-      int js = pmy_pack->mb_cells.js; int je = pmy_pack->mb_cells.je;
-      int ks = pmy_pack->mb_cells.ks; int ke = pmy_pack->mb_cells.ke;
 
       auto ncells = pmy_pack->mb_cells;
       int ng = ncells.ng;
@@ -151,9 +146,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
       int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
       int nmb = pmy_pack->nmb_thispack;
       int nvar = nimplicit;
-      auto &mbsize = pmy_pack->pmb->mbsize;
-      auto u0_ = u0;
-      auto u1_ = u1;
+      auto u0_ = u;
 
       auto Ru1_ = Ru1;
       auto Ru2_ = Ru2;
@@ -164,10 +157,6 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
       double const etaI = 0.12915286960590;
 
       double dtI = (pmy_pack->pmesh->dt); 
-
-      int is = pmy_pack->mb_cells.is; int ie = pmy_pack->mb_cells.ie;
-      int js = pmy_pack->mb_cells.js; int je = pmy_pack->mb_cells.je;
-      int ks = pmy_pack->mb_cells.ks; int ke = pmy_pack->mb_cells.ke;
 
       auto ncells = pmy_pack->mb_cells;
       int ng = ncells.ng;
@@ -191,7 +180,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) + 
 	      				  (1.-2.*alphaI) * dtI * Ru2_(m,n,k,j,i) + alphaI*dtI* Ru1_(m,n,k,j,i);
 	    });
-	ImplicitKernel(u0,w0,alphaI*dtI, Ru3);
+	ImplicitKernel(u,w,alphaI*dtI, Ru3);
 	break;
 
       case 2:
@@ -209,7 +198,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      Ru2_(m,n,k,j,i) = - (2./3.) *betaI*dtI * Ru1_(m,n,k,j,i) + ((1.-4.*etaI)/6.) * dtI * Ru2_(m,n,k,j,i);
 	    });
 
-	ImplicitKernel(u0,w0,alphaI*dtI,Ru1);
+	ImplicitKernel(u,w,alphaI*dtI,Ru1);
 	break;
 
       case 3:
@@ -220,7 +209,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	      			+ Ru2_(m,n,k,j,i) + (-1.0 + 4.*(betaI + etaI +alphaI))/6.*dtI* Ru3_(m,n,k,j,i)
 	                                      + (2./3.)*(1.-alphaI) *dtI * Ru1_(m,n,k,j,i);
 	    });
-	ImplicitKernel(u0,w0,0.,Ru1);
+	ImplicitKernel(u,w,0.,Ru1);
 	break;
 
     };

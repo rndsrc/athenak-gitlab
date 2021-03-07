@@ -22,7 +22,6 @@
 
 TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   ImEx(pp,pin),
-  first_time_(true),
   force("force",1,1,1,1,1),
   force_tmp("force_tmp",1,1,1,1,1),
   x1sin("x1sin",1,1,1),
@@ -102,9 +101,6 @@ void TurbulenceDriver::Initialize()
 
   if(initialized)  return;
 
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
   int &nx1 = pmy_pack->mb_cells.nx1;
   int &nx2 = pmy_pack->mb_cells.nx2;
   int &nx3 = pmy_pack->mb_cells.nx3;
@@ -112,6 +108,10 @@ void TurbulenceDriver::Initialize()
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
   int ncells3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*(ncells.ng)) : 1;
+
+  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
+  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
+  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
 
   Real lx = pmy_pack->pmesh->mesh_size.x1max - pmy_pack->pmesh->mesh_size.x1min;
   Real ly = pmy_pack->pmesh->mesh_size.x2max - pmy_pack->pmesh->mesh_size.x2min;
@@ -175,7 +175,6 @@ void TurbulenceDriver::Initialize()
 
     // Initialize sin and cos arrays
     // bad design: requires saving sin/cos during restarts
-    int &nx1 = pmy_pack->mb_cells.nx1;
     auto &size = pmy_pack->pmb->mbsize;
     par_for("kx_loop", DevExeSpace(), 0, nmb-1, 0, nt-1, 0, ncells1-1,
       KOKKOS_LAMBDA(int m, int n, int i)
@@ -191,7 +190,6 @@ void TurbulenceDriver::Initialize()
 
     auto x2sin_ = x2sin;
     auto x2cos_ = x2cos;
-    int &nx2 = pmy_pack->mb_cells.nx2;
     par_for("ky_loop", DevExeSpace(), 0, nmb-1, 0, nt-1, 0, ncells2-1,
       KOKKOS_LAMBDA(int m, int n, int j)
       { 
@@ -207,7 +205,6 @@ void TurbulenceDriver::Initialize()
 
     auto x3sin_ = x3sin;
     auto x3cos_ = x3cos;
-    int &nx3 = pmy_pack->mb_cells.nx3;
     par_for("kz_loop", DevExeSpace(), 0, nmb-1, 0, nt-1, 0, ncells3-1,
       KOKKOS_LAMBDA(int m, int n, int k)
       { 
@@ -509,7 +506,7 @@ array_sum::GlobalSum TurbulenceDriver::ComputeNetEnergyInjection(DvceArray5D<Rea
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto &force_temp_ = ftmp;
+  auto &force_tmp_ = ftmp;
 
   bool &two_d   = pmy_pack->pmesh->nx2gt1;
   bool &three_d = pmy_pack->pmesh->nx3gt1;
@@ -532,16 +529,16 @@ array_sum::GlobalSum TurbulenceDriver::ComputeNetEnergyInjection(DvceArray5D<Rea
 
       array_sum::GlobalSum fsum;
       fsum.the_array[IDN] = (
-			    +u(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-			    +u(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-			    +u(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-			    )*u(m,IDN,k,j,i)*dsum;
+			    +w(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
+			    +w(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
+			    +w(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
+			    )*w(m,IDN,k,j,i)*dsum;
 
       fsum.the_array[IM1] = (
 			    +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
 			    +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
 			    +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-			    )*u(m,IDN,k,j,i)*dsum;
+			    )*w(m,IDN,k,j,i)*dsum;
       mb_sum += fsum;
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
@@ -567,7 +564,7 @@ array_sum::GlobalSum TurbulenceDriver::ComputeNetMomentum(DvceArray5D<Real> &u, 
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto &force_temp_ = ftmp;
+  auto &force_tmp_ = ftmp;
 
   bool &two_d   = pmy_pack->pmesh->nx2gt1;
   bool &three_d = pmy_pack->pmesh->nx3gt1;
@@ -636,9 +633,9 @@ void TurbulenceDriver::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u)
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto force_temp_ = force_temp;
+  auto force_tmp_ = force_tmp;
   // Compute net momentum
-  auto sum_this_mb = ComputeNetMomentum(u,force_tmp)
+  auto sum_this_mb = ComputeNetMomentum(u,force_tmp);
 
   Real m0 = sum_this_mb.the_array[IDN];
   Real m1 = sum_this_mb.the_array[IM1];
@@ -791,6 +788,9 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
   //but then need to construct (and store!) 0.5 first.
   
   // TODO only RK3 for now
+  //
+  Real fcorr=0.0;
+  Real gcorr=1.0;
   
   switch(ImEx::current_stage){
 
@@ -800,8 +800,6 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
       NewRandomForce(force_tmp);
 
       // Correlation coefficients for Ornstein-Uhlenbeck
-      Real fcorr=0.0;
-      Real gcorr=1.0;
       if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
 	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage]*(pmy_pack->pmesh->dt)/tcorr));
 	  gcorr=sqrt(1.0-fcorr*fcorr);
@@ -814,13 +812,13 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
 	}
       );
 
-     ApplyForcingImplicit(force_tmp, u,w,dtI,Ru); 
+     ApplyForcingImplicit(force_tmp, u,w,dtI); 
       
     break;
 
     case 1:
       // Use previous force -- Nothing to do here
-      ApplyForcingImplicit(force, u,w,dtI,Ru); 
+      ApplyForcingImplicit(force, u,w,dtI); 
     break;
 
     case 2:
@@ -829,8 +827,8 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
       NewRandomForce(force);
 
       // Correlation coefficients for Ornstein-Uhlenbeck
-      Real fcorr=0.0;
-      Real gcorr=1.0;
+      fcorr=0.0;
+      gcorr=1.0;
       if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
 	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage+1] - ImEx::ceff[ImEx::current_stage-1])*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
@@ -847,6 +845,8 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
       
       NewRandomForce(force);
 
+      fcorr=0.0;
+      gcorr=1.0;
       if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
 	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage+1] - ImEx::ceff[ImEx::current_stage])*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
@@ -859,14 +859,14 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
 	}
       );
 
-      ApplyForcingImplicit(force_tmp, u,w,dtI,Ru); 
+      ApplyForcingImplicit(force_tmp, u,w,dtI); 
       
     break;
 
     case 3:
       // Use previous force -- Nothing to do here
       //
-      ApplyForcingImplicit(force, u,w,dtI,Ru); 
+      ApplyForcingImplicit(force, u,w,dtI); 
     break;
 
     case 4:
@@ -912,14 +912,14 @@ void TurbulenceDriver::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArray5D<
       Rstiff(m,IEN-ImEx::noff,k,j,i) = -cons(m, IEN, k,j,i);
 
 
-      cons(m,IVX,k,j,i) = prim(m,IVX,k,j,i))*prim(m,IDN,k,j,i));
-      cons(m,IVY,k,j,i) = prim(m,IVY,k,j,i))*prim(m,IDN,k,j,i));
-      cons(m,IVZ,k,j,i) = prim(m,IVZ,k,j,i))*prim(m,IDN,k,j,i));
+      cons(m,IVX,k,j,i) = prim(m,IVX,k,j,i)*prim(m,IDN,k,j,i);
+      cons(m,IVY,k,j,i) = prim(m,IVY,k,j,i)*prim(m,IDN,k,j,i);
+      cons(m,IVZ,k,j,i) = prim(m,IVZ,k,j,i)*prim(m,IDN,k,j,i);
 
       auto v2 = prim(m,IVX,k,j,i)*prim(m,IVX,k,j,i) + 
 	prim(m,IVY,k,j,i)*prim(m,IVY,k,j,i) +prim(m,IVZ,k,j,i)*prim(m,IVZ,k,j,i);
 
-      cons(m,IEN,k,j,i) = prim(m,IDN,k,j,i))*0.5*v2 + prim(m,IPR,k,j,i)/gm1;
+      cons(m,IEN,k,j,i) = prim(m,IDN,k,j,i)*0.5*v2 + prim(m,IPR,k,j,i)/gm1;
 
 
       Rstiff(m,IVX-ImEx::noff,k,j,i) = ( Rstiff(m,IVX-ImEx::noff,k,j,i)+cons(m, IVX, k,j,i))/dtI;
@@ -985,7 +985,7 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
 
   //force normalization
-  auto const s = tmp + sqrt(tmp*tmp+ dedtL*rhoV/(dtI*F2));
+  auto const s = tmp + sqrt(tmp*tmp+ dedt*rhoV/(dtI*F2));
 
   par_for("push", DevExeSpace(),0,(pmy_pack->nmb_thispack-1),
     ks,ke,js,je,is,ie,KOKKOS_LAMBDA(int m, int k, int j, int i)
