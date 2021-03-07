@@ -517,102 +517,34 @@ array_sum::GlobalSum TurbulenceDriver::ComputeNetEnergyInjection(DvceArray5D<Rea
   array_sum::GlobalSum sum_this_mb;
 
 
-  if(three_d){
+  Kokkos::parallel_reduce("net_en_3d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
+    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
+    {
+      // compute n,k,j,i indices of thread
+      int m = (idx)/nkji;
+      int k = (idx - m*nkji)/nji;
+      int j = (idx - m*nkji - k*nji)/nx1;
+      int i = (idx - m*nkji - k*nji - j*nx1) + is;
+      k += ks;
+      j += js;
 
-    Kokkos::parallel_reduce("net_en_3d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-      {
-	// compute n,k,j,i indices of thread
-	int m = (idx)/nkji;
-	int k = (idx - m*nkji)/nji;
-	int j = (idx - m*nkji - k*nji)/nx1;
-	int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	k += ks;
-	j += js;
+      auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m) * mbsize.dx3.d_view(m);
 
-	auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m) * mbsize.dx3.d_view(m);
+      array_sum::GlobalSum fsum;
+      fsum.the_array[IDN] = (
+			    +u(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
+			    +u(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
+			    +u(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
+			    )*u(m,IDN,k,j,i)*dsum;
 
-	array_sum::GlobalSum fsum;
-	fsum.the_array[IDN] = (
-			      +u(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-			      +u(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-			      +u(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-	    		      )*u(m,IDN,k,j,i)*dsum;
-
-	fsum.the_array[IDN] = (
-			      +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-			      +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-			      +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-	    		      )*u(m,IDN,k,j,i)*dsum;
-	mb_sum += fsum;
-      }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-    );
-
-   }else {
-     if (two_d){
-	Kokkos::parallel_reduce("net_mom_2d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-	  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-	  {
-	    // compute n,k,j,i indices of thread
-	    int m = (idx)/nkji;
-	    int k = (idx - m*nkji)/nji;
-	    int j = (idx - m*nkji - k*nji)/nx1;
-	    int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	    k += ks;
-	    j += js;
-
-	    auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m);
-
-	    array_sum::GlobalSum fsum;
-	    fsum.the_array[IDN] = (
-				  +u(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-				  +u(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-				  +u(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-				  )*u(m,IDN,k,j,i)*dsum;
-
-	    fsum.the_array[IDN] = (
-				  +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-				  +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-				  +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-				  )*u(m,IDN,k,j,i)*dsum;
-
-	    mb_sum += fsum;
-	  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-	);
-     }else{
-
-	Kokkos::parallel_reduce("net_mom_1d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-	  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-	  {
-	    // compute n,k,j,i indices of thread
-	    int m = (idx)/nkji;
-	    int k = (idx - m*nkji)/nji;
-	    int j = (idx - m*nkji - k*nji)/nx1;
-	    int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	    k += ks;
-	    j += js;
-
-	    auto dsum = mbsize.dx1.d_view(m);
-
-	    array_sum::GlobalSum fsum;
-	    fsum.the_array[IDN] = (
-				  +u(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-				  +u(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-				  +u(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-				  )*u(m,IDN,k,j,i)*dsum;
-
-	    fsum.the_array[IDN] = (
-				  +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
-				  +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
-				  +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
-				  )*u(m,IDN,k,j,i)*dsum;
-
-	    mb_sum += fsum;
-	  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-	);
-
-     }
-   }
+      fsum.the_array[IM1] = (
+			    +force_tmp_(m, IVX, k,j,i)*force_tmp_(m,0,k,j,i)
+			    +force_tmp_(m, IVY, k,j,i)*force_tmp_(m,1,k,j,i)
+			    +force_tmp_(m, IVZ, k,j,i)*force_tmp_(m,2,k,j,i)
+			    )*u(m,IDN,k,j,i)*dsum;
+      mb_sum += fsum;
+    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
+  );
 
 
   return sum_this_mb;
@@ -643,86 +575,29 @@ array_sum::GlobalSum TurbulenceDriver::ComputeNetMomentum(DvceArray5D<Real> &u, 
   array_sum::GlobalSum sum_this_mb;
 
 
-  if(three_d){
+  Kokkos::parallel_reduce("net_mom_3d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
+    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
+    {
+      // compute n,k,j,i indices of thread
+      int m = (idx)/nkji;
+      int k = (idx - m*nkji)/nji;
+      int j = (idx - m*nkji - k*nji)/nx1;
+      int i = (idx - m*nkji - k*nji - j*nx1) + is;
+      k += ks;
+      j += js;
 
-    Kokkos::parallel_reduce("net_mom_3d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-      {
-	// compute n,k,j,i indices of thread
-	int m = (idx)/nkji;
-	int k = (idx - m*nkji)/nji;
-	int j = (idx - m*nkji - k*nji)/nx1;
-	int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	k += ks;
-	j += js;
+      auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m) * mbsize.dx3.d_view(m);
 
-	auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m) * mbsize.dx3.d_view(m);
+      array_sum::GlobalSum fsum;
+      fsum.the_array[IDN] = 1.0 * dsum;
+      fsum.the_array[IM1] = u(m,IDN,k,j,i)*force_tmp_(m,0,k,j,i)*dsum;
+      fsum.the_array[IM2] = u(m,IDN,k,j,i)*force_tmp_(m,1,k,j,i)*dsum;
+      fsum.the_array[IM3] = u(m,IDN,k,j,i)*force_tmp_(m,2,k,j,i)*dsum;
+      fsum.the_array[IEN] = u(m,IDN,k,j,i)*dsum;
 
-	array_sum::GlobalSum fsum;
-	fsum.the_array[IDN] = 1.0 * dsum;
-	fsum.the_array[IM1] = u(m,IDN,k,j,i)*force_tmp_(m,0,k,j,i)*dsum;
-	fsum.the_array[IM2] = u(m,IDN,k,j,i)*force_tmp_(m,1,k,j,i)*dsum;
-	fsum.the_array[IM3] = u(m,IDN,k,j,i)*force_tmp_(m,2,k,j,i)*dsum;
-	fsum.the_array[IEN] = u(m,IDN,k,j,i)*dsum;
-
-	mb_sum += fsum;
-      }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-    );
-
-   }else {
-     if (two_d){
-	Kokkos::parallel_reduce("net_mom_2d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-	  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-	  {
-	    // compute n,k,j,i indices of thread
-	    int m = (idx)/nkji;
-	    int k = (idx - m*nkji)/nji;
-	    int j = (idx - m*nkji - k*nji)/nx1;
-	    int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	    k += ks;
-	    j += js;
-
-	    auto dsum = mbsize.dx1.d_view(m) * mbsize.dx2.d_view(m);
-
-	    array_sum::GlobalSum fsum;
-	    fsum.the_array[IDN] = 1.0 * dsum;
-	    fsum.the_array[IM1] = u(m,IDN,k,j,i)*force_tmp_(m,0,k,j,i)*dsum;
-	    fsum.the_array[IM2] = u(m,IDN,k,j,i)*force_tmp_(m,1,k,j,i)*dsum;
-	    fsum.the_array[IM3] = u(m,IDN,k,j,i)*force_tmp_(m,2,k,j,i)*dsum;
-	    fsum.the_array[IEN] = u(m,IDN,k,j,i)*dsum;
-
-	    mb_sum += fsum;
-	  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-	);
-     }else{
-
-	Kokkos::parallel_reduce("net_mom_1d", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
-	  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-	  {
-	    // compute n,k,j,i indices of thread
-	    int m = (idx)/nkji;
-	    int k = (idx - m*nkji)/nji;
-	    int j = (idx - m*nkji - k*nji)/nx1;
-	    int i = (idx - m*nkji - k*nji - j*nx1) + is;
-	    k += ks;
-	    j += js;
-
-	    auto dsum = mbsize.dx1.d_view(m);
-
-	    array_sum::GlobalSum fsum;
-	    fsum.the_array[IDN] = 1.0 * dsum;
-	    fsum.the_array[IM1] = u(m,IDN,k,j,i)*force_tmp_(m,0,k,j,i)*dsum;
-	    fsum.the_array[IM2] = u(m,IDN,k,j,i)*force_tmp_(m,1,k,j,i)*dsum;
-	    fsum.the_array[IM3] = u(m,IDN,k,j,i)*force_tmp_(m,2,k,j,i)*dsum;
-	    fsum.the_array[IEN] = u(m,IDN,k,j,i)*dsum;
-
-	    mb_sum += fsum;
-	  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-	);
-
-     }
-   }
-
+      mb_sum += fsum;
+    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
+  );
 
   return sum_this_mb;
 };
@@ -996,7 +871,9 @@ void TurbulenceDriver::ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w
 
     case 4:
       // Here dt is zero, so nothing really happens
-      ApplyForcingImplicit(force, u,w,dtI,Ru); 
+      pmy_pack->phydro->peos->ConsToPrim(u,w);
+      return; // No implicit source term
+
     break;
 
   };
@@ -1072,10 +949,10 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
 
   int &nmb = pmy_pack->nmb_thispack;
 
-  // Fill explicit prims by inverting u
   auto& eos_data = pmy_pack->phydro->peos->eos_data;
   auto gm1 = eos_data.gamma -1.;
   
+  // Fill explicit prims by inverting u
   pmy_pack->phydro->peos->ConsToPrim(u,w);
 
 
@@ -1086,6 +963,7 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
   Real m1 = sum_this_mb.the_array[IM1];
   Real m2 = sum_this_mb.the_array[IM2];
   Real m3 = sum_this_mb.the_array[IM3];
+  Real rhoV = sum_this_mb.the_array[IEN];
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
@@ -1098,7 +976,7 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
     }
   );
 
-  sum_this_mb_en = ComputeNetEnergyInjection(w,force_);
+  auto sum_this_mb_en = ComputeNetEnergyInjection(w,force_);
 
   auto& Fv = sum_this_mb_en.the_array[IDN];
   auto& F2 = sum_this_mb_en.the_array[IM1];
@@ -1107,7 +985,7 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
 
   //force normalization
-  auto const s = tmp + sqrt(tmp*tmp+ dedtL*m0/(dtI*F2));
+  auto const s = tmp + sqrt(tmp*tmp+ dedtL*rhoV/(dtI*F2));
 
   par_for("push", DevExeSpace(),0,(pmy_pack->nmb_thispack-1),
     ks,ke,js,je,is,ie,KOKKOS_LAMBDA(int m, int k, int j, int i)
@@ -1134,8 +1012,6 @@ void TurbulenceDriver::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArra
       force_(m,2,k,j,i) += m3/m0/ u(m,IDN,k,j,i);
     }
   );
-
-
 
   return;
 }
