@@ -22,6 +22,24 @@ class TurbulenceDriver : protected ImEx
   TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin);
   ~TurbulenceDriver() = default;
 
+  // function to compute/apply forcing
+  void ApplyForcing(DvceArray5D<Real> &u);
+
+protected:
+  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+      DvceArray5D<Real> &Ru) override;
+
+  void ApplyForcingImplicit(DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI);
+  void ComputeImplicitSources(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru);
+
+private:
+
+  void Initialize();
+  void NewRandomForce(DvceArray5D<Real> &ftmp);
+  void ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u);
+  array_sum::GlobalSum ComputeNetMomentum(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp);
+  array_sum::GlobalSum ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp);
+
   // data
   DvceArray5D<Real> force;        // forcing for driving hydro variables
   DvceArray5D<Real> force_tmp;    // second force register for OU evolution
@@ -44,15 +62,8 @@ class TurbulenceDriver : protected ImEx
   Real tcorr,dedt;
   Real expo;
 
-  // function to compute/apply forcing
-  void ApplyForcing(DvceArray5D<Real> &u);
 
-  // function to compute/apply forcing
-  void ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u);
-  void ImplicitKernel(DvceArray5D<Real> &u) override;
-
- private:
-  bool first_time_ = true;
+  bool initialized = false;
 };
 
 

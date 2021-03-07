@@ -43,10 +43,16 @@ class ImEx
   void ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u,DvceArray5D<Real> &u);
 
 protected:
+
+  Real ceff[4];
+
   enum method {RKexplicit, RK1, RK2, RK3};
   int this_imex = method::RKexplicit;
   int nimplicit=0;
   int noff=0;
+
+  int current_stage=0;
+
 
   void allocate_storage(int _noff, int _nimplicit);
 

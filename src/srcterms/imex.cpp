@@ -19,10 +19,18 @@ void ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
     integrator = pin->GetOrAddString("time", "integrator", "rk2");
     if (integrator == "rk1") {
       this_imex = method::RK1;
+      ceff[0] = 1.;
     } else if (integrator == "rk2") {
       this_imex = method::RK2;
+      ceff[0] =  0.5;
+      ceff[1] =  0.;
+      ceff[2] =  1.;
     } else if (integrator == "rk3") {
       this_imex = method::RK3;
+      ceff[0] =  0.24169426078821;
+      ceff[1] =  0.;
+      ceff[2] =  1.;
+      ceff[3] =  0.5;
     };
   }
 }
@@ -117,11 +125,10 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
       int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*ng) : 1;
       int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
 
-      int nimplicit = 5;
     
     //FIXME Hard wired to RK3 for now
-    //
-    //
+    
+      current_stage = 0;
 
       ImplicitKernel(u,w,alphaI*dtI,Ru1);
 
@@ -130,6 +137,8 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
 	  {
 	    u0_(m,n,k,j,i) = u0_(m,n,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
 	  });
+
+      ++current_stage;
       ImplicitKernel(u,w,alphaI*dtI,Ru2);
 };
 
@@ -169,7 +178,9 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
     
     //FIXME Hard wired to RK3 for now
     //
-    //
+   
+      // Increment internal counter
+      ++current_stage;
 
     switch(stage){
 
