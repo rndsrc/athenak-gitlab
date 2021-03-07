@@ -449,7 +449,7 @@ void TurbulenceDriverHydro::ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArray5
       fcorr=0.0;
       gcorr=1.0;
       if ((tcorr > 0.0)) {
-	  fcorr=exp(-(ImEx::ceff[3] - ImEx::ceff[0])*(pmy_pack->pmesh->dt)/tcorr);
+	  fcorr=exp(-(0.5 - 0.24169426078821)*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
       }
 
@@ -467,7 +467,7 @@ void TurbulenceDriverHydro::ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArray5
       fcorr=0.0;
       gcorr=1.0;
       if ((tcorr > 0.0)) {
-	  fcorr=exp(-(ImEx::ceff[2] - ImEx::ceff[3])*(pmy_pack->pmesh->dt)/tcorr);
+	  fcorr=exp(-(0.5)*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
       }
 
@@ -669,6 +669,11 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   Real m3 = sum_this_mb.the_array[IM3];
   Real rhoV = sum_this_mb.the_array[IEN];
 
+  std::cout << "m0: " << m0 << std::endl;
+  std::cout << "m1: " << m1 << std::endl;
+  std::cout << "m2: " << m2 << std::endl;
+  std::cout << "m3: " << m3 << std::endl;
+
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
   auto frce = force_;
@@ -687,12 +692,17 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   auto& Fv = sum_this_mb_en.the_array[IDN];
   auto& F2 = sum_this_mb_en.the_array[IM1];
 
+  std::cout << "Fv: " << Fv << std::endl;
+  std::cout << "F2: " << F2 << std::endl;
+
 
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
 
   //force normalization
   auto s = tmp + sqrt(tmp*tmp+ dedt/(dtI*F2));
   if ( F2 == 0.) s=0.;
+
+  std::cout << "s: " << s << std::endl;
 
 
   par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
