@@ -29,7 +29,6 @@ class TurbulenceDriverHydro : public TurbulenceDriver
   // function to compute/apply forcing
   virtual void ApplyForcing(DvceArray5D<Real> &u) override;
 
-protected:
   virtual void ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
       DvceArray5D<Real> &Ru) override;
 

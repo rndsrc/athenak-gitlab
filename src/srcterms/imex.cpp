@@ -102,7 +102,6 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
     //switch stages:
     //
     //
-      int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
       int nmb = pmy_pack->nmb_thispack;
       int nvar = nimplicit;
       auto u0_ = u;
@@ -127,7 +126,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
 
       ImplicitEquation(u,w,alphaI*dtI,Ru1);
 
-	par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
+	par_for("implicit_stage2", DevExeSpace(), 0, (nmb-1),0, nvar-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	  KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	  {
 	    u0_(m,n,k,j,i) = u0_(m,n,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
@@ -143,10 +142,10 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
     //switch stages:
     //
     //
-      int ncells1 = pmy_pack->mb_cells.nx1 + 2*(pmy_pack->mb_cells.ng);
       int nmb = pmy_pack->nmb_thispack;
-      int nvar = nimplicit;
       auto u0_ = u;
+
+      int noff_ = noff;
 
       auto Ru1_ = Ru1;
       auto Ru2_ = Ru2;
@@ -177,7 +176,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	  par_for("implicit_stage3", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
-	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) + 
+	      u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) + 
 	      				  (1.-2.*alphaI) * dtI * Ru2_(m,n,k,j,i) + alphaI*dtI* Ru1_(m,n,k,j,i);
 	    });
 	ImplicitEquation(u,w,alphaI*dtI, Ru3);
@@ -187,7 +186,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	  par_for("implicit_stage4a", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
-	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) + 
+	      u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) + 
 		betaI*dtI * Ru1_(m,n,k,j,i) + (etaI- 0.25*(1.-alphaI)) * dtI * Ru2_(m,n,k,j,i) 
 		+ (0.5 - betaI - etaI - 1.25*alphaI)*dtI* Ru3_(m,n,k,j,i);
 	    });
@@ -205,7 +204,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	  par_for("implicit_stage5", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
-	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) 
+	      u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) 
 	      			+ Ru2_(m,n,k,j,i) + (-1.0 + 4.*(betaI + etaI +alphaI))/6.*dtI* Ru3_(m,n,k,j,i)
 	                                      + (2./3.)*(1.-alphaI) *dtI * Ru1_(m,n,k,j,i);
 	    });

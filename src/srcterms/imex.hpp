@@ -41,7 +41,6 @@ class ImEx
   void ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
   void ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
 
-protected:
 
   Real ceff[4];
 

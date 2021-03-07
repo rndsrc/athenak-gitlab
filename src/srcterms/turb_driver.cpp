@@ -109,9 +109,9 @@ void TurbulenceDriver::Initialize()
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
   int ncells3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*(ncells.ng)) : 1;
 
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &is = pmy_pack->mb_cells.is;
+  int &js = pmy_pack->mb_cells.js;
+  int &ks = pmy_pack->mb_cells.ks;
 
   Real lx = pmy_pack->pmesh->mesh_size.x1max - pmy_pack->pmesh->mesh_size.x1min;
   Real ly = pmy_pack->pmesh->mesh_size.x2max - pmy_pack->pmesh->mesh_size.x2min;
@@ -229,12 +229,6 @@ void TurbulenceDriver::NewRandomForce(DvceArray5D<Real> &ftmp)
 
   if(!initialized) Initialize();
 
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
-  int &nx1 = pmy_pack->mb_cells.nx1;
-  int &nx2 = pmy_pack->mb_cells.nx2;
-  int &nx3 = pmy_pack->mb_cells.nx3;
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
@@ -248,7 +242,6 @@ void TurbulenceDriver::NewRandomForce(DvceArray5D<Real> &ftmp)
   Real dkz = 2.0*M_PI/lz;
 
   int &nt = ntot;
-  int &nw = nwave;
 
   int &nmb = pmy_pack->nmb_thispack;
 

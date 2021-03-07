@@ -40,14 +40,13 @@ void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
 
 array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp)
 {
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &is = pmy_pack->mb_cells.is;
+  int &js = pmy_pack->mb_cells.js;
+  int &ks = pmy_pack->mb_cells.ks;
   int &nx1 = pmy_pack->mb_cells.nx1;
   int &nx2 = pmy_pack->mb_cells.nx2;
   int &nx3 = pmy_pack->mb_cells.nx3;
 
-  int &nmb = pmy_pack->nmb_thispack;
 
   auto &mbsize = pmy_pack->pmb->mbsize;
 
@@ -57,8 +56,6 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5
 
   auto &force_tmp_ = ftmp;
 
-  bool &two_d   = pmy_pack->pmesh->nx2gt1;
-  bool &three_d = pmy_pack->pmesh->nx3gt1;
 
   array_sum::GlobalSum sum_this_mb;
 
@@ -104,14 +101,13 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5
 
 array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp)
 {
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &is = pmy_pack->mb_cells.is;
+  int &js = pmy_pack->mb_cells.js;
+  int &ks = pmy_pack->mb_cells.ks;
   int &nx1 = pmy_pack->mb_cells.nx1;
   int &nx2 = pmy_pack->mb_cells.nx2;
   int &nx3 = pmy_pack->mb_cells.nx3;
 
-  int &nmb = pmy_pack->nmb_thispack;
 
   auto &mbsize = pmy_pack->pmb->mbsize;
 
@@ -121,8 +117,6 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real>
 
   auto &force_tmp_ = ftmp;
 
-  bool &two_d   = pmy_pack->pmesh->nx2gt1;
-  bool &three_d = pmy_pack->pmesh->nx3gt1;
 
   array_sum::GlobalSum sum_this_mb;
 
@@ -163,14 +157,13 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real>
 
 array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetForce(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp)
 {
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
+  int &is = pmy_pack->mb_cells.is;
+  int &js = pmy_pack->mb_cells.js;
+  int &ks = pmy_pack->mb_cells.ks;
   int &nx1 = pmy_pack->mb_cells.nx1;
   int &nx2 = pmy_pack->mb_cells.nx2;
   int &nx3 = pmy_pack->mb_cells.nx3;
 
-  int &nmb = pmy_pack->nmb_thispack;
 
   auto &mbsize = pmy_pack->pmb->mbsize;
 
@@ -180,8 +173,6 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetForce(DvceArray5D<Real> &u
 
   auto &force_tmp_ = ftmp;
 
-  bool &two_d   = pmy_pack->pmesh->nx2gt1;
-  bool &three_d = pmy_pack->pmesh->nx3gt1;
 
   array_sum::GlobalSum sum_this_mb;
 
@@ -242,12 +233,7 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   Real dky = 2.0*M_PI/ly;
   Real dkz = 2.0*M_PI/lz;
 
-  int &nt = ntot;
-  int &nw = nwave;
-
   int &nmb = pmy_pack->nmb_thispack;
-
-  auto &mbsize = pmy_pack->pmb->mbsize;
 
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
@@ -382,9 +368,6 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
 
 void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
 {
-  int &nx1 = pmy_pack->mb_cells.nx1;
-  int &nx2 = pmy_pack->mb_cells.nx2;
-  int &nx3 = pmy_pack->mb_cells.nx3;
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
@@ -473,7 +456,7 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
       par_for("OU_process", DevExeSpace(), 0, nmb-1, 0, 2, 0, ncells3-1, 0, ncells2-1,
 	0, ncells1-1, KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	{
-	  force(m,n,k,j,i) = fcorr*force_tmp_(m,n,k,j,i) + gcorr*force_(m,n,k,j,i);
+	  force_(m,n,k,j,i) = fcorr*force_tmp_(m,n,k,j,i) + gcorr*force_(m,n,k,j,i);
 	}
       );
 
@@ -501,9 +484,6 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
 
 void TurbulenceDriverHydro::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru){
 
-  int &nx1 = pmy_pack->mb_cells.nx1;
-  int &nx2 = pmy_pack->mb_cells.nx2;
-  int &nx3 = pmy_pack->mb_cells.nx3;
   auto &ncells = pmy_pack->mb_cells;
   int n1 = ncells.nx1 + 2*(ncells.ng);
   int n2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
@@ -520,14 +500,16 @@ void TurbulenceDriverHydro::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArr
   auto &cons = u;
   auto &prim = w;
 
+  auto noff_ = ImEx::noff;
+
    par_for("cons_implicit", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
 
-      Rstiff(m,IVX-ImEx::noff,k,j,i) = -cons(m, IVX, k,j,i);
-      Rstiff(m,IVY-ImEx::noff,k,j,i) = -cons(m, IVY, k,j,i);
-      Rstiff(m,IVZ-ImEx::noff,k,j,i) = -cons(m, IVZ, k,j,i);
-      Rstiff(m,IEN-ImEx::noff,k,j,i) = -cons(m, IEN, k,j,i);
+      Rstiff(m,IVX-noff_,k,j,i) = -cons(m, IVX, k,j,i);
+      Rstiff(m,IVY-noff_,k,j,i) = -cons(m, IVY, k,j,i);
+      Rstiff(m,IVZ-noff_,k,j,i) = -cons(m, IVZ, k,j,i);
+      Rstiff(m,IEN-noff_,k,j,i) = -cons(m, IEN, k,j,i);
 
 
       cons(m,IVX,k,j,i) = prim(m,IVX,k,j,i)*prim(m,IDN,k,j,i);
@@ -540,10 +522,10 @@ void TurbulenceDriverHydro::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArr
       cons(m,IEN,k,j,i) = prim(m,IDN,k,j,i)*0.5*v2 + prim(m,IPR,k,j,i)/gm1;
 
 
-      Rstiff(m,IVX-ImEx::noff,k,j,i) = ( Rstiff(m,IVX-ImEx::noff,k,j,i)+cons(m, IVX, k,j,i))/dtI;
-      Rstiff(m,IVY-ImEx::noff,k,j,i) = ( Rstiff(m,IVY-ImEx::noff,k,j,i)+cons(m, IVY, k,j,i))/dtI;
-      Rstiff(m,IVZ-ImEx::noff,k,j,i) = ( Rstiff(m,IVZ-ImEx::noff,k,j,i)+cons(m, IVZ, k,j,i))/dtI;
-      Rstiff(m,IEN-ImEx::noff,k,j,i) = ( Rstiff(m,IEN-ImEx::noff,k,j,i)+cons(m, IEN, k,j,i))/dtI;
+      Rstiff(m,IVX-noff_,k,j,i) = ( Rstiff(m,IVX-noff_,k,j,i)+cons(m, IVX, k,j,i))/dtI;
+      Rstiff(m,IVY-noff_,k,j,i) = ( Rstiff(m,IVY-noff_,k,j,i)+cons(m, IVY, k,j,i))/dtI;
+      Rstiff(m,IVZ-noff_,k,j,i) = ( Rstiff(m,IVZ-noff_,k,j,i)+cons(m, IVZ, k,j,i))/dtI;
+      Rstiff(m,IEN-noff_,k,j,i) = ( Rstiff(m,IEN-noff_,k,j,i)+cons(m, IEN, k,j,i))/dtI;
 
 
 
@@ -557,9 +539,6 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
   int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
   int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
-  int &nx1 = pmy_pack->mb_cells.nx1;
-  int &nx2 = pmy_pack->mb_cells.nx2;
-  int &nx3 = pmy_pack->mb_cells.nx3;
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;

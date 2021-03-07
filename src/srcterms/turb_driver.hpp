@@ -32,7 +32,6 @@ class TurbulenceDriver : public ImEx
   DvceArray5D<Real> force;        // forcing for driving hydro variables
   DvceArray5D<Real> force_tmp;    // second force register for OU evolution
 
-protected:
 //  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
 //      DvceArray5D<Real> &Ru) =0;
 
