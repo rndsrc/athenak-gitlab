@@ -72,7 +72,7 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto &force_tmp_ = ftmp;
+  auto force_tmp_ = ftmp;
 
 
   array_sum::GlobalSum sum_this_mb;
@@ -133,7 +133,7 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real>
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto &force_tmp_ = ftmp;
+  auto force_tmp_ = ftmp;
 
 
   array_sum::GlobalSum sum_this_mb;
@@ -576,7 +576,7 @@ void TurbulenceDriverHydro::ImplicitEquationRK2(DvceArray5D<Real> &u, DvceArray5
 	}
       );
 
-      ApplyForcingImplicit(force_, u,w,dtI); 
+      ApplyForcingImplicit(force, u,w,dtI); 
       
     break;
 
@@ -606,9 +606,9 @@ void TurbulenceDriverHydro::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArr
 
   int &nmb = pmy_pack->nmb_thispack;
 
-  auto &Rstiff = Ru;
-  auto &cons = u;
-  auto &prim = w;
+  auto Rstiff = Ru;
+  auto cons = u;
+  auto prim = w;
 
   auto noff_ = ImEx::noff;
 
@@ -646,9 +646,6 @@ void TurbulenceDriverHydro::ComputeImplicitSources(DvceArray5D<Real> &u, DvceArr
 
 void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI)
 {
-  int &is = pmy_pack->mb_cells.is, &ie = pmy_pack->mb_cells.ie;
-  int &js = pmy_pack->mb_cells.js, &je = pmy_pack->mb_cells.je;
-  int &ks = pmy_pack->mb_cells.ks, &ke = pmy_pack->mb_cells.ke;
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
@@ -674,12 +671,14 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
+  auto frce = force_;
+
   par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      force_(m,0,k,j,i) -= m1/m0/ u(m,IDN,k,j,i);
-      force_(m,1,k,j,i) -= m2/m0/ u(m,IDN,k,j,i);
-      force_(m,2,k,j,i) -= m3/m0/ u(m,IDN,k,j,i);
+      frce(m,0,k,j,i) -= m1/m0/ u(m,IDN,k,j,i);
+      frce(m,1,k,j,i) -= m2/m0/ u(m,IDN,k,j,i);
+      frce(m,2,k,j,i) -= m3/m0/ u(m,IDN,k,j,i);
     }
   );
 
@@ -696,29 +695,29 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   if ( F2 == 0.) s=0.;
 
 
-  par_for("push", DevExeSpace(),0,(pmy_pack->nmb_thispack-1),
-    ks,ke,js,je,is,ie,KOKKOS_LAMBDA(int m, int k, int j, int i)
+  par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real den = u(m,IDN,k,j,i);
-      w(m,IVX,k,j,i) += dtI * u(m,IDN,k,j,i)*force_(m,0,k,j,i) *s;
-      w(m,IVY,k,j,i) += dtI * u(m,IDN,k,j,i)*force_(m,1,k,j,i) *s;
-      w(m,IVZ,k,j,i) += dtI * u(m,IDN,k,j,i)*force_(m,2,k,j,i) *s;
+      w(m,IVX,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,0,k,j,i) *s;
+      w(m,IVY,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,1,k,j,i) *s;
+      w(m,IVZ,k,j,i) += dtI * u(m,IDN,k,j,i)*frce(m,2,k,j,i) *s;
 
       w(m,IPR,k,j,i) += 0.5*dtI*dtI * s * s * (
-	  +force_(m,0,k,j,i)*force_(m,0,k,j,i) 
-	  +force_(m,1,k,j,i)*force_(m,1,k,j,i) 
-	  +force_(m,2,k,j,i)*force_(m,2,k,j,i) )* u(m,IDN,k,j,i)*gm1;
+	  +frce(m,0,k,j,i)*frce(m,0,k,j,i) 
+	  +frce(m,1,k,j,i)*frce(m,1,k,j,i) 
+	  +frce(m,2,k,j,i)*frce(m,2,k,j,i) )* u(m,IDN,k,j,i)*gm1;
     }
   );
 
 
   // Remove momentum normalization, since it will be reused in other substeps
-  par_for("net_mom_2", DevExeSpace(), 0, nmb-1, ks, ke, js, je, is, ie,
+  par_for("fix_force", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      force_(m,0,k,j,i) += m1/m0/ u(m,IDN,k,j,i);
-      force_(m,1,k,j,i) += m2/m0/ u(m,IDN,k,j,i);
-      force_(m,2,k,j,i) += m3/m0/ u(m,IDN,k,j,i);
+      frce(m,0,k,j,i) += m1/m0/ u(m,IDN,k,j,i);
+      frce(m,1,k,j,i) += m2/m0/ u(m,IDN,k,j,i);
+      frce(m,2,k,j,i) += m3/m0/ u(m,IDN,k,j,i);
     }
   );
 
