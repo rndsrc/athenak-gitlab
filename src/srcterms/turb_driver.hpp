@@ -26,26 +26,19 @@ class TurbulenceDriver : public ImEx
   ~TurbulenceDriver() = default;
 
   // function to compute/apply forcing
-  void ApplyForcing(DvceArray5D<Real> &u);
+  virtual void ApplyForcing(DvceArray5D<Real> &u)=0;
 
   // data
   DvceArray5D<Real> force;        // forcing for driving hydro variables
   DvceArray5D<Real> force_tmp;    // second force register for OU evolution
 
 protected:
-  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
-      DvceArray5D<Real> &Ru) override;
+//  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
+//      DvceArray5D<Real> &Ru) =0;
 
-  void ApplyForcingImplicit(DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI);
-  void ComputeImplicitSources(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru);
-
-private:
 
   void Initialize();
   void NewRandomForce(DvceArray5D<Real> &ftmp);
-  void ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u);
-  array_sum::GlobalSum ComputeNetMomentum(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp);
-  array_sum::GlobalSum ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp);
 
 
   DvceArray3D<Real> x1sin;   // array for pre-computed sin(k x)

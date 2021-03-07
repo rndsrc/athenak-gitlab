@@ -10,7 +10,7 @@
 
 #include "parameter_input.hpp"
 #include "mesh.hpp"
-#include "srcterms/turb_driver.hpp"
+#include "srcterms/turb_driver_hydro.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "diffusion/viscosity.hpp"
@@ -32,7 +32,8 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
 
   // (1) TURBULENT FORCING
   if (pin->DoesBlockExist("forcing")) {
-    pturb_driver = new TurbulenceDriver(this, pin);  // construct new turbulence driver
+    //FIXME (ERM): Add relativistic version here, too
+    pturb_driver = new TurbulenceDriverHydro(this, pin);  // construct new turbulence driver
   } else {
     pturb_driver = nullptr;
   }
