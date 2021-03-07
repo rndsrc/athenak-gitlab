@@ -8,7 +8,7 @@
 
 #include "imex.hpp"
 
-void ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
+ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
   pmy_pack(pp),
   Ru1("Ru1",1,1,1,1,1),
   Ru2("Ru2",1,1,1,1,1),
@@ -16,7 +16,7 @@ void ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
 {
   std::string evolution_t = pin->GetString("time","evolution");
   if (evolution_t != "static") {
-    integrator = pin->GetOrAddString("time", "integrator", "rk2");
+    auto integrator = pin->GetOrAddString("time", "integrator", "rk2");
     if (integrator == "rk1") {
       this_imex = method::RK1;
       ceff[0] = 1.;
@@ -37,7 +37,7 @@ void ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
 
 void ImEx::allocate_storage(int _noff, int _nimplicit){
 
-  nimplict = _nimplicit;
+  nimplicit = _nimplicit;
   noff = _noff;
 
   int nmb = pmy_pack->nmb_thispack;

@@ -293,7 +293,7 @@ TaskStatus MHD::UpdateUnsplitSourceTerms(Driver *pdrive, int stage)
   if (not (psrc->stagerun_terms)) {return TaskStatus::complete;}
 
   // apply source terms update to conserved variables
-  psrc->ApplySrcTermsStageRunTL(u0);
+  psrc->ApplySrcTermsStageRunTL(u0,w0,stage);
   return TaskStatus::complete;
 }
 

@@ -17,7 +17,7 @@
 //----------------------------------------------------------------------------------------
 //! \class TurbulenceDriver
 
-class TurbulenceDriver : protected ImEx
+class TurbulenceDriver : public ImEx
 {
  public:
   TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin);
@@ -25,6 +25,10 @@ class TurbulenceDriver : protected ImEx
 
   // function to compute/apply forcing
   void ApplyForcing(DvceArray5D<Real> &u);
+
+  // data
+  DvceArray5D<Real> force;        // forcing for driving hydro variables
+  DvceArray5D<Real> force_tmp;    // second force register for OU evolution
 
 protected:
   virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
@@ -41,9 +45,6 @@ private:
   array_sum::GlobalSum ComputeNetMomentum(DvceArray5D<Real> &u, DvceArray5D<Real> &ftmp);
   array_sum::GlobalSum ComputeNetEnergyInjection(DvceArray5D<Real> &w, DvceArray5D<Real> &ftmp);
 
-  // data
-  DvceArray5D<Real> force;        // forcing for driving hydro variables
-  DvceArray5D<Real> force_tmp;    // second force register for OU evolution
 
   DvceArray3D<Real> x1sin;   // array for pre-computed sin(k x)
   DvceArray3D<Real> x1cos;   // array for pre-computed cos(k x)

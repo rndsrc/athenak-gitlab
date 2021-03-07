@@ -251,7 +251,7 @@ TaskStatus Hydro::UpdateImplicitSourceTerms(Driver *pdrive, int stage)
   if (not (psrc->implicit_terms)) {return TaskStatus::complete;}
 
   // apply source terms update to conserved variables
-  psrc->ApplyImplicitSrcTermsStageRunTL(u0, stage);
+  psrc->ApplyImplicitSrcTermsStageRunTL(u0,w0, stage);
   return TaskStatus::complete;
 }
 

@@ -29,18 +29,17 @@ class ImEx
   DvceArray3D<Real> Ru2;
   DvceArray3D<Real> Ru3;
 
-  int nimplicit, noff;
 
   // function to compute/apply forcing
   void ApplySourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
-  void ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u,DvceArray5D<Real> &u);
+  void ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
 
   virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
       DvceArray5D<Real> &Ru) =0;
 
   // function to compute/apply forcing
   void ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage);
-  void ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u,DvceArray5D<Real> &u);
+  void ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u,DvceArray5D<Real> &w);
 
 protected:
 
