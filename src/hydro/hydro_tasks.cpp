@@ -233,7 +233,7 @@ TaskStatus Hydro::UpdateUnsplitSourceTerms(Driver *pdrive, int stage)
   if (not (psrc->stagerun_terms)) {return TaskStatus::complete;}
 
   // apply source terms update to conserved variables
-  psrc->ApplySrcTermsStageRunTL(u0, stage);
+  psrc->ApplySrcTermsStageRunTL(u0, w0, stage);
   return TaskStatus::complete;
 }
 
@@ -248,7 +248,7 @@ TaskStatus Hydro::UpdateUnsplitSourceTerms(Driver *pdrive, int stage)
 TaskStatus Hydro::UpdateImplicitSourceTerms(Driver *pdrive, int stage)
 {
   // return if no source terms included
-  if (not (psrc->stagerun_terms)) {return TaskStatus::complete;}
+  if (not (psrc->implicit_terms)) {return TaskStatus::complete;}
 
   // apply source terms update to conserved variables
   psrc->ApplyImplicitSrcTermsStageRunTL(u0, stage);

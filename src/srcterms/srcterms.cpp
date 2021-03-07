@@ -16,10 +16,11 @@
 // constructor, parses input file and initializes data structures and parameters
 
 SourceTerms::SourceTerms(MeshBlockPack *pp, ParameterInput *pin) :
-  pmy_pack(pp), operatorsplit_terms(false), stagerun_terms(false)
+  pmy_pack(pp)
 {
   if (pp->pturb_driver != nullptr) {
     operatorsplit_terms = true;
+    implicit_terms = true;
   }
 }
 
@@ -37,6 +38,18 @@ SourceTerms::~SourceTerms()
 void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
 {
   if (pmy_pack->pturb_driver != nullptr) {
+  }
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn ApplyImplicitSrcTermsStageRunTL()
+// apply unsplit source terms added in EACH stage of the stage run task list
+
+void SourceTerms::ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
+{
+  if (pmy_pack->pturb_driver != nullptr) {
+    static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicit(u,w,stage);
   }
   return;
 }

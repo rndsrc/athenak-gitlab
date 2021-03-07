@@ -54,7 +54,7 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   if(evolution_t != "implicit"){
     ImEx::this_imex = ImEx::method::RKexplicit;
   }else{
-    ImEx::allocate_storage(0,5);
+    ImEx::allocate_storage(1,5);
   }
 
 
@@ -482,7 +482,7 @@ void TurbulenceDriver::NewRandomForce(DvceArray5D<Real> &ftmp)
 void TurbulenceDriver::ApplyForcing(DvceArray5D<Real> &u)
 {
 
-  if(implicit_update) return;
+  if(ImEx::this_imex != ImEx::method::RKexplicit) return;
 
   //Update random force
   NewRandomForce(force_tmp);

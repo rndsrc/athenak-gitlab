@@ -198,7 +198,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	  par_for("implicit_stage4a", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
-	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff::IPIXX,k,j,i) + 
+	      u0_(m,n+noff,k,j,i) = u0_(m,n+noff,k,j,i) + 
 		betaI*dtI * Ru1_(m,n,k,j,i) + (etaI- 0.25*(1.-alphaI)) * dtI * Ru2_(m,n,k,j,i) 
 		+ (0.5 - betaI - etaI - 1.25*alphaI)*dtI* Ru3_(m,n,k,j,i);
 	    });
