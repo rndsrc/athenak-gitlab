@@ -92,6 +92,12 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetEnergyInjection(DvceArray5
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
 
+#if MPI_PARALLEL_ENABLED
+  {
+    // Does this work on GPU?
+    MPI_Allreduce(MPI_IN_PLACE, sum_this_mb.the_array,IM1+1, MPI_DOUBLE, MPI_SUM,MPI_COMM_WORLD);
+  }
+#endif
 
   return sum_this_mb;
 };
@@ -145,6 +151,13 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetMomentum(DvceArray5D<Real>
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
 
+#if MPI_PARALLEL_ENABLED
+  {
+    // Does this work on GPU?
+    MPI_Allreduce(MPI_IN_PLACE, sum_this_mb.the_array,IEN+1, MPI_DOUBLE, MPI_SUM,MPI_COMM_WORLD);
+  }
+#endif
+
   return sum_this_mb;
 };
 
@@ -196,6 +209,13 @@ array_sum::GlobalSum TurbulenceDriverHydro::ComputeNetForce(DvceArray5D<Real> &u
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
 
+#if MPI_PARALLEL_ENABLED
+  {
+    // Does this work on GPU?
+    MPI_Allreduce(MPI_IN_PLACE, sum_this_mb.the_array,IM3+1, MPI_DOUBLE, MPI_SUM,MPI_COMM_WORLD);
+  }
+#endif
+
   return sum_this_mb;
 };
 
@@ -243,8 +263,6 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   Real m3 = sum_this_mb.the_array[IM3];
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<float>::min()) );
-
-  // TODO(leva): add MPI call for gm[]
 
   par_for("net_mom_2", DevExeSpace(), 0, nmb-1, ks, ke, js, je, is, ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
@@ -313,7 +331,7 @@ void TurbulenceDriverHydro::ApplyForcingSourceTermsExplicit(DvceArray5D<Real> &u
   // new normalization: assume constant energy injection per unit mass
   // explicit solution of <sF . (v + sF dt)> = dedt
   
-  Real dvol = 1.0/(nx1*nx2*nx3); // old: Lx*Ly*Lz/nx1/nx2/nx3;
+  Real dvol = 1.0; // /(nx1*nx2*nx3); // old: Lx*Ly*Lz/nx1/nx2/nx3;
   m0 = m0*dvol*(pmy_pack->pmesh->dt);
   m1 = m1*dvol;
 
@@ -400,7 +418,7 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
       NewRandomForce(force_tmp);
 
       // Correlation coefficients for Ornstein-Uhlenbeck
-      if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
+      if ((tcorr > 0.0)) {
 	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage]*(pmy_pack->pmesh->dt)/tcorr));
 	  gcorr=sqrt(1.0-fcorr*fcorr);
       }
@@ -429,8 +447,8 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
       // Correlation coefficients for Ornstein-Uhlenbeck
       fcorr=0.0;
       gcorr=1.0;
-      if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
-	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage+1] - ImEx::ceff[ImEx::current_stage-1])*(pmy_pack->pmesh->dt)/tcorr);
+      if ((tcorr > 0.0)) {
+	  fcorr=exp(-(ImEx::ceff[3] - ImEx::ceff[0])*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
       }
 
@@ -447,8 +465,8 @@ void TurbulenceDriverHydro::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<R
 
       fcorr=0.0;
       gcorr=1.0;
-      if ((pmy_pack->pmesh->time > 0.0) and (tcorr > 0.0)) {
-	  fcorr=exp(-(ImEx::ceff[ImEx::current_stage+1] - ImEx::ceff[ImEx::current_stage])*(pmy_pack->pmesh->dt)/tcorr);
+      if ((tcorr > 0.0)) {
+	  fcorr=exp(-(ImEx::ceff[2] - ImEx::ceff[3])*(pmy_pack->pmesh->dt)/tcorr);
 	  gcorr=sqrt(1.0-fcorr*fcorr);
       }
 

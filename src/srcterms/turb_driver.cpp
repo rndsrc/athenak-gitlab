@@ -220,6 +220,8 @@ void TurbulenceDriver::Initialize()
     );
 
     initialized = true;
+
+    NewRandomForce(force);
 }  
 
 void TurbulenceDriver::NewRandomForce(DvceArray5D<Real> &ftmp)
