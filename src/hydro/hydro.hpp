@@ -39,6 +39,7 @@ class Hydro
   SourceTerms *psrc;          // source terms (both operator split and unsplit)
 
   bool relativistic = false;
+  bool needs_c2p = true;
   int nhydro;             // number of hydro variables (5/4 for adiabatic/isothermal)
   int nscalars;           // number of passive scalars
   DvceArray5D<Real> u0;   // conserved variables
