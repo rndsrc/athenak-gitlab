@@ -22,6 +22,7 @@
 
 TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
+    // Deactivate regular C2P 
     pmy_pack->phydro->needs_c2p = false;
 }
 
@@ -362,9 +363,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      frce(m,0,k,j,i) -= m1/m0;
-      frce(m,1,k,j,i) -= m2/m0;
-      frce(m,2,k,j,i) -= m3/m0;
+      frce(m,0,k,j,i) -= m1/m0/u(m, IDN,k,j,i);
+      frce(m,1,k,j,i) -= m2/m0/u(m, IDN,k,j,i);
+      frce(m,2,k,j,i) -= m3/m0/u(m, IDN,k,j,i);
     }
   );
 
@@ -542,9 +543,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   par_for("fix_force", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      frce(m,0,k,j,i) += m1/m0;
-      frce(m,1,k,j,i) += m2/m0;
-      frce(m,2,k,j,i) += m3/m0;
+      frce(m,0,k,j,i) += m1/m0/u(m, IDN,k,j,i);
+      frce(m,1,k,j,i) += m2/m0/u(m, IDN,k,j,i);
+      frce(m,2,k,j,i) += m3/m0/u(m, IDN,k,j,i);
     }
   );
 
