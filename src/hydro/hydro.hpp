@@ -20,7 +20,7 @@ class SourceTerms;
 class Driver;
 
 // constants that enumerate Hydro Riemann Solver options
-enum class Hydro_RSolver {advect, llf, hllc, roe};
+enum class Hydro_RSolver {advect, llf, hllc, roe, llf_rel,hllc_rel};
 
 namespace hydro {
 
@@ -38,6 +38,7 @@ class Hydro
   Viscosity *pvisc=nullptr;   // (optional) viscosity 
   SourceTerms *psrc;          // source terms (both operator split and unsplit)
 
+  bool relativistic = false;
   int nhydro;             // number of hydro variables (5/4 for adiabatic/isothermal)
   int nscalars;           // number of passive scalars
   DvceArray5D<Real> u0;   // conserved variables
