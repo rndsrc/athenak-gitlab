@@ -69,7 +69,6 @@ void ImEx::ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u, DvceArray5D<Re
 {
 
   
-  std::cout << "ImEx: PreStage: which method" << std::endl;
   switch (this_imex){
 
 //    case method::RK1:

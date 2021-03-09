@@ -23,7 +23,7 @@
 TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
     // Deactivate regular C2P 
-//    pmy_pack->phydro->needs_c2p = false;
+    pmy_pack->phydro->needs_c2p = false;
     pmy_pack->phydro->psrc->operatorsplit_terms = true;
     pmy_pack->phydro->psrc->stagerun_terms = true;
     pmy_pack->phydro->psrc->implicit_terms = true;
@@ -77,7 +77,6 @@ void TurbulenceDriverHydroRel::ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArr
   auto force_tmp_ = force_tmp;
   auto force_ = force;
 
-  std::cout << "Implicit Equation: " << ImEx::current_stage << std::endl;
 
 
   // This is complicated because it depends on the RK method...
@@ -192,7 +191,6 @@ void TurbulenceDriverHydroRel::ImplicitEquationRK2(DvceArray5D<Real> &u, DvceArr
 
   int &nmb = pmy_pack->nmb_thispack;
 
-  std::cout << "Implicit Equation: " << ImEx::current_stage << std::endl;
 
 
   auto force_tmp_ = force_tmp;
@@ -357,7 +355,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   Real ee_min = pfloor_/gm1;
   
   // Fill explicit prims by inverting u
-  // pmy_pack->phydro->peos->ConsToPrim(u,w);
+//  pmy_pack->phydro->peos->ConsToPrim(u,w);
+
 
 
   auto sum_this_mb = ComputeNetMomentum(u, force_);
@@ -369,10 +368,10 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   Real m3 = sum_this_mb.the_array[IM3];
   Real rhoV = sum_this_mb.the_array[IEN];
 
-  std::cout << "m0: " << m0 << std::endl;
-  std::cout << "m1: " << m1 << std::endl;
-  std::cout << "m2: " << m2 << std::endl;
-  std::cout << "m3: " << m3 << std::endl;
+//  std::cout << "m0: " << m0 << std::endl;
+//  std::cout << "m1: " << m1 << std::endl;
+//  std::cout << "m2: " << m2 << std::endl;
+//  std::cout << "m3: " << m3 << std::endl;
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
@@ -388,27 +387,45 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   );
 
 
-  auto sum_this_mb_en = ComputeNetEnergyInjection(w,force_);
+  auto sum_this_mb_en = ComputeNetEnergyInjection(u,force_);
 
   auto &term1 = sum_this_mb_en.the_array[0];
   auto term2  = sum_this_mb_en.the_array[1] * dtI;
-  auto term3  = sum_this_mb_en.the_array[1] * (-1.*dtI*dtI);
+  auto term3  = sum_this_mb_en.the_array[2] * (-1.*dtI*dtI);
 
-  std::cout << "term1: " << term1 << std::endl;
-  std::cout << "term2: " << term2 << std::endl;
-  std::cout << "term3: " << term3 << std::endl;
+// std::cout << "term1: " << term1 << std::endl;
+// std::cout << "term2: " << term2 << std::endl;
+// std::cout << "term3: " << term3 << std::endl;
 
 
-  auto const tmp = -fabs(term2)/(2.*term3);
+
+
 
   //force normalization
-  auto s = tmp + sqrt(tmp*tmp -(dedt- term1)/term3);
-  std::cout << "s: " << s << std::endl;
+// auto tmp = -fabs(term2)/(2.*term3);
+// auto s = tmp + sqrt(tmp*tmp -(dedt- term1)/term3);
+// std::cout << "s: " << s << std::endl;
+//
+// if(!std::isfinite(s)) s= dedt;
+// s= dedt;
+// std::cout << "sfix: " << s << std::endl;
 
-  if(!std::isfinite(s)) s= dedt;
-  s= dedt;
-  std::cout << "sfix: " << s << std::endl;
 
+  // Better normalization
+  // sF.v = (sS.F + s^2 aii dt F.F)/hW
+  
+  term3 = sum_this_mb_en.the_array[4] * dtI;
+  term2 = sum_this_mb_en.the_array[3];
+
+  auto tmp = -fabs(term2)/(2.*term3);
+  auto s = tmp + sqrt(tmp*tmp + dedt/term3);
+
+  if(term3==0.) s=0;
+
+//  s = fmax(s,0.);
+//  s= dedt;
+
+//  std::cout << "snew: " << s << std::endl;
 
 
   par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
@@ -428,10 +445,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       // apply density floor, without changing momentum or energy
       u_d = (u_d > dfloor_) ?  u_d : dfloor_;
-      w_d = u_d;
-
-      // apply energy floor
-      u_e = (u_e > ee_min) ?  u_e : ee_min;
+//      w_d = u_d;
 
       u_m1 += dtI*s*frce(m,0,k,j,i)*u_d;
       u_m2 += dtI*s*frce(m,1,k,j,i)*u_d;
@@ -457,8 +471,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       FS *= s*dtI/u_d;
 
+
       // Upper bound 
-      auto kk = r/(1.+q);  // (C2) //FIXME + FS ???
+      auto kk = r/(1.+q + FS);  // (C2) //FIXME + FS ???
 
       // Enforce lower velocity bound
       // Obeying this bound combined with a floor on 
@@ -467,8 +482,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       kk = fmin(2.* sqrt(v_sq_max)/(1.+v_sq_max), kk); // (C13)
 
       // Compute bracket
-      auto zm = 0.5*kk/sqrt(1. - 0.25*kk*kk); // (C23)
       auto zp = kk/sqrt(1-kk*kk);             // (C23)
+      auto zm = 0.5*kk/sqrt(1. - 0.25*kk*kk); // (C23)
 
       // Evaluate master function
       Real fm,fp;      
@@ -480,12 +495,17 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 	w_d = u_d/W; // (C15)
 
-	auto eps = W*q - z*r + z*z / (1.+W) + FS*z/r; // (C16)
+
+	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
+	auto h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
+	auto eps = (h -1.)/(gamma_adi);
+//	auto FSzr = (r==0.) ? 0.: FS*z/r;
+//	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
 	//NOTE: The following generalizes to ANY equation of state
 	eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
 	w_p = w_d*gm1*eps;
-	auto const h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+	h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
 
 	f = z - r/h; // (C22)
       }
@@ -498,12 +518,16 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 	w_d = u_d/W; // (C15)
 
-	auto eps = W*q - z*r + z*z / (1.+W) + FS*z/r; // (C16)
+	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
+	auto h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
+	auto eps = (h -1.)/(gamma_adi);
+//	auto FSzr = (r==0.) ? 0.: FS*z/r;
+//	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
 	//NOTE: The following generalizes to ANY equation of state
 	eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
 	w_p = w_d*gm1*eps;
-	auto const h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+	h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
 
 	f = z - r/h; // (C22)
       }
@@ -525,7 +549,11 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 	w_d = u_d/W; // (C15)
 
-	auto eps = W*q - z*r + z*z / (1.+W) + FS*z/r; // (C16)
+	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
+	h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
+	auto eps = (h -1.)/(gamma_adi);
+//	auto FSzr = (r==0.)? 0.: FS*z/r;
+//	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
 	//NOTE: The following generalizes to ANY equation of state
 	eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
@@ -558,7 +586,11 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
     w_d = u_d/W; // (C15)
 
-    auto eps = W*q - z*r + z*z / (1.+W) + FS*z/r; // (C16)
+	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
+	h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
+	auto eps = (h -1.)/(gamma_adi);
+//	auto FSzr = (r==0.)? 0.: FS*z/r;
+//	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
 	//NOTE: The following generalizes to ANY equation of state
     eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
@@ -637,6 +669,9 @@ array_sum::GlobalSum TurbulenceDriverHydroRel::ComputeNetEnergyInjection(DvceArr
       fsum.the_array[1] = (F2/S - FS*FS/(S*S*S))*u(m,IDN,k,j,i)*dsum;
       fsum.the_array[2] = (FS*F2/(S*S*S))*u(m,IDN,k,j,i)*dsum;
 
+      fsum.the_array[3] = (FS)*dsum;
+      fsum.the_array[4] = (F2)*u(m,IDN,k,j,i)*dsum;
+
       mb_sum += fsum;
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
@@ -644,7 +679,7 @@ array_sum::GlobalSum TurbulenceDriverHydroRel::ComputeNetEnergyInjection(DvceArr
 #if MPI_PARALLEL_ENABLED
   {
     // Does this work on GPU?
-    MPI_Allreduce(MPI_IN_PLACE, sum_this_mb.the_array,3, MPI_DOUBLE, MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, sum_this_mb.the_array,5, MPI_DOUBLE, MPI_SUM,MPI_COMM_WORLD);
   }
 #endif
 
