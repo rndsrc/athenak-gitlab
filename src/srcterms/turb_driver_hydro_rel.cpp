@@ -316,7 +316,6 @@ void TurbulenceDriverHydroRel::ComputeImplicitSources(DvceArray5D<Real> &u, Dvce
 
       
       auto gamma = sqrt(1. +z2);
-      cons(m,IDN,k,j,i) = prim(m,IDN,k,j,i) * gamma;
       cons(m,IEN,k,j,i) = wgas*gamma*gamma - prim(m,IPR,k,j,i) - prim(m,IDN,k,j,i) * gamma; //rho_eps * gamma_sq + (w_p + cons(IDN,k,j,i)/(gamma+1.))*(v_sq*gamma_sq);
       cons(m,IM1,k,j,i) = wgas * gamma * prim(m,IVX,k,j,i);
       cons(m,IM2,k,j,i) = wgas * gamma * prim(m,IVY,k,j,i);
@@ -403,11 +402,12 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   auto const tmp = -fabs(term2)/(2.*term3);
 
   //force normalization
-  auto s = tmp + sqrt(tmp*tmp -(dedt*rhoV - term1)/term3);
+  auto s = tmp + sqrt(tmp*tmp -(dedt- term1)/term3);
+  std::cout << "s: " << s << std::endl;
 
   if(!std::isfinite(s)) s= dedt;
   s= dedt;
-  std::cout << "s: " << s << std::endl;
+  std::cout << "sfix: " << s << std::endl;
 
 
 
@@ -433,9 +433,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       // apply energy floor
       u_e = (u_e > ee_min) ?  u_e : ee_min;
 
-      u_m1 += dtI*s*frce(m,0,k,j,i);
-      u_m2 += dtI*s*frce(m,1,k,j,i);
-      u_m3 += dtI*s*frce(m,2,k,j,i);
+      u_m1 += dtI*s*frce(m,0,k,j,i)*u_d;
+      u_m2 += dtI*s*frce(m,1,k,j,i)*u_d;
+      u_m3 += dtI*s*frce(m,2,k,j,i)*u_d;
 
       // Recasting all variables
 
@@ -451,16 +451,14 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 		frce(m,1,k,j,i)* frce(m,1,k,j,i)+
 		frce(m,2,k,j,i)* frce(m,2,k,j,i);
 
-      auto FS = u(m,IVX,k,j,i)* frce(m,0,k,j,i)+
-		u(m,IVY,k,j,i)* frce(m,1,k,j,i)+
-		u(m,IVZ,k,j,i)* frce(m,2,k,j,i);
+      auto FS = u_m1* frce(m,0,k,j,i)+
+		u_m2* frce(m,1,k,j,i)+
+		u_m3* frce(m,2,k,j,i);
 
-      FS/= u_d;
-
-      FS = s*dtI*(FS + s*dtI*F2);
+      FS *= s*dtI/u_d;
 
       // Upper bound 
-      auto kk = r/(1.+q +FS  );  // (C2) //FIXME + FS ???
+      auto kk = r/(1.+q);  // (C2) //FIXME + FS ???
 
       // Enforce lower velocity bound
       // Obeying this bound combined with a floor on 
@@ -511,10 +509,15 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       }
 
       //For simplicity on the GPU, use the false position method
+	int iterations = max_iterations;
+	if((fabs(zm-zp) < tol ) || ((fabs(fm) + fabs(fp)) < 2.*tol )){
+	    iterations = -1;
+	}
 
 
       Real z,h;
-      for(int ii=0; ii< max_iterations; ++ii){
+      z=0.5*(zm+zp);
+      for(int ii=0; ii< iterations; ++ii){
 
 	z =  (zm*fp - zp*fm)/(fp-fm);
 
@@ -550,10 +553,23 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       }
 
+{
+    auto const W = sqrt(1. + z*z); // (C15)
+
+    w_d = u_d/W; // (C15)
+
+    auto eps = W*q - z*r + z*z / (1.+W) + FS*z/r; // (C16)
+
+	//NOTE: The following generalizes to ANY equation of state
+    eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
+    w_p = w_d*gm1*eps;
+    h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+
     auto const conv = 1./(h*u_d); // (C26)
     w_vx = conv * u_m1;           // (C26)
     w_vy = conv * u_m2;           // (C26)
     w_vz = conv * u_m3;           // (C26)
+}
 
     }
   );
