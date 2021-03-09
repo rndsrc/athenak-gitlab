@@ -403,9 +403,10 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   auto const tmp = -fabs(term2)/(2.*term3);
 
   //force normalization
-  auto s = tmp + sqrt(tmp*tmp -(dedt - term1)/term3);
+  auto s = tmp + sqrt(tmp*tmp -(dedt*rhoV - term1)/term3);
 
   if(!std::isfinite(s)) s= dedt;
+  s= dedt;
   std::cout << "s: " << s << std::endl;
 
 
@@ -459,7 +460,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       FS = s*dtI*(FS + s*dtI*F2);
 
       // Upper bound 
-      auto kk = r/(1.+q  );  // (C2) //FIXME + FS ???
+      auto kk = r/(1.+q +FS  );  // (C2) //FIXME + FS ???
 
       // Enforce lower velocity bound
       // Obeying this bound combined with a floor on 
@@ -469,7 +470,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       // Compute bracket
       auto zm = 0.5*kk/sqrt(1. - 0.25*kk*kk); // (C23)
-      auto zp = k/sqrt(1-kk*kk);             // (C23)
+      auto zp = kk/sqrt(1-kk*kk);             // (C23)
 
       // Evaluate master function
       Real fm,fp;      
