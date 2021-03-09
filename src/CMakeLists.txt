@@ -75,6 +75,7 @@ add_executable(
         srcterms/imex.cpp
         srcterms/turb_driver.cpp
         srcterms/turb_driver_hydro.cpp
+        srcterms/turb_driver_hydro_rel.cpp
 
         utils/change_rundir.cpp
         utils/show_config.cpp

@@ -76,6 +76,7 @@ void Hydro::AssembleStageEndTasks(TaskList &tl, TaskID start)
   
 void Hydro::AssembleOperatorSplitTasks(TaskList &tl, TaskID start)
 { 
+  std::cout << "Call operator split" << std::endl;
   if (not (psrc->operatorsplit_terms)) {return;}
   auto split_srcterms = tl.AddTask(&Hydro::UpdateOperatorSplitSourceTerms, this, start);
   return;
@@ -206,7 +207,7 @@ TaskStatus Hydro::RecvU(Driver *pdrive, int stage)
 
 TaskStatus Hydro::ConToPrim(Driver *pdrive, int stage)
 {
-  if(needs_c2p) peos->ConsToPrim(u0, w0);
+  if(needs_c2p || (stage==0)) peos->ConsToPrim(u0, w0);
   return TaskStatus::complete;
 }
 

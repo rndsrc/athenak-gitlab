@@ -23,12 +23,19 @@
 TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
     // Deactivate regular C2P 
-    pmy_pack->phydro->needs_c2p = false;
+//    pmy_pack->phydro->needs_c2p = false;
+    pmy_pack->phydro->psrc->operatorsplit_terms = true;
+    pmy_pack->phydro->psrc->implicit_terms = true;
+    pmy_pack->phydro->psrc->implicit_terms = true;
 }
 
 
-void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
+void TurbulenceDriverHydroRel::ApplyForcing(DvceArray5D<Real> &u)
 {
+  if(ImEx::this_imex == ImEx::method::RKexplicit){
+	std::cout << "Internal ERROR: Relativistic driving doesn't work explicitly." << std::endl;
+	std::exit(EXIT_FAILURE);
+  }
 
   // Not supported
   return;
@@ -36,6 +43,8 @@ void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
 
 void TurbulenceDriverHydroRel::ImplicitEquation(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI, DvceArray5D<Real> &Ru)
 {
+
+
   switch (this_imex){
 
 //    case method::RK1:
@@ -67,6 +76,9 @@ void TurbulenceDriverHydroRel::ImplicitEquationRK3(DvceArray5D<Real> &u, DvceArr
 
   auto force_tmp_ = force_tmp;
   auto force_ = force;
+
+  std::cout << "Implicit Equation: " << ImEx::current_stage << std::endl;
+
 
   // This is complicated because it depends on the RK method...
 
@@ -179,6 +191,8 @@ void TurbulenceDriverHydroRel::ImplicitEquationRK2(DvceArray5D<Real> &u, DvceArr
 
 
   int &nmb = pmy_pack->nmb_thispack;
+
+  std::cout << "Implicit Equation: " << ImEx::current_stage << std::endl;
 
 
   auto force_tmp_ = force_tmp;
@@ -302,11 +316,11 @@ void TurbulenceDriverHydroRel::ComputeImplicitSources(DvceArray5D<Real> &u, Dvce
 
       
       auto gamma = sqrt(1. +z2);
-      cons(m,IDN,k,j,i) = w_d * gamma;
-      cons(m,IEN,k,j,i) = wgas*gamma*gamma - w_p - w_d * gamma; //rho_eps * gamma_sq + (w_p + cons(IDN,k,j,i)/(gamma+1.))*(v_sq*gamma_sq);
-      cons(m,IM1,k,j,i) = wgas * gamma * w_vx;
-      cons(m,IM2,k,j,i) = wgas * gamma * w_vy;
-      cons(m,IM3,k,j,i) = wgas * gamma * w_vz;
+      cons(m,IDN,k,j,i) = prim(m,IDN,k,j,i) * gamma;
+      cons(m,IEN,k,j,i) = wgas*gamma*gamma - prim(m,IPR,k,j,i) - prim(m,IDN,k,j,i) * gamma; //rho_eps * gamma_sq + (w_p + cons(IDN,k,j,i)/(gamma+1.))*(v_sq*gamma_sq);
+      cons(m,IM1,k,j,i) = wgas * gamma * prim(m,IVX,k,j,i);
+      cons(m,IM2,k,j,i) = wgas * gamma * prim(m,IVY,k,j,i);
+      cons(m,IM3,k,j,i) = wgas * gamma * prim(m,IVZ,k,j,i);
 
 
       Rstiff(m,IVX-noff_,k,j,i) = ( Rstiff(m,IVX-noff_,k,j,i)+cons(m, IVX, k,j,i))/dtI;
@@ -334,6 +348,11 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   Real gm1 = eos_data.gamma - 1.0;
   Real gamma_adi = eos_data.gamma;
 
+    // Parameters
+    int const max_iterations = 25;
+    Real const tol = 1.0e-12;
+    Real const v_sq_max = 1.0 - 1.0e-12;
+
   Real &dfloor_ = eos_data.density_floor;
   Real &pfloor_ = eos_data.pressure_floor;
   Real ee_min = pfloor_/gm1;
@@ -351,10 +370,10 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   Real m3 = sum_this_mb.the_array[IM3];
   Real rhoV = sum_this_mb.the_array[IEN];
 
-//  std::cout << "m0: " << m0 << std::endl;
-//  std::cout << "m1: " << m1 << std::endl;
-//  std::cout << "m2: " << m2 << std::endl;
-//  std::cout << "m3: " << m3 << std::endl;
+  std::cout << "m0: " << m0 << std::endl;
+  std::cout << "m1: " << m1 << std::endl;
+  std::cout << "m2: " << m2 << std::endl;
+  std::cout << "m3: " << m3 << std::endl;
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
@@ -376,8 +395,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   auto term2  = sum_this_mb_en.the_array[1] * dtI;
   auto term3  = sum_this_mb_en.the_array[1] * (-1.*dtI*dtI);
 
-//  std::cout << "Fv: " << Fv << std::endl;
-//  std::cout << "F2: " << F2 << std::endl;
+  std::cout << "term1: " << term1 << std::endl;
+  std::cout << "term2: " << term2 << std::endl;
+  std::cout << "term3: " << term3 << std::endl;
 
 
   auto const tmp = -fabs(term2)/(2.*term3);
@@ -385,9 +405,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   //force normalization
   auto s = tmp + sqrt(tmp*tmp -(dedt - term1)/term3);
 
-  if ( F2 == 0.) s=0.;
-//  std::cout << "s: " << s << std::endl;
-  if(!std::is_finite(s)) s= dedt;
+  std::cout << "s: " << s << std::endl;
+  if(!std::isfinite(s)) s= dedt;
 
 
 

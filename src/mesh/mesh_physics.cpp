@@ -41,23 +41,22 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
     phydro->AssembleStageStartTasks(stage_start_tl, none);
     phydro->AssembleStageRunTasks(stage_run_tl, none);
     phydro->AssembleStageEndTasks(stage_end_tl, none);
-  } else {
-    phydro = nullptr;
   }
 
   // (2) TURBULENT FORCING
   if (pin->DoesBlockExist("forcing")) {
     //FIXME (ERM): Add relativistic version here, too
     if(phydro!= nullptr){
-      if(phydro->relativistic)
+      if(phydro->relativistic){
 	    pturb_driver = new TurbulenceDriverHydroRel(this, pin);  // construct new turbulence driver
-      else
+	    std::cout << "Activated relativistic turbulence driving.";
+      }
+      else{
 	    pturb_driver = new TurbulenceDriverHydro(this, pin);  // construct new turbulence driver
+	    std::cout << "Activated turbulence driving.";
+      }
     }
-  } else {
-    pturb_driver = nullptr;
   }
-
   // (3) MHD
   // Create both MHD physics module and Tasks (TaskLists stored in MeshBlockPack)
   if (pin->DoesBlockExist("mhd")) {
@@ -91,9 +90,7 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
       TaskID last = stage_end_tl.GetIDLastTask();
       pmhd->AssembleStageEndTasks(stage_end_tl, last);
     }
-  } else {
-    pmhd = nullptr;
-  }
+  } 
 
   // Check that at least ONE is requested and initialized.
   // Error if there are no physics blocks in the input file.

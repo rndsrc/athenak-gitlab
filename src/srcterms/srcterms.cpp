@@ -46,7 +46,9 @@ void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real
 
 void SourceTerms::ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
 {
+  std::cout << "Call prestage" << std::endl;
   if (pmy_pack->pturb_driver != nullptr) {
+     std::cout << "Call prestage ImEx driver" << std::endl;
     static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicit(u,w,stage);
   }
   return;

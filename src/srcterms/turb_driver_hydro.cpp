@@ -22,6 +22,10 @@
 
 TurbulenceDriverHydro::TurbulenceDriverHydro(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
+
+    pmy_pack->phydro->psrc->operatorsplit_terms = true;
+    pmy_pack->phydro->psrc->implicit_terms = true;
+    pmy_pack->phydro->psrc->implicit_terms = true;
 }
 
 

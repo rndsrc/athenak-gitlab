@@ -16,6 +16,7 @@
 #include "hydro/hydro.hpp"
 #include "eos/eos.hpp"
 #include "turb_driver.hpp"
+#include "srcterms.hpp"
 
 //----------------------------------------------------------------------------------------
 //! \class TurbulenceDriverHydro
