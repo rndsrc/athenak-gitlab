@@ -21,11 +21,13 @@ ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
       this_imex = method::RK1;
       ceff[0] = 1.;
     } else if (integrator == "rk2") {
+      std::cout << "ImEx: selected rk2" << std::endl;
       this_imex = method::RK2;
       ceff[0] =  0.5;
       ceff[1] =  0.;
       ceff[2] =  1.;
     } else if (integrator == "rk3") {
+      std::cout << "ImEx: selected rk3" << std::endl;
       this_imex = method::RK3;
       ceff[0] =  0.24169426078821;
       ceff[1] =  0.;
@@ -65,6 +67,9 @@ void ImEx::allocate_storage(int _noff, int _nimplicit){
 
 void ImEx::ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
 {
+
+  
+  std::cout << "ImEx: PreStage: which method" << std::endl;
   switch (this_imex){
 
 //    case method::RK1:
@@ -131,7 +136,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK2(DvceArray5D<Real> &u, DvceArray5D
 	    u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) - dtI * Ru1_(m,n,k,j,i);
 	  });
 
-      ++current_stage;
+      current_stage=1;
       ImplicitEquation(u,w,alphaI*dtI,Ru2);
 
 
@@ -163,11 +168,11 @@ void ImEx::ApplySourceTermsImplicitRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &
       int n3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*ng) : 1;
 
       // Increment internal counter
-      ++current_stage;
 
     switch(stage){
 
       case 1:
+      	  current_stage=2;
 	  par_for("implicit_stage3", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
@@ -177,6 +182,7 @@ void ImEx::ApplySourceTermsImplicitRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	break;
 
       case 2:
+      	  current_stage=3;
 	  par_for("implicit_stage4", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
@@ -225,7 +231,7 @@ void ImEx::ApplySourceTermsImplicitPreStageRK3(DvceArray5D<Real> &u, DvceArray5D
 	    u0_(m,n+noff_,k,j,i) = u0_(m,n+noff_,k,j,i) -2.*alphaI*dtI * Ru1_(m,n,k,j,i);
 	  });
 
-      ++current_stage;
+      current_stage=1;
       ImplicitEquation(u,w,alphaI*dtI,Ru2);
 };
 
@@ -258,11 +264,11 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 
     
       // Increment internal counter
-      ++current_stage;
 
     switch(stage){
 
       case 1:
+          current_stage=2;
 	  par_for("implicit_stage3", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
@@ -273,6 +279,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	break;
 
       case 2:
+          current_stage=3;
 	  par_for("implicit_stage4a", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {
@@ -291,6 +298,7 @@ void ImEx::ApplySourceTermsImplicitRK3(DvceArray5D<Real> &u, DvceArray5D<Real> &
 	break;
 
       case 3:
+          current_stage=4;
 	  par_for("implicit_stage5", DevExeSpace(), 0, (nmb-1),0, nimplicit-1, 0, (n3-1), 0, (n2-1), 0, (n1-1),
 	    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
 	    {

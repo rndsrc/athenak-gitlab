@@ -46,9 +46,7 @@ void SourceTerms::ApplySrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real
 
 void SourceTerms::ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
 {
-  std::cout << "Call prestage" << std::endl;
   if (pmy_pack->pturb_driver != nullptr) {
-     std::cout << "Call prestage ImEx driver" << std::endl;
     static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicit(u,w,stage);
   }
   return;
@@ -60,7 +58,9 @@ void SourceTerms::ApplyImplicitSrcTermsStageRunTL(DvceArray5D<Real> &u, DvceArra
 
 void SourceTerms::ApplySrcTermsOperatorSplitTL(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
 {
+  std::cout << "Call prestage" << std::endl;
   if (pmy_pack->pturb_driver != nullptr) {
+    std::cout << "Call prestage ImEx driver" << std::endl;
     pmy_pack->pturb_driver->ApplyForcing(u);
     static_cast<ImEx*>(pmy_pack->pturb_driver)->ApplySourceTermsImplicitPreStage(u,w);
   }

@@ -405,8 +405,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   //force normalization
   auto s = tmp + sqrt(tmp*tmp -(dedt - term1)/term3);
 
-  std::cout << "s: " << s << std::endl;
   if(!std::isfinite(s)) s= dedt;
+  std::cout << "s: " << s << std::endl;
 
 
 

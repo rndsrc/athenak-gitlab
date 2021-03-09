@@ -37,10 +37,10 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
   if (pin->DoesBlockExist("hydro")) {
     phydro = new hydro::Hydro(this, pin);   // construct new Hydro object
     nphysics++;
-    phydro->AssembleOperatorSplitTasks(operator_split_tl, none);
-    phydro->AssembleStageStartTasks(stage_start_tl, none);
-    phydro->AssembleStageRunTasks(stage_run_tl, none);
-    phydro->AssembleStageEndTasks(stage_end_tl, none);
+//   phydro->AssembleOperatorSplitTasks(operator_split_tl, none);
+//   phydro->AssembleStageStartTasks(stage_start_tl, none);
+//   phydro->AssembleStageRunTasks(stage_run_tl, none);
+//   phydro->AssembleStageEndTasks(stage_end_tl, none);
   }
 
   // (2) TURBULENT FORCING
@@ -56,6 +56,13 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
 	    std::cout << "Activated turbulence driving.";
       }
     }
+  }
+
+  if (pin->DoesBlockExist("hydro")) {
+    phydro->AssembleOperatorSplitTasks(operator_split_tl, none);
+    phydro->AssembleStageStartTasks(stage_start_tl, none);
+    phydro->AssembleStageRunTasks(stage_run_tl, none);
+    phydro->AssembleStageEndTasks(stage_end_tl, none);
   }
   // (3) MHD
   // Create both MHD physics module and Tasks (TaskLists stored in MeshBlockPack)
