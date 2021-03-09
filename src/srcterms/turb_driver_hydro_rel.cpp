@@ -25,7 +25,7 @@ TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterI
     // Deactivate regular C2P 
 //    pmy_pack->phydro->needs_c2p = false;
     pmy_pack->phydro->psrc->operatorsplit_terms = true;
-    pmy_pack->phydro->psrc->implicit_terms = true;
+    pmy_pack->phydro->psrc->stagerun_terms = true;
     pmy_pack->phydro->psrc->implicit_terms = true;
 }
 
