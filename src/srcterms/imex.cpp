@@ -21,11 +21,13 @@ ImEx::ImEx(MeshBlockPack *pp, ParameterInput *pin):
       this_imex = method::RK1;
       ceff[0] = 1.;
     } else if (integrator == "rk2") {
+      std::cout << "Selected ImEx-RK2" << std::endl;
       this_imex = method::RK2;
       ceff[0] =  0.5;
       ceff[1] =  0.;
       ceff[2] =  1.;
     } else if (integrator == "rk3") {
+      std::cout << "Selected ImEx-RK3" << std::endl;
       this_imex = method::RK3;
       ceff[0] =  0.24169426078821;
       ceff[1] =  0.;
@@ -78,6 +80,8 @@ void ImEx::ApplySourceTermsImplicitPreStage(DvceArray5D<Real> &u, DvceArray5D<Re
       ApplySourceTermsImplicitPreStageRK3(u,w);
       break;
   }
+
+//      std::cout << "ImEx: Current stage" << current_stage << std::endl;
 };
 
 void ImEx::ApplySourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, int stage)
@@ -94,6 +98,8 @@ void ImEx::ApplySourceTermsImplicit(DvceArray5D<Real> &u, DvceArray5D<Real> &w, 
       ApplySourceTermsImplicitRK3(u,w,stage);
       break;
   }
+
+//      std::cout << "ImEx: Current stage" << current_stage << std::endl;
 };
 
 void ImEx::ApplySourceTermsImplicitPreStageRK2(DvceArray5D<Real> &u, DvceArray5D<Real> &w)
