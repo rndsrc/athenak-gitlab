@@ -22,19 +22,26 @@
 
 TurbulenceDriverHydro::TurbulenceDriverHydro(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
+  // Register ImEx in hydro routines
+  pp->phydro->pimex = static_cast<ImEx*>(this);
 }
 
 
-void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
+void TurbulenceDriverHydro::ApplyForcing(int stage)
 {
 
-  if(ImEx::this_imex != ImEx::method::RKexplicit) return;
+  auto &u = pmy_pack->phydro->u0;
+  auto &w = pmy_pack->phydro->w0;
 
-  //Update random force
-  NewRandomForce(force_tmp);
+  if(ImEx::this_imex == ImEx::method::RKexplicit){
 
-  ApplyForcingSourceTermsExplicit(u);
+    //Update random force
+    NewRandomForce(force_tmp);
 
+    ApplyForcingSourceTermsExplicit(u);
+  }else{
+    static_cast<ImEx*>(this)->ApplySourceTermsImplicitPreStage(u,w);
+  }
   return;
 }
 
@@ -669,10 +676,10 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   Real m3 = sum_this_mb.the_array[IM3];
   Real rhoV = sum_this_mb.the_array[IEN];
 
-//  std::cout << "m0: " << m0 << std::endl;
-//  std::cout << "m1: " << m1 << std::endl;
-//  std::cout << "m2: " << m2 << std::endl;
-//  std::cout << "m3: " << m3 << std::endl;
+  std::cout << "m0: " << m0 << std::endl;
+  std::cout << "m1: " << m1 << std::endl;
+  std::cout << "m2: " << m2 << std::endl;
+  std::cout << "m3: " << m3 << std::endl;
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
@@ -692,8 +699,8 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   auto& Fv = sum_this_mb_en.the_array[IDN];
   auto& F2 = sum_this_mb_en.the_array[IM1];
 
-//  std::cout << "Fv: " << Fv << std::endl;
-//  std::cout << "F2: " << F2 << std::endl;
+  std::cout << "Fv: " << Fv << std::endl;
+  std::cout << "F2: " << F2 << std::endl;
 
 
   auto const tmp = -fabs(Fv)/(2.*dtI*F2);
@@ -702,7 +709,7 @@ void TurbulenceDriverHydro::ApplyForcingImplicit( DvceArray5D<Real> &force_, Dvc
   auto s = tmp + sqrt(tmp*tmp+ dedt/(dtI*F2));
   if ( F2 == 0.) s=0.;
 
-//  std::cout << "s: " << s << std::endl;
+  std::cout << "s: " << s << std::endl;
 
 
   par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),

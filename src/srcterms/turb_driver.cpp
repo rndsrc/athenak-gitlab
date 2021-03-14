@@ -97,7 +97,7 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
 //! \fn  Initialize forcing
 
 
-void TurbulenceDriver::Initialize()
+void TurbulenceDriver::InitializeModes()
 {
 
   if(initialized)  return;
@@ -228,7 +228,7 @@ void TurbulenceDriver::Initialize()
 void TurbulenceDriver::NewRandomForce(DvceArray5D<Real> &ftmp)
 {
 
-  if(!initialized) Initialize();
+  if(!initialized) InitializeModes();
 
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
