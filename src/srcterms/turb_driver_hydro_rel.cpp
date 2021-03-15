@@ -27,8 +27,11 @@ TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterI
 }
 
 
-void TurbulenceDriverHydroRel::ApplyForcing(DvceArray5D<Real> &u)
+void TurbulenceDriverHydroRel::ApplyForcing(int stage)
 {
+
+  auto &u = pmy_pack->phydro->u0;
+  auto &w = pmy_pack->phydro->w0;
   if(ImEx::this_imex == ImEx::method::RKexplicit){
 	std::cout << "Internal ERROR: Relativistic driving doesn't work explicitly." << std::endl;
 	std::exit(EXIT_FAILURE);
