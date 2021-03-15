@@ -22,23 +22,26 @@
 
 TurbulenceDriverHydro::TurbulenceDriverHydro(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
-
-    pmy_pack->phydro->psrc->operatorsplit_terms = true;
-    pmy_pack->phydro->psrc->stagerun_terms = true;
-    pmy_pack->phydro->psrc->implicit_terms = true;
+  // Register ImEx in hydro routines
+  pp->phydro->pimex = static_cast<ImEx*>(this);
 }
 
 
-void TurbulenceDriverHydro::ApplyForcing(DvceArray5D<Real> &u)
+void TurbulenceDriverHydro::ApplyForcing(int stage)
 {
 
-  if(ImEx::this_imex != ImEx::method::RKexplicit) return;
+  auto &u = pmy_pack->phydro->u0;
+  auto &w = pmy_pack->phydro->w0;
 
-  //Update random force
-  NewRandomForce(force_tmp);
+  if(ImEx::this_imex == ImEx::method::RKexplicit){
 
-  ApplyForcingSourceTermsExplicit(u);
+    //Update random force
+    NewRandomForce(force_tmp);
 
+    ApplyForcingSourceTermsExplicit(u);
+  }else{
+    static_cast<ImEx*>(this)->ApplySourceTermsImplicitPreStage(u,w);
+  }
   return;
 }
 

@@ -22,11 +22,8 @@
 
 TurbulenceDriverHydroRel::TurbulenceDriverHydroRel(MeshBlockPack *pp, ParameterInput *pin) :
   TurbulenceDriver(pp,pin){
-    // Deactivate regular C2P 
-    pmy_pack->phydro->needs_c2p = false;
-    pmy_pack->phydro->psrc->operatorsplit_terms = true;
-    pmy_pack->phydro->psrc->stagerun_terms = true;
-    pmy_pack->phydro->psrc->implicit_terms = true;
+  // Register ImEx in hydro routines
+  pp->phydro->pimex = static_cast<ImEx*>(this);
 }
 
 
@@ -35,9 +32,10 @@ void TurbulenceDriverHydroRel::ApplyForcing(DvceArray5D<Real> &u)
   if(ImEx::this_imex == ImEx::method::RKexplicit){
 	std::cout << "Internal ERROR: Relativistic driving doesn't work explicitly." << std::endl;
 	std::exit(EXIT_FAILURE);
+  }else{
+    static_cast<ImEx*>(this)->ApplySourceTermsImplicitPreStage(u,w);
   }
 
-  // Not supported
   return;
 }
 

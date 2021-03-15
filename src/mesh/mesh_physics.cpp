@@ -10,12 +10,11 @@
 
 #include "parameter_input.hpp"
 #include "mesh.hpp"
-#include "srcterms/turb_driver_hydro.hpp"
-#include "srcterms/turb_driver_hydro_rel.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
+#include "srcterms/srcterms.hpp"
 
 #if MPI_PARALLEL_ENABLED
 #include <mpi.h>
@@ -31,51 +30,21 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
   int nphysics = 0;
   TaskID none(0);
 
-
   // (1) HYDRODYNAMICS
   // Create both Hydro physics module and Tasks (TaskLists stored in MeshBlockPack)
   if (pin->DoesBlockExist("hydro")) {
     phydro = new hydro::Hydro(this, pin);   // construct new Hydro object
     nphysics++;
-//   phydro->AssembleOperatorSplitTasks(operator_split_tl, none);
-//   phydro->AssembleStageStartTasks(stage_start_tl, none);
-//   phydro->AssembleStageRunTasks(stage_run_tl, none);
-//   phydro->AssembleStageEndTasks(stage_end_tl, none);
-  }
-
-  // (2) TURBULENT FORCING
-  if (pin->DoesBlockExist("forcing")) {
-    //FIXME (ERM): Add relativistic version here, too
-    if(phydro!= nullptr){
-      if(phydro->relativistic){
-	    pturb_driver = new TurbulenceDriverHydroRel(this, pin);  // construct new turbulence driver
-	    std::cout << "Activated relativistic turbulence driving.";
-      }
-      else{
-	    pturb_driver = new TurbulenceDriverHydro(this, pin);  // construct new turbulence driver
-	    std::cout << "Activated turbulence driving.";
-      }
-    }
-  }
-
-  if (pin->DoesBlockExist("hydro")) {
-    phydro->AssembleOperatorSplitTasks(operator_split_tl, none);
     phydro->AssembleStageStartTasks(stage_start_tl, none);
     phydro->AssembleStageRunTasks(stage_run_tl, none);
     phydro->AssembleStageEndTasks(stage_end_tl, none);
   }
-  // (3) MHD
+
+  // (2) MHD
   // Create both MHD physics module and Tasks (TaskLists stored in MeshBlockPack)
   if (pin->DoesBlockExist("mhd")) {
     pmhd = new mhd::MHD(this, pin);   // construct new MHD object
     nphysics++;
-
-    if (operator_split_tl.Empty()) {
-      pmhd->AssembleOperatorSplitTasks(operator_split_tl, none);
-    } else {
-      TaskID last = operator_split_tl.GetIDLastTask();
-      pmhd->AssembleOperatorSplitTasks(operator_split_tl, last);
-    }
 
     if (stage_start_tl.Empty()) {
       pmhd->AssembleStageStartTasks(stage_start_tl, none);
@@ -99,6 +68,30 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin)
     }
   } 
 
+  // (3) VISCOSITY
+  if (pin->DoesBlockExist("viscosity")) {
+    pvisc = new Viscosity(this, pin);
+    pvisc->AssembleStageRunTasks(stage_run_tl, none);
+  } else {
+    pvisc = nullptr;
+  }
+
+  // (4) RESISTIVITY
+  if (pin->DoesBlockExist("resistivity")) {
+    presist = new Resistivity(this, pin);
+    presist->AssembleStageRunTasks(stage_run_tl, none);
+  } else {
+    presist = nullptr;
+  }
+
+  // (5) SOURCE TERMS
+  // Source terms can be specified by many different <blocks> in the input file.  Thus,
+  // SourceTerms constructor parses input file to see if any source terms are enrolled.
+  // If not, functions below do not do anything
+  psrc = new SourceTerms(this, pin);
+  psrc->IncludeSplitSrcTermTasks(operator_split_tl, none);
+  psrc->IncludeUnsplitSrcTermTasks(stage_run_tl, none);
+
   // Check that at least ONE is requested and initialized.
   // Error if there are no physics blocks in the input file.
   if (nphysics == 0) {
@@ -119,25 +112,22 @@ void Mesh::NewTimeStep(const Real tlim)
   // Requires at least ONE of the physics modules to be defined.
   // limit increase in timestep to 2x old value
   dt = 2.0*dt;
+
+  // Hydro timestep
   if (pmb_pack->phydro != nullptr) {
-    // Hydro timestep
     dt = std::min(dt, (cfl_no)*(pmb_pack->phydro->dtnew) );
-    if (pmb_pack->phydro->pvisc != nullptr) {
-      // Hydro viscosity timestep
-      dt = std::min(dt, (cfl_no)*(pmb_pack->phydro->pvisc->dtnew) );
-    }
   }
+  // MHD timestep
   if (pmb_pack->pmhd != nullptr) {
-    // MHD timestep
     dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->dtnew) );
-    if (pmb_pack->pmhd->pvisc != nullptr) {
-      // MHD viscosity timestep
-      dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->pvisc->dtnew) );
-    }
-    if (pmb_pack->pmhd->presist != nullptr) {
-      // MHD resistivity timestep
-      dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->presist->dtnew) );
-    }
+  }
+  // viscosity timestep
+  if (pmb_pack->pvisc != nullptr) {
+    dt = std::min(dt, (cfl_no)*(pmb_pack->pvisc->dtnew) );
+  }
+  // resistivity timestep
+  if (pmb_pack->presist != nullptr) {
+    dt = std::min(dt, (cfl_no)*(pmb_pack->presist->dtnew) );
   }
 
 #if MPI_PARALLEL_ENABLED

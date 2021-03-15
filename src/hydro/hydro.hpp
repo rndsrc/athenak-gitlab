@@ -8,19 +8,23 @@
 //! \file hydro.hpp
 //  \brief definitions for Hydro class
 
+#include <map>
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "tasklist/task_list.hpp"
 #include "bvals/bvals.hpp"
+#include "srcterms/imex.hpp"
 
 // forward declarations
 class EquationOfState;
-class Viscosity;
-class SourceTerms;
 class Driver;
 
 // constants that enumerate Hydro Riemann Solver options
 enum class Hydro_RSolver {advect, llf, hllc, roe, llf_rel,hllc_rel};
+
+// constants that enumerate Hydro tasks
+enum class HydroTaskName {undef=0, init_recv, copy_cons, calc_flux, update,
+  send_u, recv_u, phys_bcs, implicit, cons2prim, newdt, clear_send};
 
 namespace hydro {
 
@@ -34,12 +38,10 @@ class Hydro
   ~Hydro();
 
   // data
-  EquationOfState *peos;      // chosen EOS
-  Viscosity *pvisc=nullptr;   // (optional) viscosity 
-  SourceTerms *psrc;          // source terms (both operator split and unsplit)
+  EquationOfState *peos;  // chosen EOS
+  ImEx* pimex = nullptr;
 
   bool relativistic = false;
-  bool needs_c2p = true;
   int nhydro;             // number of hydro variables (5/4 for adiabatic/isothermal)
   int nscalars;           // number of passive scalars
   DvceArray5D<Real> u0;   // conserved variables
@@ -53,11 +55,13 @@ class Hydro
   DvceFaceFld5D<Real> uflx;   // fluxes of conserved quantities on cell faces
   Real dtnew;
 
+  // map for associating HydroTaskName with TaskID
+  std::map<HydroTaskName, TaskID> hydro_tasks;
+
   // functions
   void AssembleStageStartTasks(TaskList &tl, TaskID start);
   void AssembleStageRunTasks(TaskList &tl, TaskID start);
   void AssembleStageEndTasks(TaskList &tl, TaskID start);
-  void AssembleOperatorSplitTasks(TaskList &tl, TaskID start);
   TaskStatus InitRecv(Driver *d, int stage);
   TaskStatus ClearRecv(Driver *d, int stage);
   TaskStatus ClearSend(Driver *d, int stage);
@@ -67,12 +71,9 @@ class Hydro
   TaskStatus SendU(Driver *d, int stage); 
   TaskStatus RecvU(Driver *d, int stage); 
   TaskStatus ConToPrim(Driver *d, int stage);
-  TaskStatus ViscousFluxes(Driver *d, int stage);
   TaskStatus NewTimeStep(Driver *d, int stage);
   TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage);  // in file in hydro/bvals dir
-  TaskStatus UpdateUnsplitSourceTerms(Driver *d, int stage);
-  TaskStatus UpdateImplicitSourceTerms(Driver *d, int stage);
-  TaskStatus UpdateOperatorSplitSourceTerms(Driver *d, int stage);
+  TaskStatus ImplicitSourceTerms(Driver *d, int stage);
 
   // functions to set physical BCs for Hydro conserved variables, applied to single MB
   // specified by argument 'm'. 
@@ -88,11 +89,15 @@ class Hydro
   void OutflowOuterX2(int m);
   void OutflowInnerX3(int m);
   void OutflowOuterX3(int m);
+  void ShearInnerX1(int m);
+  void ShearOuterX1(int m);
 
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
   ReconstructionMethod recon_method_;
   Hydro_RSolver rsolver_method_;
+
+
 };
 
 } // namespace hydro

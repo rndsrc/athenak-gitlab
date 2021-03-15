@@ -26,19 +26,11 @@ class TurbulenceDriver : public ImEx
   ~TurbulenceDriver() = default;
 
   // function to compute/apply forcing
-  virtual void ApplyForcing(DvceArray5D<Real> &u)=0;
+  virtual void ApplyForcing(int stage)=0;
 
   // data
   DvceArray5D<Real> force;        // forcing for driving hydro variables
   DvceArray5D<Real> force_tmp;    // second force register for OU evolution
-
-//  virtual void ImplicitKernel(DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI,
-//      DvceArray5D<Real> &Ru) =0;
-
-
-  void Initialize();
-  void NewRandomForce(DvceArray5D<Real> &ftmp);
-
 
   DvceArray3D<Real> x1sin;   // array for pre-computed sin(k x)
   DvceArray3D<Real> x1cos;   // array for pre-computed cos(k x)
@@ -60,6 +52,10 @@ class TurbulenceDriver : public ImEx
 
 
   bool initialized = false;
+  // functions
+  void InitializeModes();
+  void NewRandomForce(DvceArray5D<Real> &ftmp);
+
 };
 
 
