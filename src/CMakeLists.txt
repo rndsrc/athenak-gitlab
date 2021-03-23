@@ -14,22 +14,28 @@ add_executable(
         bvals/bvals_cc.cpp
         bvals/bvals_fc.cpp
 
+        diffusion/resistivity.cpp
+        diffusion/viscosity.cpp
+
+        driver/driver.cpp
+
         eos/eos.cpp
         eos/adiabatic_hydro.cpp
+        eos/adiabatic_hydro_rel.cpp
         eos/adiabatic_mhd.cpp
         eos/adiabatic_mhd_rel.cpp
         eos/isothermal_hydro.cpp
         eos/isothermal_mhd.cpp
 
-        driver/driver.cpp
-
         hydro/hydro.cpp
         hydro/hydro_fluxes.cpp
         hydro/hydro_newdt.cpp
+        hydro/hydro_tasks.cpp
         hydro/hydro_update.cpp
         hydro/bvals/apply_physical_bcs.cpp
         hydro/bvals/outflow_hydro.cpp
         hydro/bvals/reflect_hydro.cpp
+        hydro/bvals/shear_hydro.cpp
 
         mesh/mesh_physics.cpp
         mesh/load_balance.cpp
@@ -42,11 +48,13 @@ add_executable(
         mhd/mhd_corner_e.cpp
         mhd/mhd_ct.cpp
         mhd/mhd_fluxes.cpp
-        mhd/mhd_update.cpp
         mhd/mhd_newdt.cpp
+        mhd/mhd_tasks.cpp
+        mhd/mhd_update.cpp
         mhd/bvals/apply_physical_bcs.cpp
         mhd/bvals/outflow_mhd.cpp
         mhd/bvals/reflect_mhd.cpp
+        mhd/bvals/shear_mhd.cpp
 
         outputs/io_wrapper.cpp
         outputs/outputs.cpp
@@ -62,6 +70,15 @@ add_executable(
         pgen/orszag_tang.cpp
         pgen/shock_tube.cpp
         pgen/shock_tube_rel.cpp
+        pgen/kh_sr.cpp
+
+        srcterms/srcterms.cpp
+        srcterms/imex.cpp
+        srcterms/constant_acc.cpp
+        srcterms/shearing_box.cpp
+        srcterms/turb_driver.cpp
+        srcterms/turb_driver_hydro.cpp
+        srcterms/turb_driver_hydro_rel.cpp
 
         utils/change_rundir.cpp
         utils/show_config.cpp

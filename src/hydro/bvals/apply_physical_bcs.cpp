@@ -21,7 +21,7 @@ namespace hydro {
 // \brief Apply physical boundary conditions for all Hydro variables at faces of MB which
 //  are at the edge of the computational domain
 
-TaskStatus Hydro::HydroApplyPhysicalBCs(Driver* pdrive, int stage)
+TaskStatus Hydro::ApplyPhysicalBCs(Driver* pdrive, int stage)
 {
   // loop over all MeshBlocks in this MeshBlockPack
   int nmb = pmy_pack->nmb_thispack;
@@ -35,6 +35,9 @@ TaskStatus Hydro::HydroApplyPhysicalBCs(Driver* pdrive, int stage)
       case BoundaryFlag::outflow:
         OutflowInnerX1(m);
         break;
+      case BoundaryFlag::periodic:
+        if (pmy_pack->pmesh->shearing_periodic) ShearInnerX1(m);
+        break;
       default:
         break;
     }
@@ -46,6 +49,9 @@ TaskStatus Hydro::HydroApplyPhysicalBCs(Driver* pdrive, int stage)
         break;
       case BoundaryFlag::outflow:
         OutflowOuterX1(m);
+        break;
+      case BoundaryFlag::periodic:
+        if (pmy_pack->pmesh->shearing_periodic) ShearOuterX1(m);
         break;
       default:
         break;

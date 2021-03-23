@@ -15,6 +15,9 @@
 class MeshBlock;
 namespace hydro {class Hydro;}
 namespace mhd {class MHD;}
+class Viscosity;
+class Resistivity;
+class SourceTerms;
 
 //----------------------------------------------------------------------------------------
 //! \class MeshBlock
@@ -42,14 +45,18 @@ class MeshBlockPack
 
   MeshBlock* pmb;         // MeshBlocks in this MeshBlockPack
 
-  // physics modules (controlled by InitPhysicsModules)
-  hydro::Hydro *phydro;
-  mhd::MHD *pmhd;
+  // physics modules (controlled by AddPhysicsModules function in mesh_physics.cpp)
+  hydro::Hydro *phydro=nullptr;
+  mhd::MHD *pmhd=nullptr;
+  Viscosity *pvisc=nullptr;        // (optional) viscosity
+  Resistivity *presist=nullptr;    // (optional) resistivity
+  SourceTerms *psrc=nullptr;
 
   // task lists for MeshBlocks in this MeshBlockPack
-  TaskList tl_stagestart;
-  TaskList tl_stagerun;
-  TaskList tl_stageend;
+  TaskList stage_start_tl;
+  TaskList stage_run_tl;
+  TaskList stage_end_tl;
+  TaskList operator_split_tl;
 
   // functions
   void AddPhysicsModules(ParameterInput *pin);

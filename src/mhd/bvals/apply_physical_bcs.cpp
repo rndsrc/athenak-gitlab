@@ -24,7 +24,7 @@ namespace mhd {
 //  Note this function is idential to Hydro version
 //  TODO: can Hydro and MHD versions be combined?
 
-TaskStatus MHD::MHDApplyPhysicalBCs(Driver* pdrive, int stage)
+TaskStatus MHD::ApplyPhysicalBCs(Driver* pdrive, int stage)
 {
   // loop over all MeshBlocks in this MeshBlockPack
   int nmb = pmy_pack->nmb_thispack;
@@ -38,6 +38,9 @@ TaskStatus MHD::MHDApplyPhysicalBCs(Driver* pdrive, int stage)
       case BoundaryFlag::outflow:
         OutflowInnerX1(m);
         break;
+      case BoundaryFlag::periodic:
+        if (pmy_pack->pmesh->shearing_periodic) ShearInnerX1(m);
+        break;
       default:
         break;
     }
@@ -49,6 +52,9 @@ TaskStatus MHD::MHDApplyPhysicalBCs(Driver* pdrive, int stage)
         break;
       case BoundaryFlag::outflow:
         OutflowOuterX1(m);
+        break;
+      case BoundaryFlag::periodic:
+        if (pmy_pack->pmesh->shearing_periodic) ShearOuterX1(m);
         break;
       default:
         break;

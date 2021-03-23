@@ -8,17 +8,24 @@
 //! \file mhd.hpp
 //  \brief definitions for MHD class
 
+#include <map>
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "tasklist/task_list.hpp"
 #include "bvals/bvals.hpp"
 
 // forward declarations
-class Driver;
 class EquationOfState;
+class Driver;
 
 // constants that enumerate MHD Riemann Solver options
 enum class MHD_RSolver {advect, llf, hlld, roe, llf_rel};
+
+// constants that enumerate Hydro tasks
+enum class MHDTaskName {undef=0, init_recv, copy_cons, calc_flux, update,
+  send_u, recv_u, corner_emf, ct, send_b, recv_b, phys_bcs, cons2prim, newdt,
+  clear_send};
+
 
 namespace mhd {
 
@@ -32,7 +39,7 @@ class MHD
   ~MHD();
 
   // data
-  EquationOfState *peos;   // object that implements chosen EOS
+  EquationOfState *peos;   // chosen EOS
 
   int nmhd;                // number of cons variables (5/4 for adiabatic/isothermal)
   int nscalars;            // number of passive scalars
@@ -53,25 +60,28 @@ class MHD
   Real dtnew;
   bool relativistic {false};
 
+  // map for associating MHDTaskName with TaskID
+  std::map<MHDTaskName, TaskID> mhd_tasks;
+
   // functions
-  void MHDStageStartTasks(TaskList &tl, TaskID start);
-  void MHDStageRunTasks(TaskList &tl, TaskID start);
-  void MHDStageEndTasks(TaskList &tl, TaskID start);
-  TaskStatus MHDInitRecv(Driver *d, int stage);
-  TaskStatus MHDClearRecv(Driver *d, int stage);
-  TaskStatus MHDClearSend(Driver *d, int stage);
-  TaskStatus MHDCopyCons(Driver *d, int stage);
+  void AssembleStageStartTasks(TaskList &tl, TaskID start);
+  void AssembleStageRunTasks(TaskList &tl, TaskID start);
+  void AssembleStageEndTasks(TaskList &tl, TaskID start);
+  TaskStatus InitRecv(Driver *d, int stage);
+  TaskStatus ClearRecv(Driver *d, int stage);
+  TaskStatus ClearSend(Driver *d, int stage);
+  TaskStatus CopyCons(Driver *d, int stage);
   TaskStatus CalcFluxes(Driver *d, int stage);
   TaskStatus CornerE(Driver *d, int stage);
   TaskStatus CT(Driver *d, int stage);
   TaskStatus Update(Driver *d, int stage);
-  TaskStatus MHDSendU(Driver *d, int stage); 
-  TaskStatus MHDRecvU(Driver *d, int stage); 
-  TaskStatus MHDSendB(Driver *d, int stage); 
-  TaskStatus MHDRecvB(Driver *d, int stage); 
+  TaskStatus SendU(Driver *d, int stage); 
+  TaskStatus RecvU(Driver *d, int stage); 
+  TaskStatus SendB(Driver *d, int stage); 
+  TaskStatus RecvB(Driver *d, int stage); 
   TaskStatus ConToPrim(Driver *d, int stage);
   TaskStatus NewTimeStep(Driver *d, int stage);
-  TaskStatus MHDApplyPhysicalBCs(Driver* pdrive, int stage);
+  TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage); // in file mhd/bvals dir
 
   // functions to set physical BCs for Hydro conserved variables, applied to single MB
   // specified by argument 'm'. 
@@ -87,6 +97,8 @@ class MHD
   void OutflowOuterX2(int m);
   void OutflowInnerX3(int m);
   void OutflowOuterX3(int m);
+  void ShearInnerX1(int m);
+  void ShearOuterX1(int m);
 
  private:
   MeshBlockPack* pmy_pack;   // ptr to MeshBlockPack containing this MHD
