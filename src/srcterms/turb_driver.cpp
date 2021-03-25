@@ -79,6 +79,8 @@ TurbulenceDriver::TurbulenceDriver(MeshBlockPack *pp, ParameterInput *pin) :
   // correlation time
   tcorr = pin->GetOrAddReal("forcing","tcorr",0.0); 
 
+  eps_cool = pin->GetOrAddReal("forcing","eps_cool",1.e6); 
+
   Kokkos::realloc(x1sin, nmb, ntot, ncells1);
   Kokkos::realloc(x1cos, nmb, ntot, ncells1);
   Kokkos::realloc(x2sin, nmb, ntot, ncells2);

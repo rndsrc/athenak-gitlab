@@ -333,8 +333,15 @@ void TurbulenceDriverHydroRel::ComputeImplicitSources(DvceArray5D<Real> &u, Dvce
 
 }
 
+
+
 void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI)
 {
+
+
+//  return ApplyForcingImplicitNew(force_,u,w,dtI);
+
+
   auto &ncells = pmy_pack->mb_cells;
   int ncells1 = ncells.nx1 + 2*(ncells.ng);
   int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
@@ -346,14 +353,15 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
   Real gm1 = eos_data.gamma - 1.0;
   Real gamma_adi = eos_data.gamma;
 
-    // Parameters
-    int const max_iterations = 25;
-    Real const tol = 1.0e-12;
-    Real const v_sq_max = 1.0 - 1.0e-12;
+  // Parameters
+  int const max_iterations = 25;
+  Real const tol = 1.0e-12;
+  Real const v_sq_max = 1.0 - 1.0e-12;
 
   Real &dfloor_ = eos_data.density_floor;
   Real &pfloor_ = eos_data.pressure_floor;
   Real ee_min = pfloor_/gm1;
+  Real lcool = dtI/(eps_cool*eps_cool*eps_cool*eps_cool);
   
   // Fill explicit prims by inverting u
 //  pmy_pack->phydro->peos->ConsToPrim(u,w);
@@ -376,7 +384,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
   m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
 
-  auto frce = force_;
+  auto &frce = force_;
 
   par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
@@ -426,7 +434,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 //  s = fmax(s,0.);
 //  s= dedt;
 
-//  std::cout << "snew: " << s << std::endl;
+  std::cout << "snew: " << s << std::endl;
 
 
   par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
@@ -462,10 +470,6 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       //Need an upper bound
 
-      auto F2 = frce(m,0,k,j,i)* frce(m,0,k,j,i)+
-		frce(m,1,k,j,i)* frce(m,1,k,j,i)+
-		frce(m,2,k,j,i)* frce(m,2,k,j,i);
-
       auto FS = u_m1* frce(m,0,k,j,i)+
 		u_m2* frce(m,1,k,j,i)+
 		u_m3* frce(m,2,k,j,i);
@@ -474,7 +478,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 
       // Upper bound 
-      auto kk = r/(1.+q + FS);  // (C2) //FIXME + FS ???
+      auto kk = r/(1.+q);  // (C2) //FIXME + FS ???
 
       // Enforce lower velocity bound
       // Obeying this bound combined with a floor on 
@@ -498,15 +502,14 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 
 	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
-	auto h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
-	auto eps = (h -1.)/(gamma_adi);
-//	auto FSzr = (r==0.) ? 0.: FS*z/r;
-//	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
+	auto eps = GetEpsfromTauWithCooling(q,FS,lcool,W,gamma_adi);
 
 	//NOTE: The following generalizes to ANY equation of state
 	eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
 	w_p = w_d*gm1*eps;
-	h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+	auto h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+
+	h+= lcool*(eps*eps*eps*eps)/W;
 
 	f = z - r/h; // (C22)
       }
@@ -519,16 +522,15 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 	w_d = u_d/W; // (C15)
 
-	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
-	auto h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
-	auto eps = (h -1.)/(gamma_adi);
+	auto eps = GetEpsfromTauWithCooling(q,FS,lcool,W,gamma_adi);
 //	auto FSzr = (r==0.) ? 0.: FS*z/r;
 //	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
 	//NOTE: The following generalizes to ANY equation of state
 	eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
 	w_p = w_d*gm1*eps;
-	h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+	auto h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+	h+= lcool*(eps*eps*eps*eps)/W;
 
 	f = z - r/h; // (C22)
       }
@@ -550,9 +552,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 	w_d = u_d/W; // (C15)
 
-	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
-	h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
-	auto eps = (h -1.)/(gamma_adi);
+	auto eps = GetEpsfromTauWithCooling(q,FS,lcool,W,gamma_adi);
 //	auto FSzr = (r==0.)? 0.: FS*z/r;
 //	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
@@ -562,11 +562,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 	h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
 
 	auto f = z - r/h; // (C22)
+	h+= lcool*(eps*eps*eps*eps)/W;
 
-	// NOTE: both z and f are of order unity
-	if((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
-	    break;
-	}
 
 	if(f * fp < 0.){
 	   zm = zp;
@@ -580,6 +577,11 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 	   fp = f;
 	}
 
+	// NOTE: both z and f are of order unity
+	if((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
+	    break;
+	}
+
       }
 
 {
@@ -587,9 +589,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
     w_d = u_d/W; // (C15)
 
-	auto tmp = 0.5*(gamma_adi*(W*q - z*r + z*z / (1.+W)) +1.);
-	h = tmp + sqrt(tmp*tmp + gamma_adi * FS);
-	auto eps = (h -1.)/(gamma_adi);
+	auto eps = GetEpsfromTauWithCooling(q,FS,lcool,W,gamma_adi);
 //	auto FSzr = (r==0.)? 0.: FS*z/r;
 //	eps = W*q - z*r + z*z / (1.+W) + FSzr; // (C16)
 
@@ -597,6 +597,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
     eps = fmax(pfloor_/w_d/gm1, eps); // (C18)
     w_p = w_d*gm1*eps;
     h = (1. + eps) * ( 1. +  w_p/(w_d*(1.+eps))); // (C1) & (C21)
+    h+= lcool*(eps*eps*eps*eps)/W;
 
     auto const conv = 1./(h*u_d); // (C26)
     w_vx = conv * u_m1;           // (C26)
@@ -606,6 +607,10 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
     }
   );
+
+  sum_this_mb = ComputeNetMomentum(u, force_);
+
+//  std::cout <<  "Net momentum gain: " << sum_this_mb.the_array[1] << "\t" << sum_this_mb.the_array[2] << "\t" << sum_this_mb.the_array[3] << "\t"<<std::endl;
 
 
   // Remove momentum normalization, since it will be reused in other substeps
@@ -617,6 +622,177 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       frce(m,2,k,j,i) += m3/m0/u(m, IDN,k,j,i);
     }
   );
+
+  return;
+}
+
+void TurbulenceDriverHydroRel::ApplyForcingImplicitNew( DvceArray5D<Real> &force_, DvceArray5D<Real> &u, DvceArray5D<Real> &w, Real const dtI)
+{
+  auto &ncells = pmy_pack->mb_cells;
+  int ncells1 = ncells.nx1 + 2*(ncells.ng);
+  int ncells2 = (ncells.nx2 > 1)? (ncells.nx2 + 2*(ncells.ng)) : 1;
+  int ncells3 = (ncells.nx3 > 1)? (ncells.nx3 + 2*(ncells.ng)) : 1;
+
+  int &nmb = pmy_pack->nmb_thispack;
+
+  auto& eos_data = pmy_pack->phydro->peos->eos_data;
+  Real gm1 = eos_data.gamma - 1.0;
+  Real gamma_adi = eos_data.gamma;
+
+    // Parameters
+    int const max_iterations = 25;
+    Real const tol = 1.0e-12;
+    Real const v_sq_max = 1.0 - 1.0e-12;
+
+  Real &dfloor_ = eos_data.density_floor;
+  Real &pfloor_ = eos_data.pressure_floor;
+  Real ee_min = pfloor_/gm1;
+  
+  // Fill explicit prims by inverting u
+  pmy_pack->phydro->peos->ConsToPrim(u,w);
+
+
+  auto &frce = force_;
+  par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+
+      Real rho_eps = w(m,IPR,k,j,i) / gm1;
+      //FIXME ERM: Only ideal fluid for now
+      Real wgas = w(m,IDN,k,j,i) + gamma_adi / gm1 * w(m,IPR,k,j,i);
+      auto h = wgas/w(m,IDN,k,j,i);
+
+      frce(m,0,k,j,i) *= h;
+      frce(m,1,k,j,i) *= h;
+      frce(m,2,k,j,i) *= h;
+    }
+  );
+
+  auto sum_this_mb = ComputeNetMomentum(u, force_);
+
+  par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+
+      Real rho_eps = w(m,IPR,k,j,i) / gm1;
+      //FIXME ERM: Only ideal fluid for now
+      Real wgas = w(m,IDN,k,j,i) + gamma_adi / gm1 * w(m,IPR,k,j,i);
+      auto h = wgas/w(m,IDN,k,j,i);
+
+      frce(m,0,k,j,i) /= h;
+      frce(m,1,k,j,i) /= h;
+      frce(m,2,k,j,i) /= h;
+    }
+  );
+
+
+  Real m0 = sum_this_mb.the_array[IDN];
+  Real m1 = sum_this_mb.the_array[IM1];
+  Real m2 = sum_this_mb.the_array[IM2];
+  Real m3 = sum_this_mb.the_array[IM3];
+  Real rhoV = sum_this_mb.the_array[IEN];
+
+//  std::cout << "m0: " << m0 << std::endl;
+//  std::cout << "m1: " << m1 << std::endl;
+//  std::cout << "m2: " << m2 << std::endl;
+//  std::cout << "m3: " << m3 << std::endl;
+
+  m0 = std::max(m0, static_cast<Real>(std::numeric_limits<Real>::min()) );
+
+
+  par_for("net_mom_2", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+
+      Real rho_eps = w(m,IPR,k,j,i) / gm1;
+      //FIXME ERM: Only ideal fluid for now
+      Real wgas = w(m,IDN,k,j,i) + gamma_adi / gm1 * w(m,IPR,k,j,i);
+      auto h = wgas/w(m,IDN,k,j,i);
+
+      frce(m,0,k,j,i) -= m1/m0/u(m, IDN,k,j,i)/h;
+      frce(m,1,k,j,i) -= m2/m0/u(m, IDN,k,j,i)/h;
+      frce(m,2,k,j,i) -= m3/m0/u(m, IDN,k,j,i)/h;
+    }
+  );
+
+
+  auto sum_this_mb_en = ComputeNetEnergyInjection(u,force_);
+
+  auto &term1 = sum_this_mb_en.the_array[0];
+  auto term2  = sum_this_mb_en.the_array[1] * dtI;
+  auto term3  = sum_this_mb_en.the_array[2] * (-1.*dtI*dtI);
+
+// std::cout << "term1: " << term1 << std::endl;
+// std::cout << "term2: " << term2 << std::endl;
+// std::cout << "term3: " << term3 << std::endl;
+
+
+
+
+
+  //force normalization
+// auto tmp = -fabs(term2)/(2.*term3);
+// auto s = tmp + sqrt(tmp*tmp -(dedt- term1)/term3);
+// std::cout << "s: " << s << std::endl;
+//
+// if(!std::isfinite(s)) s= dedt;
+// s= dedt;
+// std::cout << "sfix: " << s << std::endl;
+
+
+  // Better normalization
+  // sF.v = (sS.F + s^2 aii dt F.F)/hW
+  
+  term3 = sum_this_mb_en.the_array[4] * dtI;
+  term2 = sum_this_mb_en.the_array[3];
+
+  auto tmp = -fabs(term2)/(2.*term3);
+  auto s = tmp + sqrt(tmp*tmp + dedt/term3);
+
+  if(term3==0.) s=0;
+
+//  s = fmax(s,0.);
+//  s= dedt;
+
+//  std::cout << "snew: " << s << std::endl;
+
+
+
+  par_for("update_prims_implicit", DevExeSpace(), 0, nmb-1, 0, (ncells3-1), 0, (ncells2-1), 0, (ncells1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+      Real& u_d = u(m, IDN,k,j,i);
+      Real& w_d = w(m, IDN,k,j,i);
+      Real& w_p = w(m, IPR,k,j,i);
+      Real& w_vx = w(m, IVX,k,j,i);
+      Real& w_vy = w(m, IVY,k,j,i);
+      Real& w_vz = w(m, IVZ,k,j,i);
+
+      Real rho_eps = w_p / gm1;
+      //FIXME ERM: Only ideal fluid for now
+      Real wgas = w_d + gamma_adi / gm1 * w_p;
+	auto h  = wgas/w_d;
+
+      auto z2 = w_vx*w_vx + w_vy*w_vy + w_vz*w_vz;
+
+     auto const lorentz = sqrt(1.+z2);
+
+      w_vx += dtI*s*frce(m,0,k,j,i);
+      w_vy += dtI*s*frce(m,1,k,j,i);
+      w_vz += dtI*s*frce(m,2,k,j,i);
+
+      z2 = w_vx*w_vx + w_vy*w_vy + w_vz*w_vz;
+
+      w_d *= lorentz/sqrt(1.+z2);
+      w_p *= lorentz/sqrt(1.+z2);
+
+      frce(m,0,k,j,i) += m1/m0/u(m, IDN,k,j,i)/h;
+      frce(m,1,k,j,i) += m2/m0/u(m, IDN,k,j,i)/h;
+      frce(m,2,k,j,i) += m3/m0/u(m, IDN,k,j,i)/h;
+ 	
+    }
+  );
+
 
   return;
 }

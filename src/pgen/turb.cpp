@@ -34,6 +34,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &ks = pmbp->mb_cells.ks, &ke = pmbp->mb_cells.ke;
   auto &u0 = pmbp->phydro->u0;
 
+  auto eps_init = pin->GetOrAddReal("forcing","eps_init",1.); 
+
   // Set initial conditions
   par_for("pgen_turb", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
@@ -42,7 +44,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
       u0(m,IM1,k,j,i) = 0.0;
       u0(m,IM2,k,j,i) = 0.0;
       u0(m,IM3,k,j,i) = 0.0;
-      u0(m,IEN,k,j,i) = 1.0/gm1;
+      u0(m,IEN,k,j,i) = u0(m,IDN,k,j,i)*eps_init;
     }
   );
 

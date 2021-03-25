@@ -47,7 +47,7 @@ class TurbulenceDriver : public ImEx
 
   // parameters of driving
   int nlow,nhigh,ntot,nwave;
-  Real tcorr,dedt;
+  Real tcorr,dedt, eps_cool;
   Real expo;
 
 
