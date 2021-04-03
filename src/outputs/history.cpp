@@ -70,6 +70,10 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm)
   } else {
     pdata->nhist = 7;
   }
+
+    pdata->nhist ++;
+    pdata->nhist ++;
+
   pdata->label[IDN] = "mass";
   pdata->label[IM1] = "1-mom";
   pdata->label[IM2] = "2-mom";
@@ -80,9 +84,12 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm)
   pdata->label[nhydro_  ] = "1-KE";
   pdata->label[nhydro_+1] = "2-KE";
   pdata->label[nhydro_+2] = "3-KE";
+  pdata->label[nhydro_+3] = "press";
+  pdata->label[nhydro_+4] = "w_lorentz";
 
   // capture class variabels for kernel  
   auto &u0_ = pm->pmb_pack->phydro->u0;
+  auto &w0_ = pm->pmb_pack->phydro->w0;
   auto &size = pm->pmb_pack->pmb->mbsize;
   int &nhist_ = pdata->nhist;
 
@@ -121,6 +128,8 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm)
       hvars.the_array[nhydro_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
       hvars.the_array[nhydro_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
       hvars.the_array[nhydro_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
+      hvars.the_array[nhydro_+3] = hvars.the_array[IDN]*w0_(m,IPR,k,j,i);
+      hvars.the_array[nhydro_+4] = hvars.the_array[IDN]*u0_(m,IDN,k,j,i)/w0_(m,IDN,k,j,i);
 
       // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
       for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
@@ -132,6 +141,9 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm)
 
     }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
   );
+
+  sum_this_mb.the_array[nhydro_+3]/= sum_this_mb.the_array[0];
+  sum_this_mb.the_array[nhydro_+4]/= sum_this_mb.the_array[0];
 
   // store data into hdata array
   for (int n=0; n<pdata->nhist; ++n) {
