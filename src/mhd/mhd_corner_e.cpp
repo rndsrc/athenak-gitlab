@@ -56,13 +56,28 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage)
     auto w0_ = w0;
     auto b0_ = bcc0;
     auto e3_cc_ = e3_cc;
-    par_for("e_cc_2d", DevExeSpace(), 0, nmb1, js-1, je+1, is-1, ie+1,
-      KOKKOS_LAMBDA(int m, int j, int i)
-      {
-        e3_cc_(m,ks,j,i) = w0_(m,IVY,ks,j,i)*b0_(m,IBX,ks,j,i) -
-                           w0_(m,IVX,ks,j,i)*b0_(m,IBY,ks,j,i);
-      }
-    );
+
+    if(relativistic){
+      par_for("e_cc_2d", DevExeSpace(), 0, nmb1, js-1, je+1, is-1, ie+1,
+	KOKKOS_LAMBDA(int m, int j, int i)
+	{
+	auto v2 = w0_(m,IVX,ks,j,i)*w0_(m,IVX,ks,j,i) + w0_(m,IVY,ks,j,i)*w0_(m,IVY,ks,j,i) +w0_(m,IVZ,ks,j,i)*w0_(m,IVZ,ks,j,i);
+	auto const u02 = 1. + v2;
+	auto const u0 = sqrt(u02);
+	  e3_cc_(m,ks,j,i) = (w0_(m,IVY,ks,j,i)*b0_(m,IBX,ks,j,i) -
+			     w0_(m,IVX,ks,j,i)*b0_(m,IBY,ks,j,i))/u0;
+	}
+      );
+    }
+    else{
+      par_for("e_cc_2d", DevExeSpace(), 0, nmb1, js-1, je+1, is-1, ie+1,
+	KOKKOS_LAMBDA(int m, int j, int i)
+	{
+	  e3_cc_(m,ks,j,i) = w0_(m,IVY,ks,j,i)*b0_(m,IBX,ks,j,i) -
+			     w0_(m,IVX,ks,j,i)*b0_(m,IBY,ks,j,i);
+	}
+      );
+    }
 
     // capture class variables for the kernels
     auto e1 = efld.x1e;
@@ -127,14 +142,31 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage)
   auto e1_cc_ = e1_cc;
   auto e2_cc_ = e2_cc;
   auto e3_cc_ = e3_cc;
-  par_for("e_cc_2d", DevExeSpace(), 0, nmb1, ks-1, ke+1, js-1, je+1, is-1, ie+1,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
-      e1_cc_(m,k,j,i)=w0_(m,IVZ,k,j,i)*b0_(m,IBY,k,j,i)-w0_(m,IVY,k,j,i)*b0_(m,IBZ,k,j,i);
-      e2_cc_(m,k,j,i)=w0_(m,IVX,k,j,i)*b0_(m,IBZ,k,j,i)-w0_(m,IVZ,k,j,i)*b0_(m,IBX,k,j,i);
-      e3_cc_(m,k,j,i)=w0_(m,IVY,k,j,i)*b0_(m,IBX,k,j,i)-w0_(m,IVX,k,j,i)*b0_(m,IBY,k,j,i);
-    }
-  );
+
+  if(relativistic){
+    par_for("e_cc_2d", DevExeSpace(), 0, nmb1, ks-1, ke+1, js-1, je+1, is-1, ie+1,
+      KOKKOS_LAMBDA(int m, int k, int j, int i)
+      {
+
+	auto v2 = w0_(m,IVX,k,j,i)*w0_(m,IVX,k,j,i) + w0_(m,IVY,k,j,i)*w0_(m,IVY,k,j,i) +w0_(m,IVZ,k,j,i)*w0_(m,IVZ,k,j,i);
+	auto const u02 = 1. + v2;
+	auto const u0 = sqrt(u02);
+	e1_cc_(m,k,j,i)= (w0_(m,IVZ,k,j,i)*b0_(m,IBY,k,j,i)-w0_(m,IVY,k,j,i)*b0_(m,IBZ,k,j,i))/u0;
+	e2_cc_(m,k,j,i)= (w0_(m,IVX,k,j,i)*b0_(m,IBZ,k,j,i)-w0_(m,IVZ,k,j,i)*b0_(m,IBX,k,j,i))/u0;
+	e3_cc_(m,k,j,i)= (w0_(m,IVY,k,j,i)*b0_(m,IBX,k,j,i)-w0_(m,IVX,k,j,i)*b0_(m,IBY,k,j,i))/u0;
+      }
+    );
+  }else{
+    par_for("e_cc_2d", DevExeSpace(), 0, nmb1, ks-1, ke+1, js-1, je+1, is-1, ie+1,
+      KOKKOS_LAMBDA(int m, int k, int j, int i)
+      {
+	e1_cc_(m,k,j,i)=w0_(m,IVZ,k,j,i)*b0_(m,IBY,k,j,i)-w0_(m,IVY,k,j,i)*b0_(m,IBZ,k,j,i);
+	e2_cc_(m,k,j,i)=w0_(m,IVX,k,j,i)*b0_(m,IBZ,k,j,i)-w0_(m,IVZ,k,j,i)*b0_(m,IBX,k,j,i);
+	e3_cc_(m,k,j,i)=w0_(m,IVY,k,j,i)*b0_(m,IBX,k,j,i)-w0_(m,IVX,k,j,i)*b0_(m,IBY,k,j,i);
+      }
+    );
+
+  }
 
   // capture class variables for the kernels
   auto e1 = efld.x1e;
