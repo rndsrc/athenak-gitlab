@@ -431,6 +431,9 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
   if(term3==0.) s=0;
 
+  if(!std::isfinite(s))
+	s=0.;
+
 //  s = fmax(s,0.);
 //  s= dedt;
 
@@ -478,7 +481,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
 
       // Upper bound 
-      auto kk = r/(1.+q);  // (C2) //FIXME + FS ???
+      auto kk = r/(1.+q + FS);  // (C2) //FIXME + FS ???
 
       // Enforce lower velocity bound
       // Obeying this bound combined with a floor on 
@@ -487,8 +490,8 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       kk = fmin(2.* sqrt(v_sq_max)/(1.+v_sq_max), kk); // (C13)
 
       // Compute bracket
-      auto zp = kk/sqrt(1-kk*kk);             // (C23)
-      auto zm = 0.5*kk/sqrt(1. - 0.25*kk*kk); // (C23)
+      auto zp = 100.; //kk/sqrt(1-kk*kk);             // (C23)
+      auto zm = 0.; //0.5*kk/sqrt(1. - 0.25*kk*kk); // (C23)
 
       // Evaluate master function
       Real fm,fp;      
@@ -537,7 +540,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 
       //For simplicity on the GPU, use the false position method
 	int iterations = max_iterations;
-	if((fabs(zm-zp) < tol ) || ((fabs(fm) + fabs(fp)) < 2.*tol )){
+	if((fabs(zm-zp) < tol ) || ((fabs(fm) + fabs(fp)) < 2.*tol ) || (fabs(fm-fp) < tol )){
 	    iterations = -1;
 	}
 
@@ -546,7 +549,11 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
       z=0.5*(zm+zp);
       for(int ii=0; ii< iterations; ++ii){
 
-	z =  (zm*fp - zp*fm)/(fp-fm);
+	auto ztmp =  (zm*fp - zp*fm)/(fp-fm);
+
+	if(!std::isfinite(ztmp))
+		break;
+	z = ztmp;
 
 	auto const W = sqrt(1. + z*z); // (C15)
 
@@ -578,7 +585,7 @@ void TurbulenceDriverHydroRel::ApplyForcingImplicit( DvceArray5D<Real> &force_, 
 	}
 
 	// NOTE: both z and f are of order unity
-	if((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
+	if((fabs(zm-zp) < tol ) || (fabs(f) < tol ) || (fabs(fm-fp) < tol )){
 	    break;
 	}
 

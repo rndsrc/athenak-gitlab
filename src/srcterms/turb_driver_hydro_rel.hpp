@@ -64,8 +64,8 @@ Real GetEpsfromTauWithCooling(Real u_e, Real SdotF, Real Lambda, Real lorentz, R
       Real const tol = 1.e-10;
       int const max_iterations = 200;
 
-      Real zm = 0.;
-      Real zp = 2.e1; // FIXME
+      Real zm = 1.e-12;
+      Real zp = 5.e1; // FIXME
 	
       auto fm = GetEpsfromTauWithCoolingKernel(u_e,SdotF,Lambda,lorentz,gamma_adi,zm);
       auto fp = GetEpsfromTauWithCoolingKernel(u_e,SdotF,Lambda,lorentz,gamma_adi,zp);
@@ -75,12 +75,18 @@ Real GetEpsfromTauWithCooling(Real u_e, Real SdotF, Real Lambda, Real lorentz, R
 
       //For simplicity on the GPU, use the false position method
 	int iterations = max_iterations;
-	if((fabs(zm-zp) < tol ) || ((fabs(fm) + fabs(fp)) < 2.*tol )){
+	if((fabs(zm-zp) < tol ) || ((fabs(fm) + fabs(fp)) < 2.*tol ) ||(fabs(fm-fp) < tol )){
 	    iterations = -1;
 	}
       for(int ii=0; ii< iterations; ++ii){
 
-	z =  (zm*fp - zp*fm)/(fp-fm);
+	auto ztmp =  (zm*fp - zp*fm)/(fp-fm);
+
+	if(!std::isfinite(ztmp)){
+	  break;
+	}
+
+	z = ztmp;
 
 	auto f = GetEpsfromTauWithCoolingKernel(u_e,SdotF,Lambda,lorentz,gamma_adi,z);
 
@@ -98,7 +104,7 @@ Real GetEpsfromTauWithCooling(Real u_e, Real SdotF, Real Lambda, Real lorentz, R
 	}
 
 	// NOTE: both z and f are of order unity
-	if((fabs(zm-zp) < tol*max(fabs(zm),fabs(zp)) ) || (fabs(f) < tol )){
+	if((fabs(zm-zp) < tol*max(fabs(zm),fabs(zp)) ) || (fabs(f) < tol ) || (fabs(fm-fp) <= tol*max(fabs(fm),fabs(fp)) ) ){
 	    break;
 	}
 

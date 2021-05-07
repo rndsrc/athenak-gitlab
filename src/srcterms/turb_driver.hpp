@@ -39,11 +39,9 @@ class TurbulenceDriver : public ImEx
   DvceArray3D<Real> x3sin;   // array for pre-computed sin(k z)
   DvceArray3D<Real> x3cos;   // array for pre-computed cos(k z)
 
-  DvceArray3D<Real> amp1;
-  DvceArray3D<Real> amp2;
-  DvceArray3D<Real> amp3;
+  DualArray2D<Real> amp1, amp2, amp3;
 
-  DvceArray2D<int64_t> seeds; // random seeds
+  int64_t seed; // for generating amp1,amp2,amp3 arrays
 
   // parameters of driving
   int nlow,nhigh,ntot,nwave;
