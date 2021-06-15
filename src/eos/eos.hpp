@@ -69,6 +69,26 @@ struct EOS_Data
     return std::sqrt(0.5*(qsq + std::sqrt(tmp*tmp + 4.0*asq*ct2))/d);
   }
 
+  KOKKOS_INLINE_FUNCTION
+  void FastMagnetosonicSpeedSR(Real rho_h, Real b2, Real pgas, Real vx, Real gamma_lorentz_sq, Real& plambda_plus, Real& plambda_minus)
+    const {
+      Real cs2 = gamma * pgas / rho_h;  // (MB 4)
+      Real ca2 = b2/(rho_h+b2);
+      Real v2 = 1. - 1./gamma_lorentz_sq;
+      ca2 = cs2 + ca2  - cs2*ca2;
+
+      auto const p1 = vx * (1. - ca2);
+      auto const tmp = sqrt( 
+	  ca2 * ((1.-v2*ca2) - p1*vx)/gamma_lorentz_sq
+	  );
+
+      auto const invden =1./ (1. - v2 * ca2);
+
+      plambda_plus = (p1 + tmp) * invden;
+      plambda_minus = (p1 - tmp) * invden;
+    }
+
+
   // fast magnetosonic speed function for isothermal EOS 
   KOKKOS_INLINE_FUNCTION
   Real FastMagnetosonicSpeed(Real d, Real bx, Real by, Real bz) const {
@@ -142,6 +162,20 @@ class AdiabaticMHD : public EquationOfState
 {
  public:
   AdiabaticMHD(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrimMHD(const DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
+                  DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) override;
+};
+
+
+//----------------------------------------------------------------------------------------
+//! \class AdibaticMHDRel
+//  \brief Derived class for relativistic MHD adiabatic EOS
+
+class AdiabaticMHDRel : public EquationOfState
+{
+ public:
+  AdiabaticMHDRel(MeshBlockPack *pp, ParameterInput *pin);
+  // prototype for MHD conversion function
   void ConsToPrimMHD(const DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
                   DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) override;
 };
