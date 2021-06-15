@@ -47,7 +47,16 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
   // construct EOS object (no default)
   {std::string eqn_of_state = pin->GetString("mhd","eos");
   if (eqn_of_state.compare("adiabatic") == 0) {
-    peos = new AdiabaticMHD(ppack, pin);
+
+    // FIXME : Should this only be switched via the riemann solver flag?
+    std::string rsolver = pin->GetString("mhd","rsolver");
+    if (rsolver.compare("llf_rel") == 0){
+        is_special_relativistic_ = true;
+    	peos = new AdiabaticMHDRel(ppack, pin);
+    }
+    else{
+    	peos = new AdiabaticMHD(ppack, pin);
+    }
     nmhd = 5;
   } else if (eqn_of_state.compare("isothermal") == 0) {
     peos = new IsothermalMHD(ppack, pin);
@@ -169,6 +178,9 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
 
     } else if (rsolver.compare("llf") == 0) {
       rsolver_method_ = MHD_RSolver::llf;
+
+    } else if (rsolver.compare("llf_rel") == 0) {
+      rsolver_method_ = MHD_RSolver::llf_rel;
 
     } else if (rsolver.compare("hlld") == 0) {
       if (peos->eos_data.is_adiabatic) {

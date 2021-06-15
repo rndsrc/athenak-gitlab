@@ -21,7 +21,7 @@ class SourceTerms;
 class Driver;
 
 // constants that enumerate MHD Riemann Solver options
-enum class MHD_RSolver {advect, llf, hlld, roe};
+enum class MHD_RSolver {advect, llf, hlld, roe, llf_rel};
 
 //----------------------------------------------------------------------------------------
 //! \struct MHDTaskIDs
@@ -81,6 +81,7 @@ class MHD
   DvceFaceFld5D<Real> uflx;   // fluxes of conserved quantities on cell faces
   DvceEdgeFld4D<Real> efld;   // edge-centered electric fields (fluxes of B)
   Real dtnew;
+  bool is_special_relativistic_ {false};
 
   // container to hold names of TaskIDs
   MHDTaskIDs id;

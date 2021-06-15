@@ -23,6 +23,7 @@ add_executable(
         eos/adiabatic_hydro.cpp
         eos/adiabatic_hydro_sr.cpp
         eos/adiabatic_mhd.cpp
+        eos/adiabatic_mhd_sr.cpp
         eos/isothermal_hydro.cpp
         eos/isothermal_mhd.cpp
 
