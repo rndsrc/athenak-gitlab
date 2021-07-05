@@ -25,6 +25,51 @@ AdiabaticMHDRel::AdiabaticMHDRel(MeshBlockPack *pp, ParameterInput *pin)
 }  
 
 //----------------------------------------------------------------------------------------
+// \!fn Real Equation49()
+// \brief Inline function to compute function fa(mu) defined in eq. 49 of Kastaun et al.
+// The root fa(mu)==0 of this function corresponds to the upper bracket for
+// solving Equation44
+
+KOKKOS_INLINE_FUNCTION
+Real Equation49(Real mu, Real b2, Real rpar, Real r, Real q)
+{
+  Real const x = 1./(1.+mu*b2);           // (26)
+
+  Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
+
+  return mu*sqrt(1.+rbar) - 1.;
+}
+
+//----------------------------------------------------------------------------------------
+// \!fn Real Equation44()
+// \brief Inline function to compute function f(mu) defined in eq. 44 of Kastaun et al.
+// The ConsToPRim algorithms finds the root of this function f(mu)=0
+
+KOKKOS_INLINE_FUNCTION
+Real Equation44(Real mu, Real b2, Real rpar, Real r, Real q, Real ud, Real pfloor, Real gm1)
+{
+  Real const x = 1./(1.+mu*b2);           // (26)
+
+  Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
+  Real qbar = q - 0.5*b2 - 0.5*(mu*mu*(b2*rbar- rpar*rpar)); // (31)
+//  rbar = sqrt(rbar);
+
+
+  Real z2 = (mu*mu*rbar/(abs(1.- SQR(mu)*rbar))); // (32)
+  Real w = sqrt(1.+z2);
+
+  Real const wd = ud/w;                  // (34)
+  Real eps = w*(qbar - mu*rbar)+  z2/(w+1.);
+
+
+  //NOTE: The following generalizes to ANY equation of state
+  eps = fmax(pfloor/(wd*gm1), eps);                          // 
+  Real const h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps));   // (43)
+
+  return mu - 1./(h/w + rbar*mu); // (45)
+}
+
+//----------------------------------------------------------------------------------------
 // \!fn void ConservedToPrimitive()
 // \brief No-Op version of MHD cons to prim functions.  Never used in MHD.
 
@@ -82,120 +127,150 @@ void AdiabaticMHDRel::ConsToPrimMHD(const DvceArray5D<Real> &cons,
       w_bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
 
       // apply density floor, without changing momentum or energy
-///      u_d = (u_d > dfloor_) ?  u_d : dfloor_;
-//      w_d = u_d;
+      u_d = (u_d > dfloor_) ?  u_d : dfloor_;
 
       // apply energy floor
+//      Real ee_min = pfloor_/gm1;
 //      u_e = (u_e > ee_min) ?  u_e : ee_min;
-//      w_p = pfloor_;
 
-      Real ee = u_d + u_e;
 
-      Real mm_sq = SQR(u_m1) + SQR(u_m2) + SQR(u_m3);
+      // Recast all variables (eq 22-24)
+      // Variables q and r defined in anonymous namspace: global this file
+      Real q = u_e/u_d;
+      Real r = sqrt(SQR(u_m1) + SQR(u_m2) + SQR(u_m3))/u_d;
 
-      Real bb_sq = w_bx*w_bx + w_by*w_by + w_bz*w_bz;
+      Real sqrtd = sqrt(u_d);
+      Real bx = w_bx/sqrtd;
+      Real by = w_by/sqrtd;
+      Real bz = w_bz/sqrtd;
+      Real b2 = (bx*bx+by*by+bz*bz);
 
-      Real tt = u_m1 * w_bx + u_m2 * w_by + u_m3 * w_bz;
+      Real rpar = (bx*u_m1 +  by*u_m2 +  bz*u_m3)/u_d;
 
-      Real m2_max = mm_sq_ee_sq_max * SQR(ee);
-      if( mm_sq > m2_max){
-	Real factor = std::sqrt(m2_max/mm_sq);
-	u_m1*= factor;
-	u_m2*= factor;
-	u_m3*= factor;
 
-	tt*= factor;
+      // Need to find initial bracket. Requires separate solve
+      
+
+
+      Real zm=0.;
+      Real zp=1.; // This is the lowest specific enthalpy admitted by the EOS
+
+
+
+
+      // Evaluate master function (eq C22) at bracket values
+      Real fm = Equation49(zm, b2, rpar, r, q);
+      Real fp = Equation49(zp, b2, rpar, r, q);
+
+      
+      
+      // For simplicity on the GPU, find roots using the false position method
+      int iterations = max_iterations;
+      // If bracket within tolerances, don't bother doing any iterations
+      if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
+        iterations = -1;
       }
+      Real z = 0.5*(zm + zp);
 
-    bool failed= false;
+      for (int ii=0; ii < iterations; ++ii) {
+	z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
+      	Real f = Equation49(z, b2, rpar, r, q);
 
+        // Quit if convergence reached
+	// NOTE: both z and f are of order unity
+	if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
+/**
+std::cout << "|zm-zp|=" <<fabs(zm-zp)<<" |f|="<< fabs(f) << "for i=" <<  ii << std::endl;
+**/
+	    break;
+	}
 
-    // Calculate functions of conserved quantities
-    Real d = 0.5 * (mm_sq * bb_sq - tt*tt);                  // (NH 5.7)
-    d = fmax(d, 0.0);
-    Real pgas_min = cbrt(27.0/4.0 * d) - ee - 0.5*bb_sq;
-    pgas_min = fmax(pfloor_, pgas_uniform_min);
+        // assign zm-->zp if root bracketed by [z,zp]
+	if (f * fp < 0.0) {
+	   zm = zp;
+	   fm = fp;
+	   zp = z;
+	   fp = f;
 
-    // Iterate until convergence
-    Real pgas[3];
-    pgas[0] =  pgas_min; // Do we have a previous step
-    int n;
-    for (n = 0; n < max_iterations; ++n) {
-      // Step 1: Calculate cubic coefficients
-      Real a;
-      if (n%3 != 2) {
-        a = ee + pgas[n%3] + 0.5*bb_sq;  // (NH 5.7)
-	a = fmax(a, a_min);
-      }
-
-      // Step 2: Calculate correct root of cubic equation
-      Real phi, eee, ll, v_sq;
-      if (n%3 != 2) {
-	phi = acos(1.0/a * sqrt(27.0*d/(4.0*a)));                     // (NH 5.10)
-	eee = a/3.0 - 2.0/3.0 * a * cos(2.0/3.0 * (phi+M_PI));               // (NH 5.11)
-	ll = eee - bb_sq;                                                       // (NH 5.5)
-	v_sq = ll * (bb_sq+ll);
-	v_sq = (mm_sq*ll*ll + tt*tt*(bb_sq+2.0*ll)) / (v_sq*v_sq); // (NH 5.2)
-	v_sq = fmin(fmax(v_sq, 0.0), v_sq_max);
-	Real gamma_sq = 1.0/(1.0-v_sq);                                         // (NH 3.1)
-	Real gamma = sqrt(gamma_sq);                                       // (NH 3.1)
-	Real wgas = ll/gamma_sq;                                                // (NH 5.1)
-	Real rho = u_d/gamma;                                                    // (NH 4.5)
-	pgas[(n+1)%3] = (gamma_adi-1.0)/gamma_adi * (wgas - rho);               // (NH 4.1)
-	pgas[(n+1)%3] = std::max(pgas[(n+1)%3], pgas_min);
-      }
-
-      // Step 3: Check for convergence
-      if (n%3 != 2) {
-	if (pgas[(n+1)%3] > pgas_min && fabs(pgas[(n+1)%3]-pgas[n%3]) < tol) {
-	  break;
+        // assign zp-->z if root bracketed by [zm,z]
+	} else {
+	   fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
+	   zp = z;
+	   fp = f;
 	}
       }
 
-      // Step 4: Calculate Aitken accelerant and check for convergence
-      if (n%3 == 2) {
-	Real rr = (pgas[2] - pgas[1]) / (pgas[1] - pgas[0]);  // (NH 7.1)
-	if ((rr!=rr) || fabs(rr) > rr_max) {
-	  continue;
+
+      zm= 0.;
+      zp= z;
+
+      // Evaluate master function (eq C22) at bracket values
+      fm = Equation44(zm, b2, rpar, r, q, u_d, pfloor_, gm1);
+      fp = Equation44(zp, b2, rpar, r, q, u_d, pfloor_, gm1);
+
+      // For simplicity on the GPU, find roots using the false position method
+      iterations = max_iterations;
+      // If bracket within tolerances, don't bother doing any iterations
+      if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
+        iterations = -1;
+      }
+      z = 0.5*(zm + zp);
+
+      for (int ii=0; ii < iterations; ++ii) {
+	z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
+        Real f = Equation44(z, b2, rpar, r, q, u_d, pfloor_, gm1);
+
+        // Quit if convergence reached
+	// NOTE: both z and f are of order unity
+	if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
+/**
+std::cout << "|zm-zp|=" <<fabs(zm-zp)<<" |f|="<< fabs(f) << "for i=" <<  ii << std::endl;
+**/
+	    break;
 	}
-	pgas[0] = pgas[1] + (pgas[2] - pgas[1]) / (1.0 - rr);  // (NH 7.2)
-	pgas[0] = fmax(pgas[0], pgas_min);
-	if (pgas[0] > pgas_min && fabs(pgas[0]-pgas[2]) < tol) {
-	  break;
+
+        // assign zm-->zp if root bracketed by [z,zp]
+	if (f * fp < 0.0) {
+	   zm = zp;
+	   fm = fp;
+	   zp = z;
+	   fp = f;
+
+        // assign zp-->z if root bracketed by [zm,z]
+	} else {
+	   fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
+	   zp = z;
+	   fp = f;
 	}
       }
-    }
 
-    // Step 5: Set primitives
-    if (n == max_iterations) {
-      failed = true;
-    }
-    w_p = pgas[(n+1)%3];
-//    if (!std::isfinite(w_p)) {
-//      failed=true;
-//    }
-    Real a = ee + prim(m,IPR,k,j,i) + 0.5*bb_sq;                      // (NH 5.7)
-    a = std::max(a, a_min);
-    Real phi = std::acos(1.0/a * std::sqrt(27.0*d/(4.0*a)));        // (NH 5.10)
-    Real eee = a/3.0 - 2.0/3.0 * a * std::cos(2.0/3.0 * (phi+M_PI));  // (NH 5.11)
-    Real ll = eee - bb_sq;                                          // (NH 5.5)
-    Real v_sq = (mm_sq*SQR(ll) + SQR(tt)*(bb_sq+2.0*ll))
-		/ SQR(ll * (bb_sq+ll));                             // (NH 5.2)
-    v_sq = std::min(std::max(v_sq, 0.0), v_sq_max);
-    Real gamma_sq = 1.0/(1.0-v_sq);                                 // (NH 3.1)
-    Real gamma = std::sqrt(gamma_sq);                               // (NH 3.1)
+      Real &mu = z;
 
-    w_d = u_d/gamma;                      // (NH 4.5)
-//    if (!std::isfinite(w_d)) {
-//      failed=true;
-//    }
-    Real ss = tt/ll;                          // (NH 4.8)
-    w_vx = (u_m1 + ss*w_bx) / (ll + bb_sq);  // (NH 4.6)
-    w_vy = (u_m2 + ss*w_by) / (ll + bb_sq);  // (NH 4.6)
-    w_vz = (u_m3 + ss*w_bz) / (ll + bb_sq);  // (NH 4.6)
-    w_vx *= gamma;           // (NH 4.6)
-    w_vy *= gamma;           // (NH 4.6)
-    w_vz *= gamma;           // (NH 4.6)
+      Real const x = 1./(1.+mu*b2);           // (26)
+
+      Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
+      Real qbar = q - 0.5*b2 - 0.5*(mu*mu*(b2*rbar- rpar*rpar)); // (31)
+    //  rbar = sqrt(rbar);
+
+
+      Real z2 = (mu*mu*rbar/(abs(1.- SQR(mu)*rbar))); // (32)
+      Real w = sqrt(1.+z2);
+
+      std::cout << "Lorentz: " << w << std::endl;
+      std::cout << "Mu final: " << mu << std::endl;
+
+      Real const wd = u_d/w;                  // (34)
+      Real eps = w*(qbar - mu*rbar)+  z2/(w+1.);
+
+    //NOTE: The following generalizes to ANY equation of state
+      eps = fmax(pfloor_/(wd*gm1), eps);                          // 
+      Real const h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps));   // (43)
+      w_p = w_d*gm1*eps;
+
+      Real const conv = w/(h*w + b2); // (C26)
+      w_vx = conv * ( u_m1/u_d + bx * rpar/(h*w));           // (C26)
+      w_vy = conv * ( u_m2/u_d + by * rpar/(h*w));           // (C26)
+      w_vz = conv * ( u_m3/u_d + bz * rpar/(h*w));           // (C26)
 
 //    if (!std::isfinite(w_vx) || !std::isfinite(w_vy) || !std::isfinite(w_vz)) {
 //      failed = true;
@@ -210,6 +285,7 @@ void AdiabaticMHDRel::ConsToPrimMHD(const DvceArray5D<Real> &cons,
 
       if (false)
       {
+	Real &gamma =w;
 	Real gamma_adi = gm1+1.;
 	Real rho_eps = w_p / gm1;
 	//FIXME ERM: Only ideal fluid for now
