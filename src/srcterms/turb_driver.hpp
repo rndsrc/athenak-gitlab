@@ -46,11 +46,14 @@ class TurbulenceDriver
   void IncludeInitializeModesTask(TaskList &tl, TaskID start);
   void IncludeAddForcingTask(TaskList &tl, TaskID start);
   TaskStatus InitializeModes(Driver *pdrive, int stage);
-  TaskStatus AddForcing(Driver *pdrive, int stage);
+  virtual TaskStatus AddForcing(Driver *pdrive, int stage)=0;
 
- private:
-  bool first_time=true;     // flag to enable initialization on first call 
+  virtual void GlobalNormalization(DvceArray5D<Real> &ftmp) =0;
+
+ protected:
+  bool initialized = false;
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this TurbulenceDriver
+
 };
 
 #endif // SRCTERMS_TURB_DRIVER_HPP_

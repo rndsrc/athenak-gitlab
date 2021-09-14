@@ -74,6 +74,7 @@ add_executable(
 
         srcterms/srcterms.cpp
         srcterms/turb_driver.cpp
+        srcterms/turb_driver_newtonian.cpp
 
         utils/change_rundir.cpp
         utils/show_config.cpp
