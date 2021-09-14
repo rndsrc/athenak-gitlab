@@ -16,7 +16,7 @@
 #include "ion-neutral/ion_neutral.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
-#include "srcterms/turb_driver.hpp"
+#include "srcterms/turb_driver_newtonian.hpp"
 
 #if MPI_PARALLEL_ENABLED
 #include <mpi.h>
@@ -89,7 +89,7 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin, Driver *pdrive)
   // force and adding force to fluid are included in operator_split and stage_run
   // task lists respectively.
   if (pin->DoesBlockExist("turb_driving")) {
-    pturb = new TurbulenceDriver(this, pin);
+    pturb = new TurbulenceDriverNewtonian(this, pin);
     pturb->IncludeInitializeModesTask(operator_split_tl, none);
     pturb->IncludeAddForcingTask(run_tl, none);
   } else {
