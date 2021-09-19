@@ -1,0 +1,1 @@
+readtable.cc : CXXFLAGS+=-fp-model precise

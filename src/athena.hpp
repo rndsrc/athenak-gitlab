@@ -43,7 +43,7 @@ using Real = double;
 // array indices for conserved: density, momemtum, total energy
 enum ConsIndex {IDN=0, IM1=1, IM2=2, IM3=3, IEN=4};
 // array indices for primitives: velocity, pressure
-enum PrimIndex {IVX=1, IVY=2, IVZ=3, IPR=4};
+enum PrimIndex {IVX=1, IVY=2, IVZ=3, IPR=4, ITEMP=5};
 // array indices for components of magnetic field
 enum BFldIndex {IBX=0, IBY=1, IBZ=2};
 // array indices for metric matrices in GR

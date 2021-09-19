@@ -16,6 +16,12 @@
 #include "mesh/meshblock.hpp"
 #include "parameter_input.hpp"
 
+#include "eos_framework/Margherita_EOS.h"
+
+// TEMPORARY FIX EOS_type //
+
+using AthenaEOS = EOS_Polytropic;
+
 //----------------------------------------------------------------------------------------
 //! \struct EOSData
 //  \brief container for variables associated with EOS, and in-lined wave speed functions
@@ -74,6 +80,18 @@ struct EOS_Data
   void WaveSpeedsSR(Real h, Real p, Real vx, Real lor_sq, Real& l_p, Real& l_m)
   const {
     Real cs2 = gamma * p / h;  // (MB 4)
+    Real v2 = 1.0 - 1.0/lor_sq;
+    auto const p1 = vx * (1.0 - cs2);
+    auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*vx) / lor_sq);
+    auto const invden = 1.0/(1.0 - v2*cs2);
+
+    l_p = (p1 + tmp) * invden;
+    l_m = (p1 - tmp) * invden;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void WaveSpeedsSRTable(Real h, Real p, Real vx, Real lor_sq, Real cs2, Real& l_p, Real& l_m)
+  const {
     Real v2 = 1.0 - 1.0/lor_sq;
     auto const p1 = vx * (1.0 - cs2);
     auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*vx) / lor_sq);

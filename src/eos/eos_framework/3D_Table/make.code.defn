@@ -1,0 +1,2 @@
+SRCS = readtable.cc
+SUBDIRS = 
