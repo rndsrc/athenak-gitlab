@@ -62,7 +62,7 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &co
     typename AthenaEOS::error_t error_type;
 
     Real wgas_l, cs2_l, ye_l=0.;
-    wl_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, wl_itemp, wl_idn, ye_l);
+    wl_ipl = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, wl_itemp, wl_idn, ye_l);
     Real wgas_r, cs2_r, ye_r=0.;
     wr_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, wr_itemp, wr_idn, ye_r);
 
@@ -72,10 +72,10 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &co
     //--- Step 2.  Compute wave speeds in L,R states (see Toro eq. 10.43)
 
     Real lp_l, lm_l;
-    eos.WaveSpeedsSRTable(wgas_l, wl_ipr, wl_ivx/u0l, (1.0 + u2l), cs2_l, lp_l, lm_l);
+    eos.WaveSpeedsSR(wgas_l, wl_ipr, wl_ivx/u0l, (1.0 + u2l), cs2_l, lp_l, lm_l);
 
     Real lp_r, lm_r;
-    eos.WaveSpeedsSRTable(wgas_r, wr_ipr, wr_ivx/u0r, (1.0 + u2r), cs2_r, lp_r, lm_r);
+    eos.WaveSpeedsSR(wgas_r, wr_ipr, wr_ivx/u0r, (1.0 + u2r), cs2_r, lp_r, lm_r);
 
     Real qa = fmax(-fmin(lm_l,lm_r), 0.0);
     Real a = fmax(fmax(lp_l,lp_r), qa);

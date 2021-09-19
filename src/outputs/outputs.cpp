@@ -258,6 +258,15 @@ OutputVariable GetOutputVariable(const std::string& input_string)
   } else if (input_string == "mhd_bcc") {
     return OutputVariable::mhd_bcc;
 
+  // mhd conserved variables and cell-centered magnetic fields
+  } else if (input_string == "mhd_u_bcc") {
+    return OutputVariable::mhd_u_bcc;
+
+  // mhd primitive variables and cell-centered magnetic fields
+  } else if (input_string == "mhd_w_bcc") {
+    return OutputVariable::mhd_w_bcc;
+
+  // cell-centered forcing added in turbulent driving problems
   } else if (input_string == "turb_force") {
     return OutputVariable::turb_force;
 
@@ -350,7 +359,15 @@ std::string GetOutputVariableString(OutputVariable input_flag)
     case OutputVariable::mhd_bcc:
       return "mhd_bcc";
 
-    // cell centered forcing added in turbulent driving problems
+    // mhd conserved variables and cell-centered magnetic fields
+    case OutputVariable::mhd_u_bcc:
+      return "mhd_u_bcc";
+
+    // mhd primitive variables and cell-centered magnetic fields
+    case OutputVariable::mhd_w_bcc:
+      return "mhd_w_bcc";
+
+    // cell-centered forcing added in turbulent driving problems
     case OutputVariable::turb_force:
       return "turb_force";
 
