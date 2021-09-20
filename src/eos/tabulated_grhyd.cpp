@@ -423,9 +423,11 @@ void TabulatedGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Rea
 
       typename AthenaEOS::error_type error;
       double ye = 0.0;
-      double eps;
-      w_p= AthenaEOS::press_temp__eps_rho_ye(w_temp,eps,w_d,ye,error);
-      Real wgas_u0 = w_d*(1. + eps + w_p/w_d) * u0;
+      double cs2;
+      Real wgas_u0;
+      w_p= AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_u0, cs2,w_temp,w_d,ye,error);
+      wgas_u0 *= w_d*u0;
+
       u_d  = w_d * u0;
       u_e  = wgas_u0 * u_0 + w_p;
       u_m1 = wgas_u0 * u_1;

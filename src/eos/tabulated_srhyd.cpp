@@ -324,7 +324,7 @@ void TabulatedSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Rea
       double cs2;
       Real wgas_u0;
       w_p= AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_u0, cs2,w_temp,w_d,ye,error);
-      wgas_u0 *= w_d;
+      wgas_u0 *= w_d*u0;
 
       // Set conserved quantities
       u_d  = w_d * u0;
