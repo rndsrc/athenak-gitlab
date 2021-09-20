@@ -39,14 +39,19 @@ TabulatedSRHydro::TabulatedSRHydro(MeshBlockPack *pp, ParameterInput *pin)
   if constexpr (std::is_same<AthenaEOS, EOS_Polytropic>::value){
 
     // Only used for testing
+    
+    std::cout << "Setting up polytrope. " << std::endl;
 
     EOS_Polytropic::gamma_th_m1 = eos_data.gamma -1.;
-    Cold_PWPoly::num_pieces = 1.;
-    Cold_PWPoly::k_tab[0] =  1.e-8;
+    Cold_PWPoly::num_pieces = 1;
+    Cold_PWPoly::k_tab[0] =  1.e-15;
     Cold_PWPoly::rho_tab[0] =0.;
     Cold_PWPoly::eps_tab[0] =0.;
     Cold_PWPoly::P_tab[0] =0.;
     Cold_PWPoly::gamma_tab[0] =eos_data.gamma;
+
+    Cold_PWPoly::rhomin  =1.e-10;
+    Cold_PWPoly::rhomax  =1.e3;
   }
 
   if constexpr (std::is_same<AthenaEOS, EOS_Tabulated>::value){
@@ -316,9 +321,10 @@ void TabulatedSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Rea
 
       typename AthenaEOS::error_type error;
       double ye = 0.0;
-      double eps;
-      w_p= AthenaEOS::press_temp__eps_rho_ye(w_temp,eps,w_d,ye,error);
-      Real wgas_u0 = w_d*(1. + eps + w_p/w_d) * u0;
+      double cs2;
+      Real wgas_u0;
+      w_p= AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_u0, cs2,w_temp,w_d,ye,error);
+      wgas_u0 *= w_d;
 
       // Set conserved quantities
       u_d  = w_d * u0;

@@ -79,6 +79,7 @@ void ProblemGenerator::ShockTube_(MeshBlockPack *pmbp, ParameterInput *pin)
     wl.vy = pin->GetReal("problem","vl");
     wl.vz = pin->GetReal("problem","wl");
     wl.p  = pin->GetReal("problem","pl");
+    wl.temp = wl.p/wl.d;
     // compute Lorentz factor (needed for SR)
     Real u0l = 1.0;
     if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic) {
@@ -91,6 +92,7 @@ void ProblemGenerator::ShockTube_(MeshBlockPack *pmbp, ParameterInput *pin)
     wr.vy = pin->GetReal("problem","vr");
     wr.vz = pin->GetReal("problem","wr");
     wr.p  = pin->GetReal("problem","pr");
+    wr.temp = wr.p/wr.d;
     // compute Lorentz factor (needed for SR)
     Real u0r = 1.0;
     if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic) {
@@ -126,12 +128,14 @@ void ProblemGenerator::ShockTube_(MeshBlockPack *pmbp, ParameterInput *pin)
           w0(m,ivy,k,j,i) = u0l*wl.vy;
           w0(m,ivz,k,j,i) = u0l*wl.vz;
           w0(m,IPR,k,j,i) = wl.p;
+          w0(m,ITEMP,k,j,i) = wl.temp;
         } else {
           w0(m,IDN,k,j,i) = wr.d;
           w0(m,ivx,k,j,i) = u0r*wr.vx;
           w0(m,ivy,k,j,i) = u0r*wr.vy;
           w0(m,ivz,k,j,i) = u0r*wr.vz;
           w0(m,IPR,k,j,i) = wr.p;
+          w0(m,ITEMP,k,j,i) = wr.temp;
         }
       }
     );

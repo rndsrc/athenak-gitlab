@@ -62,7 +62,7 @@ enum PhysicsModule {HydroDynamics, MagnetoHydroDynamics};
 // structs to store primitive/conserved variables in one-dimension
 // (density, velocity/momentum, pressure/(total energy), [transverse magnetic field])
 struct HydPrim1D {
-  Real d, vx, vy, vz, p;
+  Real d, vx, vy, vz, p, temp;
 };
 struct HydCons1D {
   Real d, mx, my, mz, e;
