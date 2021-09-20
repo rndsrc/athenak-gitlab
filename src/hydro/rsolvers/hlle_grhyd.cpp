@@ -88,17 +88,17 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &c
     }
 
     // Extract left primitives
-    const Real &rho_l  = wl(IDN,i);
-    const Real &pgas_l = wl(IPR,i);
-    const Real &temp_l = wl(ITEMP,i);
+    Real &rho_l  = wl(IDN,i);
+    Real &pgas_l = wl(IPR,i);
+    Real &temp_l = wl(ITEMP,i);
     const Real &uu1_l  = wl(IVX,i);
     const Real &uu2_l  = wl(IVY,i);
     const Real &uu3_l  = wl(IVZ,i);
 
     // Extract right primitives
-    const Real &rho_r  = wr(IDN,i);
-    const Real &pgas_r = wr(IPR,i);
-    const Real &temp_r = wr(ITEMP,i);
+    Real &rho_r  = wr(IDN,i);
+    Real &pgas_r = wr(IPR,i);
+    Real &temp_r = wr(ITEMP,i);
     const Real &uu1_r  = wr(IVX,i);
     const Real &uu2_r  = wr(IVY,i);
     const Real &uu3_r  = wr(IVZ,i);
@@ -133,18 +133,20 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &c
     ucov_r[2] = g_20*ucon_r[0] + g_21*ucon_r[1] + g_22*ucon_r[2] + g_23*ucon_r[3];
     ucov_r[3] = g_30*ucon_r[0] + g_31*ucon_r[1] + g_32*ucon_r[2] + g_33*ucon_r[3];
 
-    // Calculate wavespeeds in left state
+    
+    typename AthenaEOS::error_type error;
 
     Real wgas_l, cs2_l, ye_l=0.;
-    pgas_l = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, temp_l, rho_l, ye_l);
+    pgas_l = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, temp_l, rho_l, ye_l, error);
 
+    Real wgas_r, cs2_r, ye_r=0.;
+    pgas_r = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, temp_r, rho_r, ye_r, error);
+
+    // Calculate wavespeeds in left state
     Real lp_l, lm_l;
     eos.WaveSpeedsGR(wgas_l, pgas_l, ucon_l[0], ucon_l[ivx], g00, g0i, gii, cs2_l, lp_l, lm_l);
-
     // Calculate wavespeeds in right state
     Real lp_r, lm_r;
-    Real wgas_r, cs2_r, ye_r=0.;
-    pgas_r = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, temp_r, rho_r, ye_r);
     eos.WaveSpeedsGR(wgas_r, pgas_r, ucon_r[0], ucon_r[ivx], g00, g0i, gii, cs2_r, lp_r, lm_r);
 
     // Calculate extremal wavespeeds

@@ -290,6 +290,22 @@ public:
 };
 
 //----------------------------------------------------------------------------------------
+//! \class TabulatedHydroSR
+//  \brief Derived class for ideal gas EOS in special relativistic Hydro
+
+class TabulatedSRHydro : public EquationOfState
+{
+public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  TabulatedSRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
+};
+
+//----------------------------------------------------------------------------------------
 //! \class IdealHydroGR
 //  \brief Derived class for ideal gas EOS in general relativistic Hydro
 
@@ -301,6 +317,22 @@ public:
   using EquationOfState::PrimToCons;
 
   IdealGRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
+};
+
+//----------------------------------------------------------------------------------------
+//! \class TabulatedHydroGR
+//  \brief Derived class for ideal gas EOS in general relativistic Hydro
+
+class TabulatedGRHydro : public EquationOfState
+{
+public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  TabulatedGRHydro(MeshBlockPack *pp, ParameterInput *pin);
   void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
   void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
 };

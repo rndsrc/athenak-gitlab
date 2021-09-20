@@ -2,6 +2,7 @@
 #define _HH_MARGHERITA_EOS
 
 #define NEW_TABLE  // Needed for NRaphson C2P
+#define STANDALONE  // Needed for NRaphson C2P
 
 #include "3D_Table/tabulated.hh"
 

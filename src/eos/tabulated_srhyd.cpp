@@ -17,14 +17,13 @@
 #define COLDTABLE_SETUP
 
 #include "eos.hpp"
-#include "../Hybrid/hybrid_implementation.hh"
-#include "cold_pwpoly_implementation.hh"
-#include "cold_table_implementation.hh"
+#include "eos_framework/Hybrid/hybrid_implementation.hh"
+#include "eos_framework/Cold/cold_pwpoly_implementation.hh"
+#include "eos_framework/Cold/cold_table_implementation.hh"
 
-#include "hot_slice.hh"
+#include "eos_framework/Cold/hot_slice.hh"
 
 #include "eos_framework/3D_Table/tabulated_implementation.hh"
-#include "eos_framework/Hyb/tabulated_implementation.hh"
 
 //----------------------------------------------------------------------------------------
 // ctor: also calls EOS base class constructor
@@ -33,7 +32,7 @@ TabulatedSRHydro::TabulatedSRHydro(MeshBlockPack *pp, ParameterInput *pin)
   : EquationOfState(pp, pin)
 {      
   //FIXME
-  eos_data.is_adiabatic = true;
+  eos_data.is_ideal = true;
   eos_data.gamma = pin->GetReal("eos","gamma");
   eos_data.iso_cs = 0.0;
 
@@ -54,39 +53,42 @@ TabulatedSRHydro::TabulatedSRHydro(MeshBlockPack *pp, ParameterInput *pin)
 
     auto eos_type = pin->GetString("eos","eos_type");
 
-  if (eos_type ==  "stellarcollapse"){
-    EOS_Tabulated::readtable_scollapse(nuceos_table_name, do_energy_shift, recompute_mu_nu);
-  }else if (eos_type == "compose"){
-    EOS_Tabulated::readtable_compose(nuceos_table_name);
-  }else{
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
-              << "<eos>/eos_type = '" << eos_type << "' not implemented" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-  EOS_Tabulated::extend_table_high = true;
+    auto eos_filename = pin->GetString("eos","eos_filename").c_str();
 
-  // Compute Isentropic or Cold EOS for ID
+    if (eos_type ==  "stellarcollapse"){
+      EOS_Tabulated::readtable_scollapse(eos_filename, true, true);
+    }else if (eos_type == "compose"){
+      EOS_Tabulated::readtable_compose(eos_filename);
+    }else{
+      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+		<< "<eos>/eos_type = '" << eos_type << "' not implemented" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+    EOS_Tabulated::extend_table_high = true;
+
+    // Compute Isentropic or Cold EOS for ID
 
 
-  // The following could be included in an input file, but the parameters
-  // usually don't change much between EOS
+    // The following could be included in an input file, but the parameters
+    // usually don't change much between EOS
 
-  auto id_eos_type = pin->GetString("eos","id_eos_type");
+    auto id_eos_type = pin->GetString("eos","id_eos_type");
 
-  int downsample_num_points = 500;
-  int cold_table_num_points = 300;
+    int downsample_num_points = 500;
+    int cold_table_num_points = 300;
 
-  if (id_eos_type == "constant_temperature" ) {
-    auto temp_id = pin->GetReal("eos","initial_temperature");
-    HotSlice_beta_eq(downsample_num_points, cold_table_num_points, temp_id);
-  } else if (id_eos_type == "constant_entropy" ) {
-    auto entropy_id = pin->GetReal("eos","initial_entropy");
-    HotSlice_beta_eq_isentropic(downsample_num_points, cold_table_num_points,
-                                entropy_id);
-  }else if{
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
-              << "<eos>/id_eos_type = '" << id_eos_type << "' not implemented" << std::endl;
-    std::exit(EXIT_FAILURE);
+    if (id_eos_type == "constant_temperature" ) {
+      auto temp_id = pin->GetReal("eos","initial_temperature");
+      HotSlice_beta_eq(downsample_num_points, cold_table_num_points, temp_id);
+    } else if (id_eos_type == "constant_entropy" ) {
+      auto entropy_id = pin->GetReal("eos","initial_entropy");
+      HotSlice_beta_eq_isentropic(downsample_num_points, cold_table_num_points,
+				  entropy_id);
+    }else{
+      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+		<< "<eos>/id_eos_type = '" << id_eos_type << "' not implemented" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
   }
 
 }  
@@ -100,14 +102,14 @@ KOKKOS_INLINE_FUNCTION
 Real EquationC22(Real z, Real &u_d, Real q, Real r, Real gm1, Real pfloor)
 {
   Real const w = sqrt(1.0 + z*z);         // (C15)
-  Real const wd = u_d/w;                  // (C15)
+  Real wd = u_d/w;                  // (C15)
   Real eps = w*q - z*r + (z*z)/(1.0 + w); // (C16)
 
   typename AthenaEOS::error_type error;
   double ye = 0.0;
   double temp;
-  w_p= AthenaEOS::press_temp__eps_rho_ye(temp,eps,w_d,ye,error);
-  Real h = 1. + eps + w_p/w_d;
+  double w_p= AthenaEOS::press_temp__eps_rho_ye(temp,eps,wd,ye,error);
+  Real h = 1. + eps + w_p/wd;
 
   return (z - r/h); // (C22)
 }
@@ -131,7 +133,7 @@ Real EquationC22(Real z, Real &u_d, Real q, Real r, Real gm1, Real pfloor)
 //
 // This function operates over entire MeshBlock, including ghost cells.  
 
-void AdiabaticSRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim)
+void TabulatedSRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim)
 {
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
   int &ng = indcs.ng;
@@ -281,7 +283,7 @@ std::cout << "|zm-zp|=" <<fabs(zm-zp)<<" |f|="<< fabs(f) << "for i=" <<  ii << s
 //  Recall in SR hydrodynamics the conserved variables are: (D, E-D, m^i), and the
 //  primitive variables are: (\rho, P_gas, u^i).
 
-void AdiabaticSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons)
+void TabulatedSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons)
 {
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
   int &is = indcs.is; int &ie = indcs.ie;
@@ -301,15 +303,22 @@ void AdiabaticSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Rea
       Real& u_m2 = cons(m, IM2,k,j,i);
       Real& u_m3 = cons(m, IM3,k,j,i);
 
-      const Real& w_d  = prim(m, IDN,k,j,i);
-      const Real& w_p  = prim(m, IPR,k,j,i);
+      Real& w_d  = prim(m, IDN,k,j,i);
+      Real& w_p  = prim(m, IPR,k,j,i);
       const Real& w_vx = prim(m, IVX,k,j,i);
       const Real& w_vy = prim(m, IVY,k,j,i);
       const Real& w_vz = prim(m, IVZ,k,j,i);
 
+      Real& w_temp = prim(m, ITEMP,k,j,i);
+
       // Calculate Lorentz factor
       Real u0 = sqrt(1.0 + SQR(w_vx) + SQR(w_vy) + SQR(w_vz));
-      Real wgas_u0 = (w_d + gamma_prime * w_p) * u0;
+
+      typename AthenaEOS::error_type error;
+      double ye = 0.0;
+      double eps;
+      w_p= AthenaEOS::press_temp__eps_rho_ye(w_temp,eps,w_d,ye,error);
+      Real wgas_u0 = w_d*(1. + eps + w_p/w_d) * u0;
 
       // Set conserved quantities
       u_d  = w_d * u0;

@@ -39,7 +39,7 @@
 // to about 100 points and interpolate this by using a cubic spline
 // interp.
 
-void HotSlice_beta_eq(const int downsample_rho, const int num_cold_points,
+static void HotSlice_beta_eq(const int downsample_rho, const int num_cold_points,
                       double temp) {
   using var_i = Hot_Slice::v_index;
 
@@ -134,7 +134,7 @@ void HotSlice_beta_eq(const int downsample_rho, const int num_cold_points,
  * e.g. in python but for completeness we implement this also in Margherita
  */
 
-void HotSlice_beta_eq_isentropic(const int downsample_rho,
+static void HotSlice_beta_eq_isentropic(const int downsample_rho,
                                  const int num_cold_points,
                                  const double entropy_value) {
   using var_i = Hot_Slice::v_index;

@@ -59,12 +59,12 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &co
     Real u0l  = sqrt(1. + u2l); // Lorentz factor in L-state
     Real u0r  = sqrt(1. + u2r); // Lorentz factor in R-state
 
-    typename AthenaEOS::error_t error_type;
+    typename AthenaEOS::error_type error;
 
     Real wgas_l, cs2_l, ye_l=0.;
-    wl_ipl = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, wl_itemp, wl_idn, ye_l);
+    wl_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, wl_itemp, wl_idn, ye_l,error);
     Real wgas_r, cs2_r, ye_r=0.;
-    wr_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, wr_itemp, wr_idn, ye_r);
+    wr_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, wr_itemp, wr_idn, ye_r,error);
 
     wgas_l *= wl_idn;
     wgas_r *= wr_idn;
