@@ -16,9 +16,6 @@
 #include "eos/eos.hpp"
 #include "hydro.hpp"
 
-#include "coordinates/cartesian_ks.hpp"
-#include "coordinates/cell_locations.hpp"
-
 namespace hydro {
 
 //----------------------------------------------------------------------------------------
@@ -36,7 +33,6 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
   int js = indcs.js, nx2 = indcs.nx2;
   int ks = indcs.ks, nx3 = indcs.nx3;
   auto &eos = pmy_pack->phydro->peos->eos_data;
-  auto &coord = pmy_pack->coord.coord_data;
 
   Real dt1 = std::numeric_limits<float>::max();
   Real dt2 = std::numeric_limits<float>::max();
