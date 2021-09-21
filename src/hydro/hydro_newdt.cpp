@@ -86,64 +86,12 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
       Real max_dv1 = 0.0, max_dv2 = 0.0, max_dv3 = 0.0;
 
       if (is_general_relativistic_) {
-
-        // ERM: THIS IS NOT ALWAYS CORRECT
+        // ERM: Setting max_dv*=1 should be safe for Cartesian KS, however, for
+        // other metrics containing large shift terms, a more involved computation
+        // of the timestep is required.  See MR !11.
         max_dv1 = 1.0;
         max_dv2 = 1.0;
         max_dv3 = 1.0;
-
-
-	// ERM: Fastest characteristics in x-dir are
-	// Note that both left and right going characteristics
-	// have -betax.
-	// -+ alpha* sqrt(gi^xx) - betax
-
-	// Extract components of metric
-	Real &x1min = coord.mb_size.d_view(m).x1min;
-	Real &x1max = coord.mb_size.d_view(m).x1max;
-	Real &x2min = coord.mb_size.d_view(m).x2min;
-	Real &x2max = coord.mb_size.d_view(m).x2max;
-	Real &x3min = coord.mb_size.d_view(m).x3min;
-	Real &x3max = coord.mb_size.d_view(m).x3max;
-	int nx1 = coord.mb_indcs.nx1;
-	int nx2 = coord.mb_indcs.nx2;
-	int nx3 = coord.mb_indcs.nx3;
-	Real x1v,x2v,x3v;
-	x1v = CellCenterX  (i-is, nx1, x1min, x1max);
-	x2v = CellCenterX(j-js, nx2, x2min, x2max);
-	x3v = CellCenterX(k-ks, nx3, x3min, x3max);
-
-	Real g_[NMETRIC], gi_[NMETRIC];
-	ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, false,
-				coord.bh_spin, g_, gi_);
-
-	const Real
-	  &g_00 = g_[I00], &g_01 = g_[I01], &g_02 = g_[I02], &g_03 = g_[I03],
-	  &g_10 = g_[I01], &g_11 = g_[I11], &g_12 = g_[I12], &g_13 = g_[I13],
-	  &g_20 = g_[I02], &g_21 = g_[I12], &g_22 = g_[I22], &g_23 = g_[I23],
-	  &g_30 = g_[I03], &g_31 = g_[I13], &g_32 = g_[I23], &g_33 = g_[I33];
-	const Real
-	  &g00 = gi_[I00], &g01 = gi_[I01], &g02 = gi_[I02], &g03 = gi_[I03],
-	  &g10 = gi_[I01], &g11 = gi_[I11], &g12 = gi_[I12], &g13 = gi_[I13],
-	  &g20 = gi_[I02], &g21 = gi_[I12], &g22 = gi_[I22], &g23 = gi_[I23],
-	  &g30 = gi_[I03], &g31 = gi_[I13], &g32 = gi_[I23], &g33 = gi_[I33];
-	Real alpha = std::sqrt(-1.0/g00);
-
-	Real betax = -g01/g00;
-	Real sqrtg = sqrt(fabs(gi_[I11] - gi_[I01]*gi_[I01]/gi_[I00]));
-	max_dv1 = fmax(fabs(-alpha*sqrtg - betax),
-	    	       fabs(alpha*sqrtg - betax));
-
-	betax = -g02/g00;
-	sqrtg = sqrt(fabs(gi_[I22] - gi_[I02]*gi_[I02]/gi_[I00]));
-	max_dv2 = fmax(fabs(-alpha*sqrtg - betax),
-	    	       fabs(alpha*sqrtg - betax));
-
-	betax = -g03/g00;
-	sqrtg = sqrt(fabs(gi_[I33] - gi_[I03]*gi_[I03]/gi_[I00]));
-	max_dv3 = fmax(fabs(-alpha*sqrtg - betax),
-	    	       fabs(alpha*sqrtg - betax));
-
       } else if (is_special_relativistic_) {
         Real v2 = SQR(w0_(m,IVX,k,j,i)) + SQR(w0_(m,IVY,k,j,i)) + SQR(w0_(m,IVZ,k,j,i));
         Real lf = sqrt(1.0 + v2);
