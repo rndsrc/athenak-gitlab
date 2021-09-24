@@ -131,6 +131,27 @@ std::size_t IOWrapper::Write(const void *buf, IOWrapperSizeT size, IOWrapperSize
 }
 
 //----------------------------------------------------------------------------------------
+//! \fn int IOWrapper::Write_at(const void *buf, IOWrapperSizeT size,
+//                                  IOWrapperSizeT cnt, IOWrapperSizeT offset)
+//  \brief wrapper for {MPI_File_write_at} versus {std::fseek+std::fwrite}.
+
+std::size_t IOWrapper::Write_at(const void *buf, IOWrapperSizeT size,
+                                    IOWrapperSizeT cnt, IOWrapperSizeT offset) {
+#if MPI_PARALLEL_ENABLED
+  MPI_Status status;
+  int nwrite;
+  if (MPI_File_write_at(fh_,offset,const_cast<void*>(buf),cnt*size,MPI_BYTE,&status)
+      !=MPI_SUCCESS)
+    return -1;
+  if (MPI_Get_count(&status,MPI_BYTE,&nwrite)==MPI_UNDEFINED) return -1;
+  return nwrite/size;
+#else
+  std::fseek(fh_, offset, SEEK_SET);
+  return std::fwrite(buf,size,cnt,fh_);
+#endif
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn int IOWrapper::Write_at_all(const void *buf, IOWrapperSizeT size,
 //                                  IOWrapperSizeT cnt, IOWrapperSizeT offset)
 //  \brief wrapper for {MPI_File_write_at_all} versus {std::fseek+std::fwrite}.

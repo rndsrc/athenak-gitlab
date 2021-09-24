@@ -111,10 +111,14 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   
   // capture variables for kernel
   auto &indcs = pmbp->coord.coord_data.mb_indcs;
-  int &is = indcs.is; int &ie = indcs.ie;
-  int &js = indcs.js; int &je = indcs.je;
-  int &ks = indcs.ks; int &ke = indcs.ke;
-  int nmb1 = pmbp->nmb_thispack - 1;
+  int &ng = indcs.ng;
+  int n1 = indcs.nx1 + 2*ng;
+  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
+  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
+  int &is = indcs.is;
+  int &js = indcs.js;
+  int &ks = indcs.ks;
+  int nmb = pmbp->nmb_thispack;
 
   // initialize Hydro primitive variables ------------------------------------------------
   if (pmbp->phydro != nullptr) {
@@ -138,7 +142,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     auto torus_ = torus;
 
     Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
-    par_for("pgen_torus1", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
+    par_for("pgen_torus1", DevExeSpace(), 0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
       KOKKOS_LAMBDA(int m, int k, int j, int i)
       {
         Real &x1min = coord.mb_size.d_view(m).x1min;
