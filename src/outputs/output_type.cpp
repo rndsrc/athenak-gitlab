@@ -26,7 +26,6 @@
 #include "srcterms/srcterms.hpp"
 #include "srcterms/turb_driver.hpp"
 #include "outputs.hpp"
-#include "globals.hpp"
 
 //----------------------------------------------------------------------------------------
 // OutputType base class constructor
