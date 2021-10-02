@@ -45,13 +45,15 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
   // ideal gas EOS
   if (eqn_of_state.compare("ideal") == 0) {
     if (is_special_relativistic){
-      peos = new IdealSRHydro(ppack, pin);
+      peos = new TabulatedSRHydro(ppack, pin);
+//      peos = new IdealSRHydro(ppack, pin);
     } else if (is_general_relativistic){
-      peos = new IdealGRHydro(ppack, pin);
+//      peos = new IdealGRHydro(ppack, pin);
+      peos = new TabulatedGRHydro(ppack, pin);
     } else {
       peos = new IdealHydro(ppack, pin);
     }
-    nhydro = 5;
+    nhydro = 6;
 
   // isothermal EOS
   } else if (eqn_of_state.compare("isothermal") == 0) {

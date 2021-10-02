@@ -88,17 +88,24 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
       } else if (is_special_relativistic_) {
         Real v2 = SQR(w0_(m,IVX,k,j,i)) + SQR(w0_(m,IVY,k,j,i)) + SQR(w0_(m,IVZ,k,j,i));
         Real lf = sqrt(1.0 + v2);
+
+	Real h,cs2, ye=0.;
+	// Compute cs2
+	typename AthenaEOS::error_type error;
+	AthenaEOS::press_h_csnd2__temp_rho_ye(h,cs2, w0_(m,ITEMP,k,j,i), w0_(m,ITEMP,k,j,i), ye,error);
+	h*= w0_(m,IDN,k,j,i);
+
         // FIXME ERM: Ideal fluid for now
-        Real h = w0_(m,IDN,k,j,i) + (eos.gamma/(eos.gamma-1.)) * w0_(m,IPR,k,j,i);
+//        Real h = w0_(m,IDN,k,j,i) + (eos.gamma/(eos.gamma-1.)) * w0_(m,IPR,k,j,i);
         Real lm, lp;
 
-        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVX,k,j,i)/lf, lf*lf, lp, lm);
+        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVX,k,j,i)/lf, lf*lf, cs2, lp, lm);
         max_dv1 = fmax(fabs(lm), lp);
 
-        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVX,k,j,i)/lf, lf*lf, lp, lm);
+        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVX,k,j,i)/lf, lf*lf, cs2, lp, lm);
         max_dv2 = fmax(fabs(lm), lp);
 
-        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVZ,k,j,i)/lf, lf*lf, lp, lm);
+        eos.WaveSpeedsSR(h, w0_(m,IPR,k,j,i), w0_(m,IVZ,k,j,i)/lf, lf*lf, cs2, lp, lm);
         max_dv3 = fmax(fabs(lm), lp);
 
       } else {

@@ -46,12 +46,14 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &co
     Real &wl_ivy=wl(ivy,i);
     Real &wl_ivz=wl(ivz,i);
     Real &wl_ipr=wl(IPR,i);
+    Real &wl_itemp=wl(ITEMP,i);
 
     Real &wr_idn=wr(IDN,i);
     Real &wr_ivx=wr(ivx,i);
     Real &wr_ivy=wr(ivy,i);
     Real &wr_ivz=wr(ivz,i);
     Real &wr_ipr=wr(IPR,i);
+    Real &wr_itemp=wr(ITEMP,i);
 
     Real u2l = SQR(wl_ivz) + SQR(wl_ivy) + SQR(wl_ivx);
     Real u2r = SQR(wr_ivz) + SQR(wr_ivy) + SQR(wr_ivx);
@@ -59,17 +61,23 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &co
     Real u0l  = sqrt(1. + u2l); // Lorentz factor in L-state
     Real u0r  = sqrt(1. + u2r); // Lorentz factor in R-state
 
-    // FIXME ERM: Ideal fluid for now
-    Real wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
-    Real wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    typename AthenaEOS::error_type error;
+
+    Real wgas_l, cs2_l, ye_l=0.;
+    wl_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_l,cs2_l, wl_itemp, wl_idn, ye_l,error);
+    Real wgas_r, cs2_r, ye_r=0.;
+    wr_ipr = AthenaEOS::press_h_csnd2__temp_rho_ye(wgas_r,cs2_r, wr_itemp, wr_idn, ye_r,error);
+
+    wgas_l *= wl_idn;
+    wgas_r *= wr_idn;
 
     //--- Step 2.  Compute wave speeds in L,R states (see Toro eq. 10.43)
 
     Real lp_l, lm_l;
-    eos.WaveSpeedsSR(wgas_l, wl_ipr, wl_ivx/u0l, (1.0 + u2l), lp_l, lm_l);
+    eos.WaveSpeedsSR(wgas_l, wl_ipr, wl_ivx/u0l, (1.0 + u2l), cs2_l, lp_l, lm_l);
 
     Real lp_r, lm_r;
-    eos.WaveSpeedsSR(wgas_r, wr_ipr, wr_ivx/u0r, (1.0 + u2r), lp_r, lm_r);
+    eos.WaveSpeedsSR(wgas_r, wr_ipr, wr_ivx/u0r, (1.0 + u2r), cs2_r, lp_r, lm_r);
 
     Real qa = fmax(-fmin(lm_l,lm_r), 0.0);
     Real a = fmax(fmax(lp_l,lp_r), qa);

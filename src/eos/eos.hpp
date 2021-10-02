@@ -16,6 +16,12 @@
 #include "mesh/meshblock.hpp"
 #include "parameter_input.hpp"
 
+#include "eos_framework/Margherita_EOS.h"
+
+// TEMPORARY FIX EOS_type //
+
+using AthenaEOS = EOS_Polytropic;
+
 //----------------------------------------------------------------------------------------
 //! \struct EOSData
 //  \brief container for variables associated with EOS, and in-lined wave speed functions
@@ -83,6 +89,18 @@ struct EOS_Data
     l_m = (p1 - tmp) * invden;
   }
 
+  KOKKOS_INLINE_FUNCTION
+  void WaveSpeedsSR(Real h, Real p, Real vx, Real lor_sq, Real cs2, Real& l_p, Real& l_m)
+  const {
+    Real v2 = 1.0 - 1.0/lor_sq;
+    auto const p1 = vx * (1.0 - cs2);
+    auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*vx) / lor_sq);
+    auto const invden = 1.0/(1.0 - v2*cs2);
+
+    l_p = (p1 + tmp) * invden;
+    l_m = (p1 - tmp) * invden;
+  }
+
   // inlined maximal wave speeds function for ideal gas in GR hydro
   // Inputs:
   //  - h: enthalpy per unit volume
@@ -103,6 +121,44 @@ struct EOS_Data
 
     // Calculate comoving sound speed
     Real cs_sq = gamma * p / h;
+
+    // Set sound speeds in appropriate coordinates
+    Real a = SQR(u0) - (g00 + SQR(u0)) * cs_sq;
+    Real b = -2.0 * (u0*u1 - (g01 + u0*u1) * cs_sq);
+    Real c = SQR(u1) - (g11 + SQR(u1)) * cs_sq;
+    Real d = SQR(b) - 4.0*a*c;
+    if (d < 0.0 && d > discriminant_tol) {
+      d = 0.0;
+    }
+    Real d_sqrt = sqrt(d);
+    Real root_1 = (-b + d_sqrt) / (2.0*a);
+    Real root_2 = (-b - d_sqrt) / (2.0*a);
+    if (root_1 > root_2) {
+      l_p = root_1;
+      l_m = root_2;
+    } else {
+      l_p = root_2;
+      l_m = root_1;
+    }
+  }
+
+  // inlined maximal wave speeds function for ideal gas in GR hydro
+  // Inputs:
+  //  - h: enthalpy per unit volume
+  //  - p: gas pressure
+  //  - u0,u1: 4-velocity components u^0, u^1
+  //  - g00,g01,g11: metric components g^00, g^01, g^11
+  // Outputs:
+  //  - l_p/l_m: most positive/negative wavespeed
+  // Notes:
+  //  - Follows same general procedure as vchar() in phys.c in Harm.
+  //  - Variables are named as though 1 is normal direction.
+  KOKKOS_INLINE_FUNCTION
+  void WaveSpeedsGR(Real h, Real p, Real u0, Real u1, Real g00, Real g01, Real g11, Real cs_sq,
+                     Real& l_p, Real& l_m)
+  const {
+    // Parameters and constants
+    const Real discriminant_tol = -1.0e-10;  // values between this and 0 are considered 0
 
     // Set sound speeds in appropriate coordinates
     Real a = SQR(u0) - (g00 + SQR(u0)) * cs_sq;
@@ -278,6 +334,22 @@ public:
 };
 
 //----------------------------------------------------------------------------------------
+//! \class TabulatedHydroSR
+//  \brief Derived class for ideal gas EOS in special relativistic Hydro
+
+class TabulatedSRHydro : public EquationOfState
+{
+public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  TabulatedSRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
+};
+
+//----------------------------------------------------------------------------------------
 //! \class IdealHydroGR
 //  \brief Derived class for ideal gas EOS in general relativistic Hydro
 
@@ -289,6 +361,22 @@ public:
   using EquationOfState::PrimToCons;
 
   IdealGRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
+};
+
+//----------------------------------------------------------------------------------------
+//! \class TabulatedHydroGR
+//  \brief Derived class for ideal gas EOS in general relativistic Hydro
+
+class TabulatedGRHydro : public EquationOfState
+{
+public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  TabulatedGRHydro(MeshBlockPack *pp, ParameterInput *pin);
   void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
   void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
 };
