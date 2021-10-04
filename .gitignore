@@ -1,0 +1,17 @@
+# Build directories
+build/
+
+# Athena output files
+*.tab
+*.vtk
+*.hst
+
+# Visualization package files
+.smhist
+
+# Mac OS metadata
+.DS_Store
+
+# editor temp files
+*~
+*.swp

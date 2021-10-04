@@ -58,8 +58,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   // moments of the radiation field
   moments_coord("moments",1,1,1,1,1)
 {
-  // (1) Start by selecting physics for this Radiation:
-
   // Check for relativistic dynamics
   is_general_relativistic = pin->GetOrAddBoolean("radiation","general_rel",false);
   if (!is_general_relativistic) {
@@ -68,15 +66,11 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     std::exit(EXIT_FAILURE);
   }
 
-  // (2) Construct "Equation of State" class
+  // Construct "Equation of State" class
   peos = new RadiationMoments(ppack, pin);
 
   // Source terms (constructor parses input file to initialize only srcterms needed)
   psrc = new SourceTerms("radiation", ppack, pin);
-
-  // (3) read time-evolution option [already error checked in driver constructor]
-  // Then initialize memory and algorithms for reconstruction and Riemann solvers
-  std::string evolution_t = pin->GetOrAddString("radiation","evolution","dynamic");
 
   // allocate memory for conserved and primitive variables,
   // angles, and coordinate frame data
@@ -97,19 +91,22 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   amesh_indcs.ps = indcs.ng;
   amesh_indcs.pe = amesh_indcs.npsi + indcs.ng - 1;
 
-  Kokkos::realloc(ci0, nmb, nangles, ncells3, ncells2, ncells1);
-  Kokkos::realloc(i0, nmb, nangles, ncells3, ncells2, ncells1);
+  Kokkos::realloc(ci0,nmb,nangles,ncells3,ncells2,ncells1);
+  Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);
+  Kokkos::realloc(moments_coord,nmb,10,ncells3,ncells2,ncells1);
 
-  Kokkos::realloc(zetaf, ncellsa1+1);
-  Kokkos::realloc(zetav, ncellsa1);
-  Kokkos::realloc(dzetaf, ncellsa1);
-  Kokkos::realloc(psif, ncellsa2+1);
-  Kokkos::realloc(psiv, ncellsa2);
-  Kokkos::realloc(dpsif, ncellsa2);
-  Kokkos::realloc(zeta_length, ncellsa1, ncellsa2+1);
-  Kokkos::realloc(psi_length, ncellsa1+1, ncellsa2);
-  Kokkos::realloc(solid_angle, ncellsa1, ncellsa2);
-
+  // Setup mesh and frame quantities
+  // (TODO: @pdmullen) potentially move all of these to their own class
+  // pgrd = new LatLongGrid(ppack, pin)
+  Kokkos::realloc(zetaf,ncellsa1+1);
+  Kokkos::realloc(zetav,ncellsa1);
+  Kokkos::realloc(dzetaf,ncellsa1);
+  Kokkos::realloc(psif,ncellsa2+1);
+  Kokkos::realloc(psiv,ncellsa2);
+  Kokkos::realloc(dpsif,ncellsa2);
+  Kokkos::realloc(zeta_length,ncellsa1,ncellsa2+1);
+  Kokkos::realloc(psi_length,ncellsa1+1,ncellsa2);
+  Kokkos::realloc(solid_angle,ncellsa1,ncellsa2);
   Kokkos::realloc(nh_cc,4,ncellsa1,ncellsa2);
   Kokkos::realloc(nh_fc,4,ncellsa1+1,ncellsa2);
   Kokkos::realloc(nh_cf,4,ncellsa1,ncellsa2+1);
@@ -120,9 +117,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(n3_n_mu,nmb,4,ncellsa1,ncellsa2,ncells3+1,ncells2,ncells1);
   Kokkos::realloc(na1_n_0,nmb,ncellsa1+1,ncellsa2,ncells3,ncells2,ncells1);
   Kokkos::realloc(na2_n_0,nmb,ncellsa1,ncellsa2+1,ncells3,ncells2,ncells1);
-
-  Kokkos::realloc(moments_coord,nmb,10,ncells3,ncells2,ncells1);
-
   InitMesh();
   InitCoordinateFrame();
 
@@ -132,7 +126,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
 
   // for time-evolving problems, continue to construct methods, allocate arrays
   if (evolution_t.compare("stationary") != 0) {
-
     // select reconstruction method (default PLM)
     {std::string xorder = pin->GetOrAddString("hydro","reconstruct","plm");
     if (xorder.compare("dc") == 0) {
