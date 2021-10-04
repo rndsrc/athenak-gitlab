@@ -21,7 +21,7 @@
 
 BoundaryValueCC::BoundaryValueCC(MeshBlockPack *pp, ParameterInput *pin) : pmy_pack(pp)
 {
-} 
+}
   
 //----------------------------------------------------------------------------------------
 // BoundaryValueCC destructor

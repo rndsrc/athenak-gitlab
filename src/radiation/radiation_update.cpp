@@ -27,9 +27,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
-  auto &aindcs = amesh_indcs;
-  int zs = aindcs.zs, ze = aindcs.ze;
-  int ps = aindcs.ps, pe = aindcs.pe;
+
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
   bool &multi_d = pmy_pack->pmesh->multi_d;
   bool &three_d = pmy_pack->pmesh->three_d;
@@ -39,13 +37,13 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
   Real beta_dt = (pdriver->beta[stage-1])*(pmy_pack->pmesh->dt);
   int nmb1 = pmy_pack->nmb_thispack - 1;
   int nvar = nangles;
+
   auto ci0_ = ci0;
   auto ci1_ = ci1;
   auto flx1 = ciflx.x1f;
   auto flx2 = ciflx.x2f;
   auto flx3 = ciflx.x3f;
-  auto flxa1 = cia1flx;
-  auto flxa2 = cia2flx;
+
   auto &mbsize = pmy_pack->coord.coord_data.mb_size;
 
   // hierarchical parallel loop that updates conserved variables to intermediate step
@@ -93,6 +91,17 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
     }
   );
 
+  auto &aindcs = amesh_indcs;
+  int zs = aindcs.zs, ze = aindcs.ze;
+  int ps = aindcs.ps, pe = aindcs.pe;
+
+  auto flxa1 = cia1flx;
+  auto flxa2 = cia2flx;
+
+  auto zeta_length_ = zeta_length;
+  auto psi_length_ = psi_length;
+  auto solid_angle_ = solid_angle;
+
   par_for("a_update",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
     {
@@ -105,11 +114,11 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
       int zp_rc = AngleInd(z+1,p,true,false,aindcs);
       int zp_cl = AngleInd(z,p,false,true,aindcs);
       int zp_cr = AngleInd(z,p+1,false,true,aindcs);
-      Real zeta_length_m = zeta_length.d_view(z,p);
-      Real zeta_length_p = zeta_length.d_view(z,p+1);
-      Real psi_length_m = psi_length.d_view(z,p);
-      Real psi_length_p = psi_length.d_view(z+1,p);
-      Real omega = solid_angle.d_view(z,p);
+      Real zeta_length_m = zeta_length_.d_view(z,p);
+      Real zeta_length_p = zeta_length_.d_view(z,p+1);
+      Real psi_length_m = psi_length_.d_view(z,p);
+      Real psi_length_p = psi_length_.d_view(z+1,p);
+      Real omega = solid_angle_.d_view(z,p);
 
       // Add zeta-divergence
       Real left_flux = left_pole ? 0.0 : -psi_length_m*flxa1(m,zp_lc,k,j,i);
@@ -120,10 +129,11 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
       divf += (zeta_length_p*flxa2(m,zp_cr,k,j,i)-zeta_length_m*flxa2(m,zp_cl,k,j,i));
 
       // Update conserved variables
-      ci0(m,zp,k,j,i) -= beta_dt*(divf/omega);
+      ci0_(m,zp,k,j,i) -= beta_dt*(divf/omega);
     }
   );
 
+  // add radiation source terms if any
   if (psrc->source_terms_enabled) {
     if (psrc->beam_source)  psrc->AddBeamSource(ci0, i0, beta_dt);
   }

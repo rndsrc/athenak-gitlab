@@ -51,10 +51,10 @@
 int main(int argc, char *argv[])
 {
   std::string input_file, restart_file, run_dir;
-  int  res_flag = 0;  // set to 1 if -r        argument is on cmdline 
+  // int  res_flag = 0;  // set to 1 if -r        argument is on cmdline
   int narg_flag = 0;  // set to 1 if -n        argument is on cmdline
   int marg_flag = 0;  // set to 1 if -m        argument is on cmdline
-  int iarg_flag = 0;  // set to 1 if -i <file> argument is on cmdline
+  // int iarg_flag = 0;  // set to 1 if -i <file> argument is on cmdline
 
   //--- Step 1. --------------------------------------------------------------------------
   // Initialize environment (must initialize MPI first, then Kokkos)
@@ -139,12 +139,12 @@ int main(int argc, char *argv[])
       switch(*(argv[i]+1)) {
         case 'i':                      // -i <input_file>
           input_file.assign(argv[++i]);
-          iarg_flag = 1;
+          // iarg_flag = 1;
           break;
-        case 'r':                      // -r <restart_file>
-          res_flag = 1;
-          restart_file.assign(argv[++i]);
-          break;
+        // case 'r':                      // -r <restart_file>
+        //   res_flag = 1;
+        //   restart_file.assign(argv[++i]);
+        //   break;
         case 'd':                      // -d <run_directory>
           run_dir.assign(argv[++i]);
           break;

@@ -18,8 +18,6 @@
 #include "parameter_input.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
-#include "eos/eos.hpp"
-#include "hydro/hydro.hpp"
 #include "radiation/radiation.hpp"
 #include "pgen.hpp"
 
@@ -34,12 +32,12 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &is = indcs.is; int &ie = indcs.ie;
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
+
   auto &aindcs = pmbp->prad->amesh_indcs;
   int &zs = aindcs.zs; int &ze = aindcs.ze;
   int &ps = aindcs.ps; int &pe = aindcs.pe;
-  auto &u0 = pmbp->phydro->u0; 
+
   auto &ci0 = pmbp->prad->ci0;
-  auto &coord = pmbp->coord.coord_data;
   int nmb1 = (pmbp->nmb_thispack-1);
 
   par_for("rad_beam",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,

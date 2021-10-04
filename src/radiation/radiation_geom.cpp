@@ -187,13 +187,19 @@ void Radiation::InitCoordinateFrame() {
   int &is = indcs.is;
   int &js = indcs.js;
   int &ks = indcs.ks;
+
   int &zs = amesh_indcs.zs;  int &ze = amesh_indcs.ze;
   int &ps = amesh_indcs.ps;  int &pe = amesh_indcs.pe;
+
   int &nmb = pmy_pack->nmb_thispack;
   auto coord = pmy_pack->coord.coord_data;
+
   auto nh_cc_ = nh_cc;
   auto nh_fc_ = nh_fc;
   auto nh_cf_ = nh_cf;
+
+  auto zetaf_ = zetaf;
+  auto zetav_ = zetav;
 
   Real e[4][4] = {};
   Real e_cov[4][4] = {};
@@ -415,10 +421,10 @@ void Radiation::InitCoordinateFrame() {
           Real na1 = 0.0;
           for (int d1 = 0; d1 < 4; ++d1) {
             for (int d2 = 0; d2 < 4; ++d2) {
-              na1 += (1.0 / sin(zetaf.d_view(z))
+              na1 += (1.0 / sin(zetaf_.d_view(z))
                       * nh_fc_.d_view(d1,z,p) * nh_fc_.d_view(d2,z,p)
-                      * (nh_fc_.d_view(0,z,p) * omega[3][d1][d2]
-                         - nh_fc_.d_view(3,z,p) * omega[0][d1][d2]));
+                      * (nh_fc_.d_view(0,z,p) * omega_[3][d1][d2]
+                         - nh_fc_.d_view(3,z,p) * omega_[0][d1][d2]));
             }
           }
           Real n_0 = 0.0;
@@ -457,10 +463,10 @@ void Radiation::InitCoordinateFrame() {
           Real na2 = 0.0;
           for (int d1 = 0; d1 < 4; ++d1) {
             for (int d2 = 0; d2 < 4; ++d2) {
-              na2 += (1.0 / SQR(sin(zetav.d_view(z))) * nh_cf_.d_view(d1,z,p)
+              na2 += (1.0 / SQR(sin(zetav_.d_view(z))) * nh_cf_.d_view(d1,z,p)
                       * nh_cf_.d_view(d2,z,p)
-                      * (nh_cf_.d_view(2,z,p) * omega[1][d1][d2]
-                         - nh_cf_.d_view(1,z,p) * omega[2][d1][d2]));
+                      * (nh_cf_.d_view(2,z,p) * omega_[1][d1][d2]
+                         - nh_cf_.d_view(1,z,p) * omega_[2][d1][d2]));
             }
           }
           Real n_0 = 0.0;

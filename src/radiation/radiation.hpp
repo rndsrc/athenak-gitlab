@@ -73,10 +73,6 @@ void InverseAngleInd(int zm, int& z, int& p, struct AMeshIndcs amidcs)
 {
   z = (int) (((Real) zm)/(2*amidcs.ng+amidcs.npsi));
   p = zm - z * (amidcs.npsi + 2*amidcs.ng);
-  if ((z * (amidcs.npsi + 2*amidcs.ng) + p) != zm) {
-    z = NAN;
-    p = NAN;
-  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -190,10 +186,10 @@ public:
   DualArray2D<Real> zeta_length;
   DualArray2D<Real> psi_length;
   DualArray2D<Real> solid_angle;
+
   DualArray3D<Real> nh_cc;
   DualArray3D<Real> nh_fc;
   DualArray3D<Real> nh_cf;
-
   DvceArray7D<Real> nmu;
   DvceArray7D<Real> n0_n_mu;
   DvceArray7D<Real> n1_n_mu;

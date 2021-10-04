@@ -12,9 +12,8 @@
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
-#include "bvals/bvals.hpp"
 #include "srcterms/srcterms.hpp"
-
+#include "bvals/bvals.hpp"
 #include "radiation/radiation.hpp"
 
 namespace radiation {
