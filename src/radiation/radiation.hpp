@@ -167,9 +167,9 @@ public:
   ~Radiation();
 
   // data
-  // flags to denote relativistic dynamics
-  bool is_special_relativistic = false;
-  bool is_general_relativistic = false;
+  // flags to denote hydro or mhd is enabled
+  bool is_hydro_enabled = false;
+  bool is_mhd_enabled = false;
 
   ReconstructionMethod recon_method;
   EquationOfState *peos;  // chosen EOS
@@ -212,6 +212,7 @@ public:
   DvceFaceFld5D<Real> ciflx;   // fluxes of conserved quantities on cell faces
   DvceArray5D<Real> cia1flx;   // fluxes of conserved quantities in zeta
   DvceArray5D<Real> cia2flx;   // fluxes of conserved quantities in psi
+  Real dtnew;
 
   // container to hold names of TaskIDs
   RadiationTaskIDs id;
@@ -226,6 +227,7 @@ public:
   TaskStatus SendCI(Driver *d, int stage);
   TaskStatus RecvCI(Driver *d, int stage);
   TaskStatus ConToPrim(Driver *d, int stage);
+  TaskStatus NewTimeStep(Driver *d, int stage);
   TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage);  // in radiation/bvals dir
 
   // CalculateFluxes function

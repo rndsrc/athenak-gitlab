@@ -30,9 +30,11 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
 {
   // (1) Start by selecting physics for this Hydro:
 
-  // Check for relativistic dynamics
+  // Check for relativistic dynamics and radiation
   is_special_relativistic = pin->GetOrAddBoolean("hydro","special_rel",false);
   is_general_relativistic = pin->GetOrAddBoolean("hydro","general_rel",false);
+  is_radiation_enabled = pin->DoesBlockExist("radiation");
+
   if (is_special_relativistic && is_general_relativistic) {
     std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
               << "Cannot specify both SR and GR at same time" << std::endl;

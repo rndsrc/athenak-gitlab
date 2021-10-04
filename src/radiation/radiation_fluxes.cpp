@@ -32,13 +32,15 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
+  int ncells1 = indcs.nx1 + 2*(indcs.ng);
+
   auto &aindcs = amesh_indcs;
   int zs = aindcs.zs, ze = aindcs.ze;
   int ps = aindcs.ps, pe = aindcs.pe;
-  int ncells1 = indcs.nx1 + 2*(indcs.ng);
   
   int nvars = nangles;
   int nmb1 = pmy_pack->nmb_thispack - 1;
+
   const auto recon_method_ = recon_method;
   auto &eos = peos->eos_data;
   auto &coord = pmy_pack->coord.coord_data;

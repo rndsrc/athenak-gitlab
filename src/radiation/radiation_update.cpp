@@ -54,7 +54,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
   int scr_level = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1);
 
-  par_for_outer("spatial_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
+  par_for_outer("s_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
     KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int j)
     {
       ScrArray1D<Real> divf(member.team_scratch(scr_level), ncells1);
@@ -93,32 +93,31 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage)
     }
   );
 
-  par_for("angular_update", DevExeSpace(), 0, nmb1, zs, ze, ps, pe, ks, ke, js, je, is, ie,
+  par_for("a_update",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
     {
       // Determine poles
-      bool left_pole = (z == zs);
-      bool right_pole = (z == ze);
+      bool left_pole = (z == zs); bool right_pole = (z == ze);
 
       // Calculate angle lengths and solid angles
-      int zp = AngleInd(z, p, false, false, aindcs);
-      int zp_lc = AngleInd(z, p, true, false, aindcs);
-      int zp_rc = AngleInd(z+1, p, true, false, aindcs);
-      int zp_cl = AngleInd(z, p, false, true, aindcs);
-      int zp_cr = AngleInd(z, p+1, false, true, aindcs);
+      int zp = AngleInd(z,p,false,false,aindcs);
+      int zp_lc = AngleInd(z,p,true,false,aindcs);
+      int zp_rc = AngleInd(z+1,p,true,false,aindcs);
+      int zp_cl = AngleInd(z,p,false,true,aindcs);
+      int zp_cr = AngleInd(z,p+1,false,true,aindcs);
       Real zeta_length_m = zeta_length.d_view(z,p);
       Real zeta_length_p = zeta_length.d_view(z,p+1);
       Real psi_length_m = psi_length.d_view(z,p);
       Real psi_length_p = psi_length.d_view(z+1,p);
       Real omega = solid_angle.d_view(z,p);
-      // Calculate zeta-divergence
+
+      // Add zeta-divergence
       Real left_flux = left_pole ? 0.0 : -psi_length_m*flxa1(m,zp_lc,k,j,i);
       Real right_flux = right_pole ? 0.0 : psi_length_p*flxa1(m,zp_rc,k,j,i);
       Real divf = left_flux + right_flux;
 
       // Add psi-divergence
-      divf += (zeta_length_p * flxa2(m,zp_cr,k,j,i)
-               - zeta_length_m * flxa2(m,zp_cl,k,j,i));
+      divf += (zeta_length_p*flxa2(m,zp_cr,k,j,i)-zeta_length_m*flxa2(m,zp_cl,k,j,i));
 
       // Update conserved variables
       ci0(m,zp,k,j,i) -= beta_dt*(divf/omega);

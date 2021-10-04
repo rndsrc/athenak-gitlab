@@ -43,6 +43,7 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
   auto &mbsize = pmy_pack->coord.coord_data.mb_size;
   auto &is_special_relativistic_ = is_special_relativistic;
   auto &is_general_relativistic_ = is_general_relativistic;
+  auto &is_radiation_enabled_ = is_radiation_enabled;
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
@@ -81,7 +82,7 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
 
       Real max_dv1 = 0.0, max_dv2 = 0.0, max_dv3 = 0.0;
 
-      if (is_general_relativistic_) {
+      if (is_general_relativistic_ || is_radiation_enabled_) {
         max_dv1 = 1.0;
         max_dv2 = 1.0;
         max_dv3 = 1.0;

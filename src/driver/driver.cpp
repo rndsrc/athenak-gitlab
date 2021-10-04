@@ -268,11 +268,12 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout)
   //---- Step 3.  Compute first time step (if problem involves time evolution
 
   if (time_evolution != TimeEvolution::tstatic) {
-    if (phydro != nullptr) {
-      (void) pmesh->pmb_pack->phydro->NewTimeStep(this, nexp_stages);
-    }
     if (pmhd != nullptr) {
       (void) pmesh->pmb_pack->pmhd->NewTimeStep(this, nexp_stages);
+    } else if (phydro != nullptr) {
+      (void) pmesh->pmb_pack->phydro->NewTimeStep(this, nexp_stages);
+    } else if (prad != nullptr) {
+      (void) pmesh->pmb_pack->prad->NewTimeStep(this, nexp_stages);
     }
     pmesh->NewTimeStep(tlim);
   }

@@ -58,6 +58,7 @@ public:
   // flags to denote relativistic dynamics
   bool is_special_relativistic = false;
   bool is_general_relativistic = false;
+  bool is_radiation_enabled = true;
 
   ReconstructionMethod recon_method;
   Hydro_RSolver rsolver_method;

@@ -79,6 +79,7 @@ add_executable(
         radiation/radiation_fluxes.cpp
         radiation/radiation_geom.cpp
         radiation/radiation_moments.cpp
+        radiation/radiation_newdt.cpp
         radiation/radiation_tasks.cpp
         radiation/radiation_update.cpp
         radiation/bvals/apply_physical_bcs.cpp

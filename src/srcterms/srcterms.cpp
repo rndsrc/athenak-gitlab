@@ -126,9 +126,11 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
+
   auto &aindcs = pmy_pack->prad->amesh_indcs;
   int zs = aindcs.zs, ze = aindcs.ze;
   int ps = aindcs.ps, pe = aindcs.pe;
+
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto coord = pmy_pack->coord.coord_data;
 

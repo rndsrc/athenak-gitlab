@@ -42,24 +42,11 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   auto &coord = pmbp->coord.coord_data;
   int nmb1 = (pmbp->nmb_thispack-1);
 
-  // Set initial conditions
-  par_for("hyd_beam", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
-      // background fluid
-      u0(m,IDN,k,j,i) = 1.0;
-      u0(m,IM1,k,j,i) = 0.0;
-      u0(m,IM2,k,j,i) = 0.0;
-      u0(m,IM3,k,j,i) = 0.0;
-      u0(m,IEN,k,j,i) = -1.0;
-    }
-  );
-
-  par_for("rad_beam", DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
+  par_for("rad_beam",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
     {
-      int zp = AngleInd(z,p,false,false,aindcs);
       // radiation field
+      int zp = AngleInd(z,p,false,false,aindcs);
       ci0(m,zp,k,j,i) = 0.0;
     }
   );

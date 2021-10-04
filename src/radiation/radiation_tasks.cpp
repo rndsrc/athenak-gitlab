@@ -48,6 +48,9 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
   id.recvci = run.AddTask(&Radiation::RecvCI, this, id.sendci);
   id.bcs   = run.AddTask(&Radiation::ApplyPhysicalBCs, this, id.recvci);
   id.c2p   = run.AddTask(&Radiation::ConToPrim, this, id.bcs);
+  if (!(is_hydro_enabled || is_mhd_enabled)) {
+    id.newdt = run.AddTask(&Radiation::NewTimeStep, this, id.c2p);
+  }
 
   // end task list
   id.clear = end.AddTask(&Radiation::ClearSend, this, none);

@@ -121,14 +121,14 @@ Coordinates::Coordinates(Mesh *pm, RegionIndcs indcs, int igids, int nmb)
 
 //----------------------------------------------------------------------------------------
 //! \fn
-// Read properties of metric from input file for GR.  This function called from Hydro
-// and MHD constructors, but only when GR is specified
+// Read properties of metric from input file for GR.  This function called in Radiation
+// constructor or in Hydro and MHD constructors when GR is specified.
 
 void Coordinates::InitMetric(ParameterInput *pin)
 {
   coord_data.is_minkowski = pin->GetOrAddBoolean("coord","minkowski",false);
-  coord_data.bh_mass = pin->GetReal("coord","m");
-  coord_data.bh_spin = pin->GetReal("coord","a");
+  coord_data.bh_mass = pin->GetOrAddReal("coord","m",1.0);
+  coord_data.bh_spin = pin->GetOrAddReal("coord","a",0.0);
   coord_data.bh_rmin = pin->GetOrAddReal("coord","rmin",0.0);
 }
 

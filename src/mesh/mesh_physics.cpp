@@ -148,6 +148,12 @@ void Mesh::NewTimeStep(const Real tlim)
       dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->presist->dtnew) );
     }
   }
+  // Radiation timestep
+  if (pmb_pack->phydro == nullptr && pmb_pack->pmhd == nullptr) {
+    if (pmb_pack->prad != nullptr) {
+      dt = std::min(dt, (cfl_no)*(pmb_pack->prad->dtnew) );
+    }
+  }
 
 #if MPI_PARALLEL_ENABLED
   // get minimum dt over all MPI ranks

@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file hydro.cpp
-//  \brief implementation of functions in class Hydro
+//! \file radiation.cpp
+//  \brief implementation of functions in class Radiation
 
 #include <iostream>
 
@@ -58,19 +58,19 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   // moments of the radiation field
   moments_coord("moments",1,1,1,1,1)
 {
-  // Check for relativistic dynamics
-  is_general_relativistic = pin->GetOrAddBoolean("radiation","general_rel",false);
-  if (!is_general_relativistic) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Radiation currently requires GR" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
+  // Check for hydrodynamics or mhd
+  is_hydro_enabled = pin->DoesBlockExist("hydro");
+  is_mhd_enabled = pin->DoesBlockExist("mhd");
 
   // Construct "Equation of State" class
   peos = new RadiationMoments(ppack, pin);
 
   // Source terms (constructor parses input file to initialize only srcterms needed)
   psrc = new SourceTerms("radiation", ppack, pin);
+
+  // read time-evolution option [already error checked in driver constructor]
+  // Then initialize memory and algorithms for reconstruction and Riemann solvers
+  std::string evolution_t = pin->GetString("time","evolution");
 
   // allocate memory for conserved and primitive variables,
   // angles, and coordinate frame data
@@ -125,9 +125,9 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   pbval_ci->AllocateBuffersCC(nangles);
 
   // for time-evolving problems, continue to construct methods, allocate arrays
-  if (evolution_t.compare("stationary") != 0) {
+  if (evolution_t.compare("static") != 0) {
     // select reconstruction method (default PLM)
-    {std::string xorder = pin->GetOrAddString("hydro","reconstruct","plm");
+    {std::string xorder = pin->GetOrAddString("radiation","reconstruct","plm");
     if (xorder.compare("dc") == 0) {
       recon_method = ReconstructionMethod::dc;
     } else if (xorder.compare("plm") == 0) {
@@ -152,7 +152,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
       recon_method = ReconstructionMethod::wenoz;
     } else {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                << std::endl << "<hydro> recon = '" << xorder << "' not implemented"
+                << std::endl << "<radiation> recon = '" << xorder << "' not implemented"
                 << std::endl;
       std::exit(EXIT_FAILURE);
     }}
@@ -167,7 +167,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   }
 
   // (5) initialize metric (GR only)
-  if (is_general_relativistic) {pmy_pack->coord.InitMetric(pin);}
+  pmy_pack->coord.InitMetric(pin);
 
 }
 
