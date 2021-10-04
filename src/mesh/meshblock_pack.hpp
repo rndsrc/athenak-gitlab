@@ -17,6 +17,7 @@
 class MeshBlock;
 namespace hydro {class Hydro;}
 namespace mhd {class MHD;}
+namespace radiation {class Radiation;}
 class IonNeutral;
 class TurbulenceDriver;
 
@@ -48,6 +49,7 @@ public:
   mhd::MHD *pmhd=nullptr;
   IonNeutral *pionn=nullptr;
   TurbulenceDriver *pturb=nullptr;
+  radiation::Radiation *prad=nullptr;
 
   // task lists for all MeshBlocks in this MeshBlockPack
   TaskList operator_split_tl;            // operator-split physics

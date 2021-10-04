@@ -39,7 +39,7 @@ add_executable(
         hydro/bvals/reflect_hydro.cpp
         hydro/bvals/shear_hydro.cpp
 
-	ion-neutral/ion_neutral.cpp
+	      ion-neutral/ion_neutral.cpp
 
         mesh/mesh_physics.cpp
         mesh/load_balance.cpp
@@ -74,6 +74,15 @@ add_executable(
         pgen/lw_implode.cpp
         pgen/orszag_tang.cpp
         pgen/shock_tube.cpp
+
+        radiation/radiation.cpp
+        radiation/radiation_fluxes.cpp
+        radiation/radiation_geom.cpp
+        radiation/radiation_moments.cpp
+        radiation/radiation_tasks.cpp
+        radiation/radiation_update.cpp
+        radiation/bvals/apply_physical_bcs.cpp
+        radiation/bvals/outflow_radiation.cpp
 
         srcterms/srcterms.cpp
         srcterms/turb_driver.cpp

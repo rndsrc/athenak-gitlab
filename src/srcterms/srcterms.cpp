@@ -9,14 +9,17 @@
 //  Source terms objects are stored in the respective fluid class, so that Hydro/MHD can
 //  have different source terms
 
+#include <cmath>
 #include <iostream>
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
+#include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 #include "turb_driver.hpp"
 #include "srcterms.hpp"
 
@@ -50,8 +53,23 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
     omega0 = pin->GetReal(block,"omega0");
   }
 
+  // (3) beam source (radiation)
+  beam_source = pin->GetOrAddBoolean(block,"beam_source",false);
+  if (beam_source) {
+    source_terms_enabled = true;
+    pos_1 = pin->GetReal(block, "pos_1");
+    pos_2 = pin->GetReal(block, "pos_2");
+    pos_3 = pin->GetReal(block, "pos_3");
+    width = pin->GetReal(block, "width");
+    dir_1 = pin->GetReal(block, "dir_1");
+    dir_2 = pin->GetReal(block, "dir_2");
+    dir_3 = pin->GetReal(block, "dir_3");
+    spread = pin->GetReal(block, "spread");
+    dii_dt = pin->GetReal(block, "dii_dt");
+  }
+
   // TODO: finish implementing cooling
-  // (3) Optically thin (ISM) cooling
+  // (4) Optically thin (ISM) cooling
   ism_cooling = pin->GetOrAddBoolean(block,"ism_cooling",false);
   if (ism_cooling) {
     source_terms_enabled = true;
@@ -91,6 +109,117 @@ void SourceTerms::AddConstantAccel(DvceArray5D<Real> &u0, const DvceArray5D<Real
       Real src = bdt*g*w0(m,IDN,k,j,i);
       u0(m,dir,k,j,i) += src;
       if ((u0.extent_int(1) - 1) == IEN) { u0(m,IEN,k,j,i) += src*w0(m,dir,k,j,i); }
+    }
+  );
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn
+// Add beam of radiation
+// NOTE source terms must all be computed using prim (i0) and NOT cons (ci0) vars
+
+void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> &i0,
+                                const Real bdt)
+{
+  auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
+  int is = indcs.is, ie = indcs.ie;
+  int js = indcs.js, je = indcs.je;
+  int ks = indcs.ks, ke = indcs.ke;
+  auto &aindcs = pmy_pack->prad->amesh_indcs;
+  int zs = aindcs.zs, ze = aindcs.ze;
+  int ps = aindcs.ps, pe = aindcs.pe;
+  int nmb1 = pmy_pack->nmb_thispack - 1;
+  auto coord = pmy_pack->coord.coord_data;
+
+  // Allocate scratch arrays
+  Real e[4][4] = {};
+  Real e_cov[4][4] = {};
+  Real omega[4][4][4] = {};
+  auto e_ = e;
+  auto e_cov_ = e_cov;
+  auto omega_ = omega;
+  auto nh_cc_ = pmy_pack->prad->nh_cc;
+  auto n0_n_mu_ = pmy_pack->prad->n0_n_mu;
+
+  Real &pos_1_ = pos_1;
+  Real &pos_2_ = pos_2;
+  Real &pos_3_ = pos_3;
+  Real &width_ = width;
+  Real &dir_1_ = dir_1;
+  Real &dir_2_ = dir_2;
+  Real &dir_3_ = dir_3;
+  Real &spread_ = spread;
+  Real &dii_dt_ = dii_dt;
+
+  par_for("beam_source", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
+    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i)
+    {
+      Real &x1min = coord.mb_size.d_view(m).x1min;
+      Real &x1max = coord.mb_size.d_view(m).x1max;
+      int nx1 = coord.mb_indcs.nx1;
+      Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+
+      Real &x2min = coord.mb_size.d_view(m).x2min;
+      Real &x2max = coord.mb_size.d_view(m).x2max;
+      int nx2 = coord.mb_indcs.nx2;
+      Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
+
+      Real &x3min = coord.mb_size.d_view(m).x3min;
+      Real &x3max = coord.mb_size.d_view(m).x3max;
+      int nx3 = coord.mb_indcs.nx3;
+      Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
+
+      Real g_[NMETRIC], gi_[NMETRIC];
+      ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, true,
+                              coord.bh_spin, g_, gi_);
+      ComputeTetrad(x1v, x2v, x3v, true, e_, e_cov_, omega_);
+
+      // Calculate proper distance to beam origin and minimum angle between directions
+      Real dx1 = x1v - pos_1_;
+      Real dx2 = x2v - pos_2_;
+      Real dx3 = x3v - pos_3_;
+      Real dx_sq = g_[I11] * SQR(dx1) + 2.0 * g_[I12] * dx1 * dx2
+                   + 2.0 * g_[I13] * dx1 * dx3 + g_[I22] * SQR(dx2)
+                   + 2.0 * g_[I23] * dx2 * dx3 + g_[I33] * SQR(dx3);
+      Real mu_min = cos(spread_/2.0 * M_PI/180.0);
+
+      // Calculate contravariant time component of direction
+      Real temp_a = g_[I00];
+      Real temp_b = 2.0 * (g_[I01] * dir_1_ + g_[I02] * dir_2_ + g_[I03] * dir_3_);
+      Real temp_c = g_[I11] * SQR(dir_1_) + 2.0 * g_[I12] * dir_1_ * dir_2_
+                    + 2.0 * g_[I13] * dir_1_ * dir_3_ + g_[I22] * SQR(dir_2_)
+                    + 2.0 * g_[I23] * dir_2_ * dir_3_ + g_[I33] * SQR(dir_3_);
+      Real dir_0 = ((-temp_b - std::sqrt(SQR(temp_b) - 4.0 * temp_a * temp_c))
+                    / (2.0 * temp_a));
+
+      // lower indices, assuming Minkowski
+      // (TODO: @pdmullen) extend to non-Minkowski metric
+      Real dc0 = -dir_0;
+      Real dc1 = dir_1_;
+      Real dc2 = dir_2_;
+      Real dc3 = dir_3_;
+
+      // Calculate covariant direction in tetrad frame
+      Real dtc0 = (e_[0][0]*dc0 + e_[0][1]*dc1 + e_[0][2]*dc2 + e_[0][3]*dc3);
+      Real dtc1 = (e_[1][0]*dc0 + e_[1][1]*dc1 + e_[1][2]*dc2 + e_[1][3]*dc3)/(-dtc0);
+      Real dtc2 = (e_[2][0]*dc0 + e_[2][1]*dc1 + e_[2][2]*dc2 + e_[2][3]*dc3)/(-dtc0);
+      Real dtc3 = (e_[3][0]*dc0 + e_[3][1]*dc1 + e_[3][2]*dc2 + e_[3][3]*dc3)/(-dtc0);
+
+      // Go through angles
+      for (int z = zs; z <= ze; ++z) {
+        for (int p = ps; p <= pe; ++p) {
+          int zp = AngleInd(z,p,false,false,aindcs);
+          Real mu = (nh_cc_.d_view(1,z,p) * dtc1
+                   + nh_cc_.d_view(2,z,p) * dtc2
+                   + nh_cc_.d_view(3,z,p) * dtc3);
+          Real dcons_dt = 0.0;
+          if (dx_sq < SQR(width_/2.0) && mu > mu_min) {
+            dcons_dt = dii_dt_ * n0_n_mu_(m,0,z,p,k,j,i);
+          }
+          ci0(m,zp,k,j,i) += dcons_dt*bdt;
+        }
+      }
     }
   );
   return;

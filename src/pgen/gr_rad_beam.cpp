@@ -1,0 +1,69 @@
+//========================================================================================
+// AthenaXXX astrophysical plasma code
+// Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
+// Licensed under the 3-clause BSD License (the "LICENSE")
+//========================================================================================
+//! \file gr_rad_beam.cpp
+//  \brief Beam test for radiation (in flat space)
+
+// C++ headers
+#include <algorithm>  // min, max
+#include <iostream>   // endl
+#include <sstream>    // stringstream
+#include <stdexcept>  // runtime_error
+#include <string>     // c_str()
+
+// Athena++ headers
+#include "athena.hpp"
+#include "parameter_input.hpp"
+#include "coordinates/cell_locations.hpp"
+#include "mesh/mesh.hpp"
+#include "eos/eos.hpp"
+#include "hydro/hydro.hpp"
+#include "radiation/radiation.hpp"
+#include "pgen.hpp"
+
+//----------------------------------------------------------------------------------------
+//! \fn void MeshBlock::UserProblem(ParameterInput *pin)
+//  \brief Sets initial conditions for GR radiation beam test
+
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
+{
+  // capture variables for kernel
+  auto &indcs = pmbp->coord.coord_data.mb_indcs;
+  int &is = indcs.is; int &ie = indcs.ie;
+  int &js = indcs.js; int &je = indcs.je;
+  int &ks = indcs.ks; int &ke = indcs.ke;
+  auto &aindcs = pmbp->prad->amesh_indcs;
+  int &zs = aindcs.zs; int &ze = aindcs.ze;
+  int &ps = aindcs.ps; int &pe = aindcs.pe;
+  auto &u0 = pmbp->phydro->u0; 
+  auto &ci0 = pmbp->prad->ci0;
+  auto &coord = pmbp->coord.coord_data;
+  int nmb1 = (pmbp->nmb_thispack-1);
+
+  // Set initial conditions
+  par_for("hyd_beam", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+      // background fluid
+      u0(m,IDN,k,j,i) = 1.0;
+      u0(m,IM1,k,j,i) = 0.0;
+      u0(m,IM2,k,j,i) = 0.0;
+      u0(m,IM3,k,j,i) = 0.0;
+      u0(m,IEN,k,j,i) = -1.0;
+    }
+  );
+
+  par_for("rad_beam", DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+    {
+      int zp = AngleInd(z,p,false,false,aindcs);
+      // radiation field
+      ci0(m,zp,k,j,i) = 0.0;
+    }
+  );
+
+  return;
+}
+

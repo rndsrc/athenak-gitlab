@@ -329,4 +329,20 @@ public:
                   DvceArray5D<Real> &cons) override;
 };
 
+//----------------------------------------------------------------------------------------
+//! \class RadiationMoments
+//  \brief Derived class for radiation
+
+class RadiationMoments : public EquationOfState
+{
+public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  RadiationMoments(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) override;
+};
+
 #endif // EOS_EOS_HPP_

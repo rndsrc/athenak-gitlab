@@ -16,6 +16,7 @@
 #include "ion-neutral/ion_neutral.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
+#include "radiation/radiation.hpp"
 #include "srcterms/turb_driver.hpp"
 
 #if MPI_PARALLEL_ENABLED
@@ -94,6 +95,16 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin, Driver *pdrive)
     pturb->IncludeAddForcingTask(run_tl, none);
   } else {
     pturb = nullptr;
+  }
+
+  // (5) RADIATION
+  // Create radiation physics module.  Create tasklist.
+  if (pin->DoesBlockExist("radiation")) {
+    prad = new radiation::Radiation(this, pin);
+    nphysics++;
+    prad->AssembleRadiationTasks(start_tl, run_tl, end_tl);
+  } else {
+    prad = nullptr;
   }
 
   // Check that at least ONE is requested and initialized.

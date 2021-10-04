@@ -36,6 +36,7 @@ class SourceTerms
   bool source_terms_enabled;   // true if any srcterm included
   bool const_accel;
   bool shearing_box;
+  bool beam_source;
   bool ism_cooling;
 
   // magnitude and direction of constant accel
@@ -45,11 +46,19 @@ class SourceTerms
   // Orbital frequency and shear rate for shearing box
   Real omega0, qshear;
 
+  // Beam source
+  Real pos_1, pos_2, pos_3;
+  Real width;
+  Real dir_1, dir_2, dir_3;
+  Real spread;
+  Real dii_dt;
+
   // physical constants and heating rate used with ISM cooling
   Real mbar, kboltz, hrate;
 
   // functions
   void AddConstantAccel(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
+  void AddBeamSource(DvceArray5D<Real> &ci0,const DvceArray5D<Real> &i0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                       const DvceArray5D<Real> &bcc, const Real dt);

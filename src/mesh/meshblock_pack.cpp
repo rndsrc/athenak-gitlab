@@ -14,6 +14,7 @@
 #include "mesh.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 #include "srcterms/turb_driver.hpp"
 
 //----------------------------------------------------------------------------------------
@@ -44,4 +45,5 @@ MeshBlockPack::~MeshBlockPack()
   if (phydro != nullptr) {delete phydro;}
   if (pmhd   != nullptr) {delete pmhd;}
   if (pturb  != nullptr) {delete pturb;}
+  if (prad  != nullptr) {delete prad;}
 }

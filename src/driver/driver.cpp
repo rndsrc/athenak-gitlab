@@ -16,6 +16,7 @@
 #include "outputs/outputs.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 #include "driver.hpp"
 
 //----------------------------------------------------------------------------------------
@@ -247,6 +248,21 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout)
 
     // Set primitive variables in initial conditions everywhere 
     (void) pmhd->ConToPrim(this, 0);
+  }
+
+  // Initialize radiation: ghost zones and primitive variables (everywhere)
+  radiation::Radiation *prad = pmesh->pmb_pack->prad;
+  if (prad != nullptr) {
+    // following functions return a TaskStatus, but it is ignored so cast to (void)
+    (void) prad->InitRecv(this, 0);
+    (void) prad->SendCI(this, 0);
+    (void) prad->ClearSend(this, 0);
+    (void) prad->ClearRecv(this, 0);
+    (void) prad->RecvCI(this, 0);
+    (void) prad->ApplyPhysicalBCs(this, 0);
+
+    // Set primitive variables in initial conditions everywhere
+    (void) prad->ConToPrim(this, 0);
   }
 
   //---- Step 3.  Compute first time step (if problem involves time evolution

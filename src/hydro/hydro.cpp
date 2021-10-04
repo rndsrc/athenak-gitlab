@@ -102,7 +102,7 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
   pbval_u->AllocateBuffersCC((nhydro+nscalars));
 
   // for time-evolving problems, continue to construct methods, allocate arrays
-  if (evolution_t.compare("stationary") != 0) {
+  if (evolution_t.compare("static") != 0) {
 
     // select reconstruction method (default PLM)
     {std::string xorder = pin->GetOrAddString("hydro","reconstruct","plm");
@@ -155,7 +155,7 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
       }
 
     // General relativistic solvers
-    } else if (is_general_relativistic){
+    } else if (is_general_relativistic) {
       if (rsolver.compare("hlle") == 0) {
         rsolver_method = Hydro_RSolver::hlle_gr;
       // Error for anything else
