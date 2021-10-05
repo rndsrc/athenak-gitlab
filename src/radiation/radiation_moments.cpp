@@ -56,13 +56,13 @@ void RadiationMoments::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &pr
 
       // Populate angular ghost zones in azimuthal angle
       for (int z=zs; z<=ze; ++z) {
-        for (int p=ps-ng; p<=ps-1; ++p) {
+        for (int p=ps-aindcs.ng; p<=ps-1; ++p) {
           int p_src = pe - ps + 1 + p;
           int zp = AngleInd(z,p,false,false,aindcs);
           int zp_src = AngleInd(z,p_src,false,false,aindcs);
           prim(m,zp,k,j,i) = prim(m,zp_src,k,j,i);
         }
-        for (int p=pe+1; p<=pe+ng; ++p) {
+        for (int p=pe+1; p<=pe+aindcs.ng; ++p) {
           int p_src = ps - pe - 1 + p;
           int zp = AngleInd(z,p,false,false,aindcs);
           int zp_src = AngleInd(z,p_src,false,false,aindcs);
@@ -71,19 +71,19 @@ void RadiationMoments::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &pr
       }
 
       // Populate angular ghost zones in polar angle
-      for (int z=zs-ng; z<=zs-1; ++z) {
-        for (int p=ps-ng; p<=pe+ng; ++p) {
+      for (int z=zs-aindcs.ng; z<=zs-1; ++z) {
+        for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
           int z_src = 2*zs - 1 - z;
-          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*ng);
+          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
           int zp = AngleInd(z,p,false,false,aindcs);
           int zp_src = AngleInd(z_src,p_src,false,false,aindcs);
           prim(m,zp,k,j,i) = prim(m,zp_src,k,j,i);
         }
       }
-      for (int z=ze+1; z<=ze+ng; ++z) {
-        for (int p=ps-ng; p<=pe+ng; ++p) {
+      for (int z=ze+1; z<=ze+aindcs.ng; ++z) {
+        for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
           int z_src = 2*ze + 1 - z;
-          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*ng);
+          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
           int zp = AngleInd(z,p,false,false,aindcs);
           int zp_src = AngleInd(z_src,p_src,false,false,aindcs);
           prim(m,zp,k,j,i) = prim(m,zp_src,k,j,i);
@@ -101,25 +101,20 @@ void RadiationMoments::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &pr
   auto nmu_ = pmy_pack->prad->nmu;
   auto solid_angle_ = pmy_pack->prad->solid_angle;
 
-  par_for("zero_moments",DevExeSpace(),0,(nmb-1),0,9,ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int n, int k, int j, int i)
+  par_for("set_moments",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      mcoord_(m,n,k,j,i) = 0.0;
-    }
-  );
+      for (int n12=0; n12<=9; ++n12) {
+        mcoord_(m,n12,k,j,i) = 0.0;
+      }
 
-  par_for("set_moments",DevExeSpace(),0,(nmb-1),zs,ze,ps,pe,
-    KOKKOS_LAMBDA(int m, int z, int p)
-    {
-      int zp = AngleInd(z,p,false,false,aindcs);
-      for (int n1 = 0, n12 = 0; n1 < 4; ++n1) {
-        for (int n2 = n1; n2 < 4; ++n2, ++n12) {
-          for (int k = ks; k <= ke; ++k) {
-            for (int j = js; j <= je; ++j) {
-              for (int i = is; i <= ie; ++i) {
-                mcoord_(m,n12,k,j,i) += (nmu_(m,n1,z,p,k,j,i)*nmu_(m,n2,z,p,k,j,i)
-                                         *prim(m,zp,k,j,i)*solid_angle_.d_view(z,p));
-              }
+      for (int z=zs; z<=ze; ++z) {
+        for (int p=ps; p<=pe; ++p) {
+          int zp = AngleInd(z,p,false,false,aindcs);
+          for (int n1 = 0, n12 = 0; n1 < 4; ++n1) {
+            for (int n2 = n1; n2 < 4; ++n2, ++n12) {
+              mcoord_(m,n12,k,j,i) += (nmu_(m,n1,z,p,k,j,i)*nmu_(m,n2,z,p,k,j,i)
+                                       *prim(m,zp,k,j,i)*solid_angle_.d_view(z,p));
             }
           }
         }

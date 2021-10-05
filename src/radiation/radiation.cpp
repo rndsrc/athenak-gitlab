@@ -81,14 +81,16 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
   int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
   int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
-  int ncellsa1 = amesh_indcs.nzeta + 2*(indcs.ng);
-  int ncellsa2 = amesh_indcs.npsi + 2*(indcs.ng);
-  nangles = ncellsa1*ncellsa2;
+
   amesh_indcs.ng = indcs.ng;
-  amesh_indcs.zs = indcs.ng;
-  amesh_indcs.ze = amesh_indcs.nzeta + indcs.ng - 1;
-  amesh_indcs.ps = indcs.ng;
-  amesh_indcs.pe = amesh_indcs.npsi + indcs.ng - 1;
+  int ncellsa1 = amesh_indcs.nzeta + 2*(amesh_indcs.ng);
+  int ncellsa2 = amesh_indcs.npsi + 2*(amesh_indcs.ng);
+  nangles = ncellsa1*ncellsa2;
+
+  amesh_indcs.zs = amesh_indcs.ng;
+  amesh_indcs.ze = amesh_indcs.nzeta + amesh_indcs.ng - 1;
+  amesh_indcs.ps = amesh_indcs.ng;
+  amesh_indcs.pe = amesh_indcs.npsi + amesh_indcs.ng - 1;
 
   Kokkos::realloc(ci0,nmb,nangles,ncells3,ncells2,ncells1);
   Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);

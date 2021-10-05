@@ -195,6 +195,8 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
     {
       // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add
       // other reconstruction algorithms
+      // (TODO: @pdmullen) @c-white's version of AngleInd does not have
+      // clause for when zeta_face is true.  Should it? Here, zp_c and zp_r are equiv.
       int zp_l = AngleInd(z-1, p, false, false, aindcs);
       int zp_c = AngleInd(z, p, true, false, aindcs);
       int zp_r = AngleInd(z, p, false, false, aindcs);

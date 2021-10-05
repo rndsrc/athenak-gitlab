@@ -27,9 +27,9 @@ ix3_bc = outflow  # bottom boundary
 ox3_bc = outflow  # top boundary
 
 <meshblock>
-nx1 = 32  # block size in x-direction
-nx2 = 16  # block size in y-direction
-nx3 = 16  # block size in z-direction
+nx1 = 4  # block size in x-direction
+nx2 = 8  # block size in y-direction
+nx3 = 8  # block size in z-direction
 
 <coord>
 minkowski = true  # Minkowski flag
@@ -42,8 +42,8 @@ nlim       = -1       # cycle limit
 tlim       = 1.4142135623730951  # time limit
 
 <radiation>
+nzeta     = 8        # number of cells in zeta-direction
 npsi      = 16       # number of cells in psi-direction
-nzeta     = 16       # number of cells in zeta-direction
 reconstruct = dc     # donor cell reconstruction
 beam_source = true   # apply beam source term
 pos_1  = 1.5         # x-coordinate of beam origin
