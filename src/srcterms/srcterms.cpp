@@ -134,13 +134,6 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto coord = pmy_pack->coord.coord_data;
 
-  // Allocate scratch arrays
-  Real e[4][4] = {};
-  Real e_cov[4][4] = {};
-  Real omega[4][4][4] = {};
-  auto e_ = e;
-  auto e_cov_ = e_cov;
-  auto omega_ = omega;
   auto nh_cc_ = pmy_pack->prad->nh_cc;
   auto n0_n_mu_ = pmy_pack->prad->n0_n_mu;
 
@@ -175,7 +168,8 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
       Real g_[NMETRIC], gi_[NMETRIC];
       ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, true,
                               coord.bh_spin, g_, gi_);
-      ComputeTetrad(x1v, x2v, x3v, true, e_, e_cov_, omega_);
+      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
+      ComputeTetrad(x1v, x2v, x3v, true, e, e_cov, omega);
 
       // Calculate proper distance to beam origin and minimum angle between directions
       Real dx1 = x1v - pos_1_;
@@ -203,10 +197,10 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
       Real dc3 = dir_3_;
 
       // Calculate covariant direction in tetrad frame
-      Real dtc0 = (e_[0][0]*dc0 + e_[0][1]*dc1 + e_[0][2]*dc2 + e_[0][3]*dc3);
-      Real dtc1 = (e_[1][0]*dc0 + e_[1][1]*dc1 + e_[1][2]*dc2 + e_[1][3]*dc3)/(-dtc0);
-      Real dtc2 = (e_[2][0]*dc0 + e_[2][1]*dc1 + e_[2][2]*dc2 + e_[2][3]*dc3)/(-dtc0);
-      Real dtc3 = (e_[3][0]*dc0 + e_[3][1]*dc1 + e_[3][2]*dc2 + e_[3][3]*dc3)/(-dtc0);
+      Real dtc0 = (e[0][0]*dc0 + e[0][1]*dc1 + e[0][2]*dc2 + e[0][3]*dc3);
+      Real dtc1 = (e[1][0]*dc0 + e[1][1]*dc1 + e[1][2]*dc2 + e[1][3]*dc3)/(-dtc0);
+      Real dtc2 = (e[2][0]*dc0 + e[2][1]*dc1 + e[2][2]*dc2 + e[2][3]*dc3)/(-dtc0);
+      Real dtc3 = (e[3][0]*dc0 + e[3][1]*dc1 + e[3][2]*dc2 + e[3][3]*dc3)/(-dtc0);
 
       // Go through angles
       for (int z = zs; z <= ze; ++z) {
