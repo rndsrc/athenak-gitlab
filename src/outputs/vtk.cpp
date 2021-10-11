@@ -139,16 +139,16 @@ void VTKOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin)
     {std::stringstream msg;
     msg << std::endl << "SCALARS " << outvars[n].label.c_str() << " float" << std::endl
         << "LOOKUP_TABLE default" << std::endl;
-    vtkfile.Write_at_all(msg.str().c_str(),sizeof(char),msg.str().size(),header_offset);
+    vtkfile.Write_at(msg.str().c_str(),sizeof(char),msg.str().size(),header_offset);
     header_offset += msg.str().size();}
 
     // Loop over MeshBlocks
     for (int m=0; m<nout_mbs; ++m) {
       auto &indcs = pm->pmb_pack->coord.coord_data.mb_indcs;
       LogicalLocation loc = pm->loclist[outmbs[m].mb_gid];
-      int &mb_nx1 = indcs.nx1;
-      int &mb_nx2 = indcs.nx2;
-      int &mb_nx3 = indcs.nx3;
+      int mb_nx1 = (out_params.slice1)? 0 : (indcs.nx1);
+      int mb_nx2 = (out_params.slice2)? 0 : (indcs.nx2);
+      int mb_nx3 = (out_params.slice3)? 0 : (indcs.nx3);
       int &ois = outmbs[m].ois;
       int &oie = outmbs[m].oie;
       int &ojs = outmbs[m].ojs;
@@ -171,7 +171,7 @@ void VTKOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin)
           }
           size_t my_offset = header_offset + data_offset +
                              ((j-ojs)*nout1 + (k-oks)*nout1*nout2)*sizeof(float);
-          vtkfile.Write_at_all(&data[0], sizeof(float), (oie-ois+1), my_offset);
+          vtkfile.Write_at(&data[0], sizeof(float), (oie-ois+1), my_offset);
         }
       }
     }  // end loop over MeshBlocks
