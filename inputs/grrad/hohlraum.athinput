@@ -1,0 +1,57 @@
+<comment>
+problem = Hohlraum test
+
+<job>
+basename = hohlraum   # name of run
+
+<time>
+evolution  = dynamic  # dynamic/kinematic/static
+integrator = rk2      # time integration algorithm
+cfl_number = 0.3      # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1       # cycle limit
+tlim       = 1.0      # time limit
+
+<mesh>
+nghost = 2        # Number of ghost cells
+nx1    = 64       # Number of zones in X1-direction
+x1min  = 0.0      # minimum value of X1
+x1max  = 1.0      # maximum value of X1
+ix1_bc = user     # inner-X1 boundary flag
+ox1_bc = user     # outer-X1 boundary flag
+
+nx2    = 1         # Number of zones in X2-direction
+x2min  = -0.5      # minimum value of X1
+x2max  = 0.5       # maximum value of X1
+ix2_bc = periodic  # inner-X1 boundary flag
+ox2_bc = periodic  # outer-X1 boundary flag
+
+nx3    = 1         # Number of zones in X3-direction
+x3min  = -0.5      # minimum value of X3
+x3max  = 0.5       # maximum value of X3
+ix3_bc = periodic  # inner-X3 boundary flag
+ox3_bc = periodic  # outer-X3 boundary flag
+
+<coord>
+m = 0.0  # minkowski
+a = 0.0  # black hole spin a (0 <= a/M < 1)
+rmin = 0.0 # excision radius
+
+<radiation>
+nzeta     = 127      # number of polar angles in direction space
+npsi      = 128      # number of azimuthal angles in direction space
+reconstruct = plm    # reconstruction method
+
+<problem>
+erad     = 0.0  # initial isotropic radiation energy density
+ii_ix1   = 1.0  # isotropic radiation energy density at left boundary
+ii_ox1   = 0.0  # isotropic radiation energy density at right boundary
+ii_ix2   = 0.0  # isotropic radiation energy density at front boundary
+ii_ox2   = 0.0  # isotropic radiation energy density at back boundary
+ii_ix3   = 0.0  # isotropic radiation energy density at bottom boundary
+ii_ox3   = 0.0  # isotropic radiation energy density at top boundary
+
+<output1>
+file_type   = tab            # output format
+variable    = rad_moments    # choice of variables to output
+data_format = %.24e          # data format
+dt          = 0.1            # output cadence

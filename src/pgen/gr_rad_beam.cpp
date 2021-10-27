@@ -19,6 +19,7 @@
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
 #include "radiation/radiation.hpp"
+#include "srcterms/srcterms.hpp"
 #include "pgen.hpp"
 
 //----------------------------------------------------------------------------------------
@@ -37,7 +38,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &zs = aindcs.zs; int &ze = aindcs.ze;
   int &ps = aindcs.ps; int &pe = aindcs.pe;
 
-  auto &ci0 = pmbp->prad->ci0;
+  auto &i0 = pmbp->prad->i0;
   int nmb1 = (pmbp->nmb_thispack-1);
 
   par_for("rad_beam",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
@@ -45,7 +46,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     {
       // radiation field
       int zp = AngleInd(z,p,false,false,aindcs);
-      ci0(m,zp,k,j,i) = 0.0;
+      i0(m,zp,k,j,i) = 0.0;
     }
   );
 

@@ -3,7 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file hydro_newdt.cpp
+//! \file radiation_newdt.cpp
 //  \brief function to compute radiation timestep across all MeshBlock(s) in a MeshBlockPack
 
 #include <limits>
@@ -41,7 +41,7 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage)
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
 
-  Kokkos::parallel_reduce("HydroNudt2",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
+  Kokkos::parallel_reduce("radNudt2",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
     KOKKOS_LAMBDA(const int &idx, Real &min_dt1, Real &min_dt2, Real &min_dt3)
     {
       int m = (idx)/nkji;

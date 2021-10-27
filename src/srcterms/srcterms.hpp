@@ -58,7 +58,7 @@ class SourceTerms
 
   // functions
   void AddConstantAccel(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
-  void AddBeamSource(DvceArray5D<Real> &ci0,const DvceArray5D<Real> &i0,const Real dt);
+  void AddBeamSource(DvceArray5D<Real> &i0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                       const DvceArray5D<Real> &bcc, const Real dt);

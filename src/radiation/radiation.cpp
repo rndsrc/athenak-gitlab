@@ -24,12 +24,11 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   pmy_pack(ppack),
 
   // intensities and fluxes
-  ci0("cons",1,1,1,1,1),
   i0("prim",1,1,1,1,1),
-  ci1("cons1",1,1,1,1,1),
-  ciflx("ciflx",1,1,1,1,1),
-  cia1flx("cia1flx",1,1,1,1,1),
-  cia2flx("cia2flx",1,1,1,1,1),
+  i1("cons1",1,1,1,1,1),
+  iflx("ciflx",1,1,1,1,1),
+  ia1flx("cia1flx",1,1,1,1,1),
+  ia2flx("cia2flx",1,1,1,1,1),
 
   // angle and lengths...yuck...(TODO: @pdmullen) be smarter about this
   zetaf("zetaf",1),
@@ -46,11 +45,11 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   nh_cc("nh_cc",1,1,1),
   nh_fc("nh_fc",1,1,1),
   nh_cf("nh_cf",1,1,1),
-  nmu("nmu",1,1,1,1,1,1,1),
-  n0_n_mu("n0_n_mu",1,1,1,1,1,1,1),
-  n1_n_mu("n1_n_mu",1,1,1,1,1,1,1),
-  n2_n_mu("n2_n_mu",1,1,1,1,1,1,1),
-  n3_n_mu("n3_n_mu",1,1,1,1,1,1,1),
+  n0("n0",1,1,1,1,1,1),
+  n0_n_0("n0_n_0",1,1,1,1,1,1),
+  n1_n_0("n1_n_0",1,1,1,1,1,1),
+  n2_n_0("n2_n_0",1,1,1,1,1,1),
+  n3_n_0("n3_n_0",1,1,1,1,1,1),
   na1_n_0("na1_n_0",1,1,1,1,1,1),
   na2_n_0("na2_n_0",1,1,1,1,1,1),
 
@@ -61,8 +60,11 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   is_hydro_enabled = pin->DoesBlockExist("hydro");
   is_mhd_enabled = pin->DoesBlockExist("mhd");
 
-  // Construct "Equation of State" class
-  peos = new RadiationMoments(ppack, pin);
+  // initialize metric (GR only)
+  pmy_pack->coord.InitMetric(pin);
+
+  // no-op, passed to boundary functions
+  peos = new EquationOfState(ppack, pin);
 
   // Source terms (constructor parses input file to initialize only srcterms needed)
   psrc = new SourceTerms("radiation", ppack, pin);
@@ -92,13 +94,10 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   amesh_indcs.ps = amesh_indcs.ng;
   amesh_indcs.pe = amesh_indcs.npsi + amesh_indcs.ng - 1;
 
-  Kokkos::realloc(ci0,nmb,nangles,ncells3,ncells2,ncells1);
   Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);
-  Kokkos::realloc(moments_coord,nmb,10,ncells3,ncells2,ncells1);
+  Kokkos::realloc(moments_coord,nmb,1,ncells3,ncells2,ncells1);
 
-  // Setup mesh and frame quantities
-  // (TODO: @pdmullen) potentially move all of these to their own class
-  // pgrd = new LatLongGrid(ppack, pin)
+  // Setup angular mesh and coordinate frame quantities
   Kokkos::realloc(zetaf,ncellsa1+1);
   Kokkos::realloc(zetav,ncellsa1);
   Kokkos::realloc(dzetaf,ncellsa1);
@@ -111,14 +110,14 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(nh_cc,4,ncellsa1,ncellsa2);
   Kokkos::realloc(nh_fc,4,ncellsa1+1,ncellsa2);
   Kokkos::realloc(nh_cf,4,ncellsa1,ncellsa2+1);
-  Kokkos::realloc(nmu,nmb,4,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(n0_n_mu,nmb,4,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(n1_n_mu,nmb,4,ncellsa1,ncellsa2,ncells3,ncells2,ncells1+1);
-  Kokkos::realloc(n2_n_mu,nmb,4,ncellsa1,ncellsa2,ncells3,ncells2+1,ncells1);
-  Kokkos::realloc(n3_n_mu,nmb,4,ncellsa1,ncellsa2,ncells3+1,ncells2,ncells1);
+  Kokkos::realloc(n0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
+  Kokkos::realloc(n0_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
+  Kokkos::realloc(n1_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1+1);
+  Kokkos::realloc(n2_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2+1,ncells1);
+  Kokkos::realloc(n3_n_0,nmb,ncellsa1,ncellsa2,ncells3+1,ncells2,ncells1);
   Kokkos::realloc(na1_n_0,nmb,ncellsa1+1,ncellsa2,ncells3,ncells2,ncells1);
   Kokkos::realloc(na2_n_0,nmb,ncellsa1,ncellsa2+1,ncells3,ncells2,ncells1);
-  InitMesh();
+  InitAngularMesh();
   InitCoordinateFrame();
 
   // allocate boundary buffers for conserved (cell-centered) variables
@@ -159,16 +158,13 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     }}
 
     // allocate second registers, fluxes
-    Kokkos::realloc(ci1,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(ciflx.x1f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(ciflx.x2f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(ciflx.x3f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(cia1flx,nmb,((ncellsa1+1)*ncellsa2),ncells3,ncells2,ncells1);
-    Kokkos::realloc(cia2flx,nmb,(ncellsa1*(ncellsa2+1)),ncells3,ncells2,ncells1);
+    Kokkos::realloc(i1,nmb,nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x1f,nmb,nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x2f,nmb,nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x3f,nmb,nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(ia1flx,nmb,((ncellsa1+1)*ncellsa2),ncells3,ncells2,ncells1);
+    Kokkos::realloc(ia2flx,nmb,(ncellsa1*(ncellsa2+1)),ncells3,ncells2,ncells1);
   }
-
-  // (5) initialize metric (GR only)
-  pmy_pack->coord.InitMetric(pin);
 
 }
 

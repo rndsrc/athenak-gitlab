@@ -125,6 +125,10 @@ template <typename T>
 using DualArray2D = Kokkos::DualView<T **, LayoutWrapper, DevMemSpace>;
 template <typename T>
 using DualArray3D = Kokkos::DualView<T ***, LayoutWrapper, DevMemSpace>;
+template <typename T>
+using DualArray6D = Kokkos::DualView<T ******, LayoutWrapper, DevMemSpace>;
+template <typename T>
+using DualArray7D = Kokkos::DualView<T *******, LayoutWrapper, DevMemSpace>;
 
 // template declarations for construction of Kokkos::View in scratch memory
 template <typename T>

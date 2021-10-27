@@ -270,14 +270,6 @@ OutputVariable GetOutputVariable(const std::string& input_string)
   } else if (input_string == "turb_force") {
     return OutputVariable::turb_force;
 
-  // radiation conserved variable
-  } else if (input_string == "rad_ci_0") {
-    return OutputVariable::rad_ci_0;
-
-  // radiation primitive variable
-  } else if (input_string == "rad_i_0") {
-    return OutputVariable::rad_i_0;
-
   // radiation field moments
   } else if (input_string == "rad_moments") {
     return OutputVariable::rad_moments;
@@ -382,14 +374,6 @@ std::string GetOutputVariableString(OutputVariable input_flag)
     // cell-centered forcing added in turbulent driving problems
     case OutputVariable::turb_force:
       return "turb_force";
-
-    // radiation conserved variables
-    case OutputVariable::rad_ci_0:
-      return "rad_ci_0";
-
-    // radiation conserved variables
-    case OutputVariable::rad_i_0:
-      return "rad_i_0";
 
     // radiation field moments
     case OutputVariable::rad_moments:

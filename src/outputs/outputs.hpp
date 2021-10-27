@@ -27,7 +27,7 @@ enum class OutputVariable {undef=-1,
   mhd_w_d,   mhd_w_vx,   mhd_w_vy,   mhd_w_vz,   mhd_w_p,   mhd_w, 
   mhd_bcc1,  mhd_bcc2,   mhd_bcc3,   mhd_bcc,    mhd_b_x1f, mhd_b_x2f, mhd_b_x3f,
   mhd_u_bcc, mhd_w_bcc,  turb_force,
-  rad_ci_0,  rad_i_0,    rad_moments};
+  rad_moments};
 
 // forward declarations, and two utility function prototypes
 class Mesh;

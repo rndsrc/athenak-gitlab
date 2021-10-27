@@ -82,6 +82,7 @@ add_executable(
         radiation/radiation_newdt.cpp
         radiation/radiation_tasks.cpp
         radiation/radiation_update.cpp
+        radiation/bvals/angular_mesh_bcs.cpp
         radiation/bvals/apply_physical_bcs.cpp
         radiation/bvals/outflow_radiation.cpp
 

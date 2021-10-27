@@ -350,8 +350,8 @@ static void ComputePrimitiveSingle(int m, int k, int j, int i,
   Real u0(0.0), u1(0.0), u2(0.0), u3(0.0);
   TransformVector(pgen, my_ur, 0.0, 0.0, x1v, x2v, x3v, &u1, &u2, &u3);
 
-  ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, true,
-                          coord.bh_spin, g_, gi_);
+  ComputeMetricAndInverse(x1v, x2v, x3v, true,
+                          coord.bh_mass, coord.bh_spin, g_, gi_);
 
   Real tmp = g_[I11]*u1*u1 + 2.0*g_[I12]*u1*u2 + 2.0*g_[I13]*u1*u3
            + g_[I22]*u2*u2 + 2.0*g_[I23]*u2*u3

@@ -9,21 +9,23 @@
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
 #include "driver/driver.hpp"
+#include "coordinates/cartesian_ks.hpp"
 #include "coordinates/coordinates.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
 #include "srcterms/srcterms.hpp"
 #include "radiation.hpp"
+#include "radiation_tetrad.hpp"
 
 #include <cmath>
   
 namespace radiation {
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Radiation::InitMesh
+//! \fn  void Radiation::InitMesh()
 //! \brief Initialize angular mesh
 
-void Radiation::InitMesh() {
+void Radiation::InitAngularMesh() {
   // construct polar angles, equally spaced in cosine
   auto zetaf_ = zetaf;
   auto zetav_ = zetav;
@@ -50,11 +52,11 @@ void Radiation::InitMesh() {
     zetaf_.h_view(ze+ng+1-z) = 2.0*M_PI - zetaf_.h_view(nzeta+z);  // set S ghost faces
   }
   for (int z = zs-ng; z <= ze+ng; ++z) {
-    zetav_.h_view(z) = (zetaf_.h_view(z+1) * cos(zetaf_.h_view(z+1))
-                - sin(zetaf_.h_view(z+1)) - zetaf_.h_view(z)
-                * cos(zetaf_.h_view(z)) + sin(zetaf_.h_view(z)))
-                / (cos(zetaf_.h_view(z+1)) - cos(zetaf_.h_view(z)));
-    dzetaf_.h_view(z) = zetaf_.h_view(z+1) - zetaf_.h_view(z);
+    zetav_.h_view(z) = (zetaf_.h_view(z+1)  * cos(zetaf_.h_view(z+1))
+                  - sin(zetaf_.h_view(z+1)) - zetaf_.h_view(z)
+                  * cos(zetaf_.h_view(z  )) + sin(zetaf_.h_view(z)))
+                 / (cos(zetaf_.h_view(z+1)) - cos(zetaf_.h_view(z)));
+    dzetaf_.h_view(z) = zetaf_.h_view(z+1)  - zetaf_.h_view(z);
   }
 
   zetaf_.template modify<HostMemSpace>();
@@ -174,11 +176,8 @@ void Radiation::InitMesh() {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Radiation::InitCoordinateFrame
+//! \fn  void Radiation::InitCoordinateFrame()
 //! \brief Initialize frame related quantities.
-// (TODO: @pdmullen): this is really gross...Does this simplify to something much
-// simpler for just CartesianKS.  Lugging around these huge arrays may be crippling on
-// GPUs.
 
 void Radiation::InitCoordinateFrame() {
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
@@ -204,11 +203,11 @@ void Radiation::InitCoordinateFrame() {
   auto zetav_ = zetav;
 
   // Calculate n^mu and n^0 n_mu
-  auto nmu_ = nmu;
-  auto n0_n_mu_ = n0_n_mu;
-  par_for("rad_nmu_n0_n_mu",DevExeSpace(),
-          0,(nmb-1),0,(ncellsa1-1),0,(ncellsa2-1),0,(n3-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  auto n0_ = n0;
+  auto n0_n_0_ = n0_n_0;
+
+  par_for("rad_n0_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -225,43 +224,30 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2v, x3v, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real n0 = 0.0;
-      Real n1 = 0.0;
-      Real n2 = 0.0;
-      Real n3 = 0.0;
-      Real n_0 = 0.0;
-      Real n_1 = 0.0;
-      Real n_2 = 0.0;
-      Real n_3 = 0.0;
-      for (int d = 0; d < 4; ++d) {
-        n0 += e[d][0] * nh_cc_.d_view(d,z,p);
-        n1 += e[d][1] * nh_cc_.d_view(d,z,p);
-        n2 += e[d][2] * nh_cc_.d_view(d,z,p);
-        n3 += e[d][3] * nh_cc_.d_view(d,z,p);
-        n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
-        n_1 += e_cov[d][1] * nh_cc_.d_view(d,z,p);
-        n_2 += e_cov[d][2] * nh_cc_.d_view(d,z,p);
-        n_3 += e_cov[d][3] * nh_cc_.d_view(d,z,p);
+      for (int z=0; z<=(ncellsa1-1); ++z) {
+        for (int p=0; p<=(ncellsa2-1); ++p) {
+          Real n0 = 0.0;
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n0 += e[d][0] * nh_cc_.d_view(d,z,p);
+            n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
+          }
+          n0_(m,z,p,k,j,i) = n0;
+          n0_n_0_(m,z,p,k,j,i) = n0 * n_0;
+        }
       }
-      nmu_(m,0,z,p,k,j,i) = n0;
-      nmu_(m,1,z,p,k,j,i) = n1;
-      nmu_(m,2,z,p,k,j,i) = n2;
-      nmu_(m,3,z,p,k,j,i) = n3;
-      n0_n_mu_(m,0,z,p,k,j,i) = n0 * n_0;
-      n0_n_mu_(m,1,z,p,k,j,i) = n0 * n_1;
-      n0_n_mu_(m,2,z,p,k,j,i) = n0 * n_2;
-      n0_n_mu_(m,3,z,p,k,j,i) = n0 * n_3;
     }
   );
 
+
   // Calculate n^1 n_mu
-  auto n1_n_mu_ = n1_n_mu;
-  par_for("rad_n1_n_mu", DevExeSpace(),
-          0,(nmb-1),0,(ncellsa1-1),0,(ncellsa2-1),0,(n3-1),0,(n2-1),0,n1,
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  auto n1_n_0_ = n1_n_0;
+
+  par_for("rad_n1_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, n1,
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -278,33 +264,28 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1f, x2v, x3v, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1f, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real n1 = 0.0;
-      Real n_0 = 0.0;
-      Real n_1 = 0.0;
-      Real n_2 = 0.0;
-      Real n_3 = 0.0;
-      for (int d = 0; d < 4; ++d) {
-        n1 += e[d][1] * nh_cc_.d_view(d,z,p);
-        n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
-        n_1 += e_cov[d][1] * nh_cc_.d_view(d,z,p);
-        n_2 += e_cov[d][2] * nh_cc_.d_view(d,z,p);
-        n_3 += e_cov[d][3] * nh_cc_.d_view(d,z,p);
+      for (int z=0; z<=(ncellsa1-1); ++z) {
+        for (int p=0; p<=(ncellsa2-1); ++p) {
+          Real n1 = 0.0;
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n1 += e[d][1] * nh_cc_.d_view(d,z,p);
+            n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
+          }
+          n1_n_0_(m,z,p,k,j,i) = n1 * n_0;
+        }
       }
-      n1_n_mu_(m,0,z,p,k,j,i) = n1 * n_0;
-      n1_n_mu_(m,1,z,p,k,j,i) = n1 * n_1;
-      n1_n_mu_(m,2,z,p,k,j,i) = n1 * n_2;
-      n1_n_mu_(m,3,z,p,k,j,i) = n1 * n_3;
     }
   );
 
   // Calculate n^2 n_mu
-  auto n2_n_mu_ = n2_n_mu;
-  par_for("rad_n2_n_mu", DevExeSpace(),
-          0,(nmb-1),0,(ncellsa1-1),0,(ncellsa2-1),0,(n3-1),0,n2,0,(n1-1),
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  auto n2_n_0_ = n2_n_0;
+
+  par_for("rad_n2_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, n2, 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -321,33 +302,29 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2f, x3v, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2f, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real n2 = 0.0;
-      Real n_0 = 0.0;
-      Real n_1 = 0.0;
-      Real n_2 = 0.0;
-      Real n_3 = 0.0;
-      for (int d = 0; d < 4; ++d) {
-        n2 += e[d][2] * nh_cc_.d_view(d,z,p);
-        n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
-        n_1 += e_cov[d][1] * nh_cc_.d_view(d,z,p);
-        n_2 += e_cov[d][2] * nh_cc_.d_view(d,z,p);
-        n_3 += e_cov[d][3] * nh_cc_.d_view(d,z,p);
+      for (int z=0; z<=(ncellsa1-1); ++z) {
+        for (int p=0; p<=(ncellsa2-1); ++p) {
+          Real n2 = 0.0;
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n2 += e[d][2] * nh_cc_.d_view(d,z,p);
+            n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
+          }
+          n2_n_0_(m,z,p,k,j,i) = n2 * n_0;
+        }
       }
-      n2_n_mu_(m,0,z,p,k,j,i) = n2 * n_0;
-      n2_n_mu_(m,1,z,p,k,j,i) = n2 * n_1;
-      n2_n_mu_(m,2,z,p,k,j,i) = n2 * n_2;
-      n2_n_mu_(m,3,z,p,k,j,i) = n2 * n_3;
     }
   );
 
+
   // Calculate n^3 n_mu
-  auto n3_n_mu_ = n3_n_mu;
-  par_for("rad_n3_n_mu", DevExeSpace(),
-          0,(nmb-1),0,(ncellsa1-1),0,(ncellsa2-1),0,n3,0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  auto n3_n_0_ = n3_n_0;
+
+  par_for("rad_n3_n_0", DevExeSpace(), 0, (nmb-1), 0, n3, 0, (n2-1), 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -364,33 +341,28 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3f = LeftEdgeX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2v, x3f, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3f, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real n3 = 0.0;
-      Real n_0 = 0.0;
-      Real n_1 = 0.0;
-      Real n_2 = 0.0;
-      Real n_3 = 0.0;
-      for (int d = 0; d < 4; ++d) {
-        n3 += e[d][3] * nh_cc_.d_view(d,z,p);
-        n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
-        n_1 += e_cov[d][1] * nh_cc_.d_view(d,z,p);
-        n_2 += e_cov[d][2] * nh_cc_.d_view(d,z,p);
-        n_3 += e_cov[d][3] * nh_cc_.d_view(d,z,p);
+      for (int z=0; z<=(ncellsa1-1); ++z) {
+        for (int p=0; p<=(ncellsa2-1); ++p) {
+          Real n3 = 0.0;
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n3 += e[d][3] * nh_cc_.d_view(d,z,p);
+            n_0 += e_cov[d][0] * nh_cc_.d_view(d,z,p);
+          }
+          n3_n_0_(m,z,p,k,j,i) = n3 * n_0;
+        }
       }
-      n3_n_mu_(m,0,z,p,k,j,i) = n3 * n_0;
-      n3_n_mu_(m,1,z,p,k,j,i) = n3 * n_1;
-      n3_n_mu_(m,2,z,p,k,j,i) = n3 * n_2;
-      n3_n_mu_(m,3,z,p,k,j,i) = n3 * n_3;
     }
   );
 
   // Calculate n^zeta n_0
   auto na1_n_0_ = na1_n_0;
-  par_for("rad_na1_n_0", DevExeSpace(),
-          0,(nmb-1),0,ncellsa1,0,(ncellsa2-1),0,(n3-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+
+  par_for("rad_na1_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -407,31 +379,35 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2v, x3v, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real na1 = 0.0;
-      for (int d1 = 0; d1 < 4; ++d1) {
-        for (int d2 = 0; d2 < 4; ++d2) {
-          na1 += (1.0 / sin(zetaf_.d_view(z))
-                  * nh_fc_.d_view(d1,z,p) * nh_fc_.d_view(d2,z,p)
-                  * (nh_fc_.d_view(0,z,p) * omega[3][d1][d2]
-                     - nh_fc_.d_view(3,z,p) * omega[0][d1][d2]));
+      for (int z=0; z<=(ncellsa1); ++z) {
+        for (int p=0; p<=(ncellsa2-1); ++p) {
+          Real na1 = 0.0;
+          for (int d1 = 0; d1 < 4; ++d1) {
+            for (int d2 = 0; d2 < 4; ++d2) {
+              na1 += (1.0 / sin(zetaf_.d_view(z))
+                      * nh_fc_.d_view(d1,z,p) * nh_fc_.d_view(d2,z,p)
+                      * (nh_fc_.d_view(0,z,p) * omega[3][d1][d2]
+                       - nh_fc_.d_view(3,z,p) * omega[0][d1][d2]));
+            }
+          }
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n_0 += e_cov[d][0] * nh_fc_.d_view(d,z,p);
+          }
+          na1_n_0_(m,z,p,k,j,i) = na1 * n_0;
         }
       }
-      Real n_0 = 0.0;
-      for (int d1 = 0; d1 < 4; ++d1) {
-        n_0 += e_cov[d1][0] * nh_fc_.d_view(d1,z,p);
-      }
-      na1_n_0_(m,z,p,k,j,i) = na1 * n_0;
     }
   );
 
   // Calculate n^psi n_0
-  auto na2_n_0_ = na1_n_0;
-  par_for("rad_na2_n_0", DevExeSpace(),
-          0,(nmb-1),0,(ncellsa1-1),0,ncellsa2,0,(n3-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  auto na2_n_0_ = na2_n_0;
+
+  par_for("rad_na2_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
@@ -448,23 +424,27 @@ void Radiation::InitCoordinateFrame() {
       int nx3 = coord.mb_indcs.nx3;
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2v, x3v, true, e, e_cov, omega);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
-      Real na2 = 0.0;
-      for (int d1 = 0; d1 < 4; ++d1) {
-        for (int d2 = 0; d2 < 4; ++d2) {
-          na2 += (1.0 / SQR(sin(zetav_.d_view(z))) * nh_cf_.d_view(d1,z,p)
-                  * nh_cf_.d_view(d2,z,p)
-                  * (nh_cf_.d_view(2,z,p) * omega[1][d1][d2]
-                     - nh_cf_.d_view(1,z,p) * omega[2][d1][d2]));
+      for (int z=0; z<=(ncellsa1-1); ++z) {
+        for (int p=0; p<=(ncellsa2); ++p) {
+          Real na2 = 0.0;
+          for (int d1 = 0; d1 < 4; ++d1) {
+            for (int d2 = 0; d2 < 4; ++d2) {
+              na2 += (1.0 / SQR(sin(zetav_.d_view(z)))
+                      * nh_cf_.d_view(d1,z,p) * nh_cf_.d_view(d2,z,p)
+                      * (nh_cf_.d_view(2,z,p) * omega[1][d1][d2]
+                       - nh_cf_.d_view(1,z,p) * omega[2][d1][d2]));
+            }
+          }
+          Real n_0 = 0.0;
+          for (int d = 0; d < 4; ++d) {
+            n_0 += e_cov[d][0] * nh_cf_.d_view(d,z,p);
+          }
+          na2_n_0_(m,z,p,k,j,i) = na2 * n_0;
         }
       }
-      Real n_0 = 0.0;
-      for (int d1 = 0; d1 < 4; ++d1) {
-        n_0 += e_cov[d1][0] * nh_cf_.d_view(d1,z,p);
-      }
-      na2_n_0_(m,z,p,k,j,i) = na2 * n_0;
     }
   );
 

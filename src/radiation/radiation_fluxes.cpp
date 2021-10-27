@@ -12,16 +12,22 @@
 #include "mesh/mesh.hpp"
 #include "coordinates/coordinates.hpp"
 #include "radiation.hpp"
-#include "eos/eos.hpp"
 // include inlined reconstruction methods (yuck...)
 #include "reconstruct/dc.cpp"
 #include "reconstruct/plm.cpp"
 #include "reconstruct/ppm.cpp"
 #include "reconstruct/wenoz.cpp"
-// include inlined flux calculation
-#include "radiation/radiation_rsolver.cpp"
+
+#include <Kokkos_Core.hpp>
 
 namespace radiation {
+
+KOKKOS_INLINE_FUNCTION
+void SpatialFlux(TeamMember_t const &member,
+     const int m, const int k, const int j,  const int il, const int iu,
+     const DvceArray6D<Real> nn, struct AMeshIndcs aindcs,
+     const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx);
+
 //----------------------------------------------------------------------------------------
 //! \fn  void Radiation::CalcFluxes
 //! \brief Compute radiation fluxes
@@ -42,13 +48,12 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   int nmb1 = pmy_pack->nmb_thispack - 1;
 
   const auto recon_method_ = recon_method;
-  auto &eos = peos->eos_data;
   auto &coord = pmy_pack->coord.coord_data;
   auto &i0_ = i0;
 
-  auto n1_n_mu_ = n1_n_mu;
-  auto n2_n_mu_ = n2_n_mu;
-  auto n3_n_mu_ = n3_n_mu;
+  auto n1_n_0_ = n1_n_0;
+  auto n2_n_0_ = n2_n_0;
+  auto n3_n_0_ = n3_n_0;
   auto na1_n_0_ = na1_n_0;
   auto na2_n_0_ = na2_n_0;
 
@@ -57,7 +62,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
   size_t scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 2;
   int scr_level = 0;
-  auto flx1 = ciflx.x1f;
+  auto flx1 = iflx.x1f;
 
   par_for_outer("rflux_x1",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je,
     KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j)
@@ -71,8 +76,15 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
         case ReconstructionMethod::dc:
           DonorCellX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
           break;
-        // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add other
-        // reconstruction algorithms
+        case ReconstructionMethod::plm:
+          PiecewiseLinearX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          break;
+        case ReconstructionMethod::ppm:
+          PiecewiseParabolicX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          break;
+        case ReconstructionMethod::wenoz:
+          WENOZX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          break;
         default:
           break;
       }
@@ -80,8 +92,8 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
       member.team_barrier();
 
       // compute fluxes over [is,ie+1]
-      SpatialFlux(member, eos, coord, m, k, j, is, ie+1, IVX,
-                  n1_n_mu_, nvars, aindcs, iil, iir, flx1);
+      SpatialFlux(member, m, k, j, is, ie+1,
+                  n1_n_0_, aindcs, iil, iir, flx1);
       member.team_barrier();
 
     }
@@ -92,7 +104,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
   if (pmy_pack->pmesh->multi_d) {
     scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 3;
-    auto flx2 = ciflx.x2f;
+    auto flx2 = iflx.x2f;
 
     par_for_outer("rflux_x2",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke,
       KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k)
@@ -117,8 +129,15 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
             case ReconstructionMethod::dc:
               DonorCellX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
               break;
-            // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add
-            // other reconstruction algorithms
+            case ReconstructionMethod::plm:
+              PiecewiseLinearX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
+              break;
+            case ReconstructionMethod::ppm:
+              PiecewiseParabolicX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
+              break;
+            case ReconstructionMethod::wenoz:
+              WENOZX2(member, m, k, j, is-1, ie+1, i0_, iil_jp1, iir);
+              break;
             default:
               break;
           }
@@ -126,8 +145,8 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
           // compute fluxes over [js,je+1].  RS returns flux in input iir array
           if (j>(js-1)) {
-            SpatialFlux(member, eos, coord, m, k, j, is, ie, IVY,
-                        n2_n_mu_, nvars, aindcs, iil, iir, flx2);
+            SpatialFlux(member, m, k, j, is, ie,
+                        n2_n_0_, aindcs, iil, iir, flx2);
             member.team_barrier();
           }
   
@@ -141,7 +160,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
   if (pmy_pack->pmesh->three_d) {
     scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 3;
-    auto flx3 = ciflx.x3f;
+    auto flx3 = iflx.x3f;
 
     par_for_outer("rflux_x3",DevExeSpace(), scr_size, scr_level, 0, nmb1, js, je,
       KOKKOS_LAMBDA(TeamMember_t member, const int m, const int j)
@@ -166,8 +185,15 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
             case ReconstructionMethod::dc:
               DonorCellX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
               break;
-            // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add
-            // other reconstruction algorithms
+            case ReconstructionMethod::plm:
+              PiecewiseLinearX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
+              break;
+            case ReconstructionMethod::ppm:
+              PiecewiseParabolicX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
+              break;
+            case ReconstructionMethod::wenoz:
+              WENOZX3(member, m, k, j, is-1, ie+1, i0_, iil_kp1, iir);
+              break;
             default:
               break;
           }
@@ -175,8 +201,8 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
           // compute fluxes over [ks,ke+1].  RS returns flux in input iir array
           if (k>(ks-1)) {
-            SpatialFlux(member, eos, coord, m, k, j, is, ie, IVZ,
-                        n3_n_mu_, nvars, aindcs, iil, iir, flx3);
+            SpatialFlux(member, m, k, j, is, ie,
+                        n3_n_0_, aindcs, iil, iir, flx3);
             member.team_barrier();
           }
 
@@ -188,26 +214,39 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   //--------------------------------------------------------------------------------------
   // z-direction.
   // Angular Flux
-  auto flxa1 = cia1flx;
+  auto flxa1 = ia1flx;
+  auto zetaf_ = zetaf;
+  auto zetav_ = zetav;
 
   par_for("rflux_a1", DevExeSpace(), 0, nmb1, ks, ke, js, je, zs, ze+1, ps, pe,
     KOKKOS_LAMBDA(int m, int k, int j, int z, int p)
     {
-      // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add
-      // other reconstruction algorithms
-      // (TODO: @pdmullen) @c-white's version of AngleInd does not have
-      // clause for when zeta_face is true.  Should it? Here, zp_c and zp_r are equiv.
-      int zp_l = AngleInd(z-1, p, false, false, aindcs);
-      int zp_c = AngleInd(z, p, true, false, aindcs);
-      int zp_r = AngleInd(z, p, false, false, aindcs);
+      int zpll = AngleInd(z-2, p, false, false, aindcs);
+      int zpl  = AngleInd(z-1, p, false, false, aindcs);
+      int zpc  = AngleInd(z  , p, true , false, aindcs);
+      int zpr  = AngleInd(z  , p, false, false, aindcs);
+      int zprr = AngleInd(z+1, p, false, false, aindcs);
+      Real dxl = zetaf_.d_view(z) - zetav_.d_view(z-1);
+      Real dxr = zetav_.d_view(z) - zetaf_.d_view(z);
       for (int i = is; i <= ie; ++i) {
+        Real ill = i0_(m,zpll,k,j,i);
+        Real il  = i0_(m,zpl, k,j,i);
+        Real ir  = i0_(m,zpr, k,j,i);
+        Real irr = i0_(m,zprr,k,j,i);
+        Real dql = il - ill;
+        Real dqc = ir - il;
+        Real dqr = irr - ir;
+        Real dq2l = dql*dqc;
+        Real dq2r = dqc*dqr;
+        Real dqml = (dq2l > 0.0) ? 2.0*dq2l / (dql + dqc) : 0.0;
+        Real dqmr = (dq2r > 0.0) ? 2.0*dq2r / (dqc + dqr) : 0.0;
         Real n_tmp = na1_n_0_(m,z,p,k,j,i);
-        Real iil = i0_(m,zp_l,k,j,i);
-        Real iir = i0_(m,zp_r,k,j,i);
+        Real iil = il + dxl*dqml;
+        Real iir = ir - dxr*dqmr;
         if (n_tmp < 0.0) {
-          flxa1(m,zp_c,k,j,i) = n_tmp*iil;
+          flxa1(m,zpc,k,j,i) = n_tmp*iil;
         } else {
-          flxa1(m,zp_c,k,j,i) = n_tmp*iir;
+          flxa1(m,zpc,k,j,i) = n_tmp*iir;
         }
       }
     }
@@ -216,30 +255,69 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   //--------------------------------------------------------------------------------------
   // p-direction.
   // Angular Flux
-  auto flxa2 = cia2flx;
+  auto flxa2 = ia2flx;
+  auto psiv_ = psiv;
+  auto psif_ = psif;
 
   par_for("rflux_a2", DevExeSpace(), 0, nmb1, ks, ke, js, je, zs, ze, ps, pe+1,
     KOKKOS_LAMBDA(int m, int k, int j, int z, int p)
     {
-      // (TODO: @pdmullen) donor cell is easiest, so start with that.  Later add
-      // other reconstruction algorithms
-      int zp_l = AngleInd(z, p-1, false, false, aindcs);
-      int zp_c = AngleInd(z, p, false, true, aindcs);
-      int zp_r = AngleInd(z, p, false, false, aindcs);
+      int zpll = AngleInd(z, p-2, false, false, aindcs);
+      int zpl  = AngleInd(z, p-1, false, false, aindcs);
+      int zpc  = AngleInd(z, p  , false, true , aindcs);
+      int zpr  = AngleInd(z, p  , false, false, aindcs);
+      int zprr = AngleInd(z, p+1, false, false, aindcs);
+      Real dxl = psif_.d_view(p) - psiv_.d_view(p-1);
+      Real dxr = psiv_.d_view(p) - psif_.d_view(p  );
       for (int i = is; i <= ie; ++i) {
+        Real ill = i0_(m,zpll,k,j,i);
+        Real il  = i0_(m,zpl, k,j,i);
+        Real ir  = i0_(m,zpr, k,j,i);
+        Real irr = i0_(m,zprr,k,j,i);
+        Real dql = il - ill;
+        Real dqc = ir - il;
+        Real dqr = irr - ir;
+        Real dq2l = dql*dqc;
+        Real dq2r = dqc*dqr;
+        Real dqml = (dq2l > 0.0) ? 2.0*dq2l / (dql + dqc) : 0.0;
+        Real dqmr = (dq2r > 0.0) ? 2.0*dq2r / (dqc + dqr) : 0.0;
         Real n_tmp = na2_n_0_(m,z,p,k,j,i);
-        Real iil = i0_(m,zp_l,k,j,i);
-        Real iir = i0_(m,zp_r,k,j,i);
+        Real iil = il + dxl * dqml;
+        Real iir = ir - dxr * dqmr;
         if (n_tmp < 0.0) {
-          flxa2(m,zp_c,k,j,i) = n_tmp*iil;
+          flxa2(m,zpc,k,j,i) = n_tmp*iil;
         } else {
-          flxa2(m,zp_c,k,j,i) = n_tmp*iir;
+          flxa2(m,zpc,k,j,i) = n_tmp*iir;
         }
       }
     }
   );
 
   return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void SpatialFlux
+//! \brief Inline function for computing radiation spatial fluxes
+
+KOKKOS_INLINE_FUNCTION
+void SpatialFlux(TeamMember_t const &member,
+     const int m, const int k, const int j,  const int il, const int iu,
+     const DvceArray6D<Real> nn, struct AMeshIndcs aindcs,
+     const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx)
+{
+  par_for_inner(member, il, iu, [&](const int i)
+  {
+    for (int z = aindcs.zs-aindcs.ng; z <= aindcs.ze+aindcs.ng; ++z) {
+      for (int p = aindcs.ps-aindcs.ng; p <= aindcs.pe+aindcs.ng; ++p) {
+        int zp = AngleInd(z, p, false, false, aindcs);
+        flx(m,zp,k,j,i) = (nn(m,z,p,k,j,i)
+                           * (nn(m,z,p,k,j,i) < 0.0 ? iil(zp,i) : iir(zp,i)));
+      }
+    }
+  });
+
+  return;
 }
 
 } // namespace radiation

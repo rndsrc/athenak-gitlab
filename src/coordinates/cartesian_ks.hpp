@@ -12,8 +12,6 @@
 #include "athena.hpp"
 #include "globals.hpp"
 #include "mesh/mesh.hpp"
-  
-#define SMALL_NUMBER 1.0e-5
 
 //----------------------------------------------------------------------------------------
 //! \fn void ComputeMetricAndInverse
@@ -21,14 +19,12 @@
 //!  Cartesian Kerr-Schild coordinates
 
 KOKKOS_INLINE_FUNCTION
-void ComputeMetricAndInverse(Real x, Real y, Real z, bool minkowski, bool ic,
-                             Real a, Real g[], Real ginv[])
+void ComputeMetricAndInverse(Real x, Real y, Real z, bool ic,
+                             Real m, Real a, Real g[], Real ginv[])
 {
-  if (fabs(z) < (SMALL_NUMBER)) z = (SMALL_NUMBER);
   Real rad = fmax(sqrt(SQR(x) + SQR(y) + SQR(z)),1.0);  // avoid singularity for rad<1
-  if (ic) {rad=sqrt(SQR(x) + SQR(y) + SQR(z));}  // unless you are trying to set ic
-  Real r = SQR(rad)-SQR(a) + sqrt( SQR(SQR(rad)-SQR(a))+4.0*SQR(a)*SQR(z) );
-  r = sqrt(r/2.0);
+  Real r = sqrt((SQR(rad)-SQR(a)
+                + sqrt( SQR(SQR(rad)-SQR(a))+4.0*SQR(a)*SQR(z) ))/2.0);
   
   // Set covariant components
   // null vector l
@@ -39,8 +35,7 @@ void ComputeMetricAndInverse(Real x, Real y, Real z, bool minkowski, bool ic,
   l_lower[3] = z/r;
   
   // g_nm = f*l_n*l_m + eta_nm, where eta_nm is Minkowski metric
-  Real f = 2.0 * SQR(r)*r / (SQR(SQR(r)) + SQR(a)*SQR(z));
-  if (minkowski) {f=0.0;}
+  Real f = 2.0 * m * SQR(r)*r / (SQR(SQR(r)) + SQR(a)*SQR(z));
   g[I00] = f * l_lower[0]*l_lower[0] - 1.0;
   g[I01] = f * l_lower[0]*l_lower[1];
   g[I02] = f * l_lower[0]*l_lower[2];
@@ -81,10 +76,9 @@ void ComputeMetricAndInverse(Real x, Real y, Real z, bool minkowski, bool ic,
 //!  used to compute the coordinate source terms in the equations of motion.
 
 KOKKOS_INLINE_FUNCTION
-void ComputeMetricDerivatives(Real x, Real y, Real z, bool minkowski,
-                              Real a, Real dg_dx1[], Real dg_dx2[], Real dg_dx3[])
+void ComputeMetricDerivatives(Real x, Real y, Real z,
+                              Real m, Real a, Real dg_dx1[], Real dg_dx2[], Real dg_dx3[])
 {
-  if (fabs(z) < (SMALL_NUMBER)) z = (SMALL_NUMBER);
   Real rad = fmax(sqrt(SQR(x) + SQR(y) + SQR(z)),1.0);  // avoid singularity for rad<1
   Real r = SQR(rad)-SQR(a) + sqrt( SQR(SQR(rad)-SQR(a))+4.0*SQR(a)*SQR(z) );
   r = sqrt(r/2.0);
@@ -98,12 +92,12 @@ void ComputeMetricDerivatives(Real x, Real y, Real z, bool minkowski,
   Real qa = 2.0*SQR(r) - SQR(rad) + SQR(a);
   Real qb = SQR(r) + SQR(a);
   Real qc = 3.0*SQR(a * z)-SQR(r)*SQR(r);
-  Real f = 2.0 * SQR(r)*r / (SQR(SQR(r)) + SQR(a)*SQR(z));
+  Real f = 2.0 * m * SQR(r)*r / (SQR(SQR(r)) + SQR(a)*SQR(z));
 
-  Real df_dx1 = SQR(f)*x/(2.0*std::pow(r,3)) * ( ( qc ) )/ qa ;
+  Real df_dx1 = SQR(f)*x/(2.0*pow(r,3)) * ( ( qc ) )/ qa ;
   //4 x/r^2 1/(2r^3) * -r^4/r^2 = 2 x / r^3
-  Real df_dx2 = SQR(f)*y/(2.0*std::pow(r,3)) * ( ( qc ) )/ qa ;
-  Real df_dx3 = SQR(f)*z/(2.0*std::pow(r,5)) * ( ( qc * qb ) / qa - 2.0*SQR(a*r)) ;
+  Real df_dx2 = SQR(f)*y/(2.0*pow(r,3)) * ( ( qc ) )/ qa ;
+  Real df_dx3 = SQR(f)*z/(2.0*pow(r,5)) * ( ( qc * qb ) / qa - 2.0*SQR(a*r)) ;
   //4 z/r^2 * 1/2r^5 * -r^4*r^2 / r^2 = -2 z/r^3
   Real dl1_dx1 = x*r * ( SQR(a)*x - 2.0*a*r*y - SQR(r)*x )/( SQR(qb) * qa ) + r/( qb );
   // x r *(-r^2 x)/(r^6) + 1/r = -x^2/r^3 + 1/r
@@ -119,13 +113,6 @@ void ComputeMetricDerivatives(Real x, Real y, Real z, bool minkowski,
   Real dl0_dx1 = 0.0;
   Real dl0_dx2 = 0.0;
   Real dl0_dx3 = 0.0;
-
-  if (minkowski) {
-    f = 0.0;
-    df_dx1 = 0.0;
-    df_dx2 = 0.0;
-    df_dx3 = 0.0;
-  }
 
   // Set x-derivatives of covariant components
   dg_dx1[I00] = df_dx1*llower[0]*llower[0] + f*dl0_dx1*llower[0] + f*llower[0]*dl0_dx1;
@@ -151,7 +138,7 @@ void ComputeMetricDerivatives(Real x, Real y, Real z, bool minkowski,
   dg_dx2[I23] = df_dx2*llower[2]*llower[3] + f*dl2_dx2*llower[3] + f*llower[2]*dl3_dx2;
   dg_dx2[I33] = df_dx2*llower[3]*llower[3] + f*dl3_dx2*llower[3] + f*llower[3]*dl3_dx2;
 
-  // Set phi-derivatives of covariant components
+  // Set z-derivatives of covariant components
   dg_dx3[I00] = df_dx3*llower[0]*llower[0] + f*dl0_dx3*llower[0] + f*llower[0]*dl0_dx3;
   dg_dx3[I01] = df_dx3*llower[0]*llower[1] + f*dl0_dx3*llower[1] + f*llower[0]*dl1_dx3;
   dg_dx3[I02] = df_dx3*llower[0]*llower[2] + f*dl0_dx3*llower[2] + f*llower[0]*dl2_dx3;

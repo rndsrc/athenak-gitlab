@@ -126,7 +126,6 @@ Coordinates::Coordinates(Mesh *pm, RegionIndcs indcs, int igids, int nmb)
 
 void Coordinates::InitMetric(ParameterInput *pin)
 {
-  coord_data.is_minkowski = pin->GetOrAddBoolean("coord","minkowski",false);
   coord_data.bh_mass = pin->GetOrAddReal("coord","m",1.0);
   coord_data.bh_spin = pin->GetOrAddReal("coord","a",0.0);
   coord_data.bh_rmin = pin->GetOrAddReal("coord","rmin",0.0);
@@ -169,8 +168,8 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim, const EOS_Data &e
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, false,
-                              coord.bh_spin, g_, gi_);
+      ComputeMetricAndInverse(x1v, x2v, x3v, false,
+                              coord.bh_mass, coord.bh_spin, g_, gi_);
 
       // Extract primitives
       const Real &rho  = prim(m,IDN,k,j,i);
@@ -207,8 +206,8 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim, const EOS_Data &e
 
       // Calculate source terms
       Real dg_dx1[NMETRIC], dg_dx2[NMETRIC], dg_dx3[NMETRIC];
-      ComputeMetricDerivatives(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin,
-                               dg_dx1, dg_dx2, dg_dx3);
+      ComputeMetricDerivatives(x1v, x2v, x3v,
+                               coord.bh_mass, coord.bh_spin, dg_dx1, dg_dx2, dg_dx3);
 
       Real s_1 = 0.0, s_2 = 0.0, s_3 = 0.0;
       s_1 += dg_dx1[I00] * tt[I00];
@@ -310,8 +309,8 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim,
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, false,
-                              coord.bh_spin, g_, gi_);
+      ComputeMetricAndInverse(x1v, x2v, x3v, false,
+                              coord.bh_mass, coord.bh_spin, g_, gi_);
 
       // create references to components of metric; formatting reflects structure
       const Real
@@ -377,7 +376,7 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim,
 
       // Calculate source terms
       Real dg_dx1[NMETRIC], dg_dx2[NMETRIC], dg_dx3[NMETRIC];
-      ComputeMetricDerivatives(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin,
+      ComputeMetricDerivatives(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin,
                                dg_dx1, dg_dx2, dg_dx3);
 
       Real s_1 = 0.0, s_2 = 0.0, s_3 = 0.0;

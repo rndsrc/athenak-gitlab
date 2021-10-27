@@ -262,7 +262,7 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout)
     (void) prad->ApplyPhysicalBCs(this, 0);
 
     // Set primitive variables in initial conditions everywhere
-    (void) prad->ConToPrim(this, 0);
+    (void) prad->SetRadMoments(this, 0);
   }
 
   //---- Step 3.  Compute first time step (if problem involves time evolution
@@ -403,6 +403,13 @@ void Driver::Execute(Mesh *pmesh, ParameterInput *pin, Outputs *pout)
       nmb_updated_ += pmesh->nmb_total;
       pmesh->NewTimeStep(tlim);
 
+      // hack to only compute moments before output.  Consider a
+      // UserWorkBeforeOutput function.
+      radiation::Radiation *prad = pmesh->pmb_pack->prad;
+      if (prad != nullptr) {
+        (void) prad->SetRadMoments(this, 0);
+      }
+
       // Test for/make outputs
       for (auto &out : pout->pout_list) {
         // compare at floating point (32-bit) precision to reduce effect of round off
@@ -431,6 +438,14 @@ void Driver::Finalize(Mesh *pmesh, ParameterInput *pin, Outputs *pout)
 {
   // cycle through output Types and load data / write files
   //  This design allows for asynchronous outputs to implemented in the future.
+
+  // hack to only compute moments before output.  Consider a
+  // UserWorkBeforeOutput function.
+  radiation::Radiation *prad = pmesh->pmb_pack->prad;
+  if (prad != nullptr) {
+    (void) prad->SetRadMoments(this, 0);
+  }
+
   for (auto &out : pout->pout_list) {
     out->LoadOutputData(pmesh);
     out->WriteOutputFile(pmesh, pin);

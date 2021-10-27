@@ -23,6 +23,9 @@
 #include "turb_driver.hpp"
 #include "srcterms.hpp"
 
+#include "radiation/radiation_tetrad.hpp"
+
+
 //----------------------------------------------------------------------------------------
 // constructor, parses input file and initializes data structures and parameters
 // Only source terms specified in input file are initialized.  If none requested,
@@ -117,10 +120,10 @@ void SourceTerms::AddConstantAccel(DvceArray5D<Real> &u0, const DvceArray5D<Real
 //----------------------------------------------------------------------------------------
 //! \fn
 // Add beam of radiation
-// NOTE source terms must all be computed using prim (i0) and NOT cons (ci0) vars
+// NOTE Radiation beam source terms calculation does not depend on values stored in i0.
+// Rather, it directly updates i0.
 
-void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> &i0,
-                                const Real bdt)
+void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt)
 {
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
   int is = indcs.is, ie = indcs.ie;
@@ -135,7 +138,7 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
   auto coord = pmy_pack->coord.coord_data;
 
   auto nh_cc_ = pmy_pack->prad->nh_cc;
-  auto n0_n_mu_ = pmy_pack->prad->n0_n_mu;
+  auto n0_n_0_ = pmy_pack->prad->n0_n_0;
 
   Real &pos_1_ = pos_1;
   Real &pos_2_ = pos_2;
@@ -166,10 +169,10 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, true,
-                              coord.bh_spin, g_, gi_);
-      Real e[4][4] = {}; Real e_cov[4][4] = {}; Real omega[4][4][4] = {};
-      ComputeTetrad(x1v, x2v, x3v, true, e, e_cov, omega);
+      ComputeMetricAndInverse(x1v, x2v, x3v, true,
+                              coord.bh_mass, coord.bh_spin, g_, gi_);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
 
       // Calculate proper distance to beam origin and minimum angle between directions
       Real dx1 = x1v - pos_1_;
@@ -186,15 +189,14 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
       Real temp_c = g_[I11] * SQR(dir_1_) + 2.0 * g_[I12] * dir_1_ * dir_2_
                     + 2.0 * g_[I13] * dir_1_ * dir_3_ + g_[I22] * SQR(dir_2_)
                     + 2.0 * g_[I23] * dir_2_ * dir_3_ + g_[I33] * SQR(dir_3_);
-      Real dir_0 = ((-temp_b - std::sqrt(SQR(temp_b) - 4.0 * temp_a * temp_c))
+      Real dir_0 = ((-temp_b - sqrt(SQR(temp_b) - 4.0 * temp_a * temp_c))
                     / (2.0 * temp_a));
 
-      // lower indices, assuming Minkowski
-      // (TODO: @pdmullen) extend to non-Minkowski metric
-      Real dc0 = -dir_0;
-      Real dc1 = dir_1_;
-      Real dc2 = dir_2_;
-      Real dc3 = dir_3_;
+      // lower indices
+      Real dc0 = g_[I00]*dir_0 + g_[I01]*dir_1_ + g_[I02]*dir_2_ + g_[I03]*dir_3_;
+      Real dc1 = g_[I01]*dir_0 + g_[I11]*dir_1_ + g_[I12]*dir_2_ + g_[I13]*dir_3_;
+      Real dc2 = g_[I02]*dir_0 + g_[I12]*dir_1_ + g_[I22]*dir_2_ + g_[I23]*dir_3_;
+      Real dc3 = g_[I03]*dir_0 + g_[I13]*dir_1_ + g_[I23]*dir_2_ + g_[I33]*dir_3_;
 
       // Calculate covariant direction in tetrad frame
       Real dtc0 = (e[0][0]*dc0 + e[0][1]*dc1 + e[0][2]*dc2 + e[0][3]*dc3);
@@ -211,9 +213,9 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &ci0, const DvceArray5D<Real> 
                    + nh_cc_.d_view(3,z,p) * dtc3);
           Real dcons_dt = 0.0;
           if (dx_sq < SQR(width_/2.0) && mu > mu_min) {
-            dcons_dt = dii_dt_ * n0_n_mu_(m,0,z,p,k,j,i);
+            dcons_dt = dii_dt_;
           }
-          ci0(m,zp,k,j,i) += dcons_dt*bdt;
+          i0(m,zp,k,j,i) += dcons_dt*bdt;
         }
       }
     }

@@ -47,7 +47,7 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
   id.sendci = run.AddTask(&Radiation::SendCI, this, id.expl);
   id.recvci = run.AddTask(&Radiation::RecvCI, this, id.sendci);
   id.bcs   = run.AddTask(&Radiation::ApplyPhysicalBCs, this, id.recvci);
-  id.c2p   = run.AddTask(&Radiation::ConToPrim, this, id.bcs);
+  id.c2p   = run.AddTask(&Radiation::SetRadMoments, this, id.bcs);
   if (!(is_hydro_enabled || is_mhd_enabled)) {
     id.newdt = run.AddTask(&Radiation::NewTimeStep, this, id.c2p);
   }
@@ -152,7 +152,7 @@ TaskStatus Radiation::ClearSend(Driver *pdrive, int stage)
 TaskStatus Radiation::CopyCons(Driver *pdrive, int stage)
 {
   if (stage == 1) {
-    Kokkos::deep_copy(DevExeSpace(), ci1, ci0);
+    Kokkos::deep_copy(DevExeSpace(), i1, i0);
   }
   return TaskStatus::complete;
 }
@@ -163,7 +163,7 @@ TaskStatus Radiation::CopyCons(Driver *pdrive, int stage)
 
 TaskStatus Radiation::SendCI(Driver *pdrive, int stage)
 {
-  TaskStatus tstat = pbval_ci->SendBuffersCC(ci0, VariablesID::FluidCons_ID);
+  TaskStatus tstat = pbval_ci->SendBuffersCC(i0, VariablesID::FluidCons_ID);
   return tstat;
 }
 
@@ -173,17 +173,19 @@ TaskStatus Radiation::SendCI(Driver *pdrive, int stage)
 
 TaskStatus Radiation::RecvCI(Driver *pdrive, int stage)
 {
-  TaskStatus tstat = pbval_ci->RecvBuffersCC(ci0);
+  TaskStatus tstat = pbval_ci->RecvBuffersCC(i0);
   return tstat;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Radiation::ConToPrim
-//  \brief
+//! \fn  void Radiation::SetMoments
+//  \brief compute radiation moments, only executed before outputs
 
-TaskStatus Radiation::ConToPrim(Driver *pdrive, int stage)
+TaskStatus Radiation::SetRadMoments(Driver *pdrive, int stage)
 {
-  peos->ConsToPrim(ci0, i0);
+  if (stage == 0) {
+    SetMoments(i0);
+  }
   return TaskStatus::complete;
 }
 

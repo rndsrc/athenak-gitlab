@@ -26,13 +26,13 @@ void Radiation::OutflowInnerX1(int m)
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &is = indcs.is;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ix1", DevExeSpace(),0,(nvar-1),0,(n3-1),0,(n2-1),0,(ng-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     {
-      ci0_(m,n,k,j,is-i-1) = ci0_(m,n,k,j,is);
+      i0_(m,n,k,j,is-i-1) = i0_(m,n,k,j,is);
     }
   );
 
@@ -51,13 +51,13 @@ void Radiation::OutflowOuterX1(int m)
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &ie = indcs.ie;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ox1", DevExeSpace(),0,(nvar-1),0,(n3-1),0,(n2-1),0,(ng-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     {
-      ci0_(m,n,k,j,ie+i+1) = ci0_(m,n,k,j,ie);
+      i0_(m,n,k,j,ie+i+1) = i0_(m,n,k,j,ie);
     }
   );
 
@@ -76,13 +76,13 @@ void Radiation::OutflowInnerX2(int m)
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &js = indcs.js;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ix2", DevExeSpace(),0,(nvar-1),0,(n3-1),0,(ng-1),0,(n1-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     { 
-      ci0_(m,n,k,js-j-1,i) =  ci0_(m,n,k,js,i);
+      i0_(m,n,k,js-j-1,i) =  i0_(m,n,k,js,i);
     }
   );
 
@@ -101,13 +101,13 @@ void Radiation::OutflowOuterX2(int m)
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &je = indcs.je;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ox2", DevExeSpace(),0,(nvar-1),0,(n3-1),0,(ng-1),0,(n1-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     { 
-      ci0_(m,n,k,je+j+1,i) =  ci0_(m,n,k,je,i);
+      i0_(m,n,k,je+j+1,i) =  i0_(m,n,k,je,i);
     }   
   );
 
@@ -127,13 +127,13 @@ void Radiation::OutflowInnerX3(int m)
   int n2 = indcs.nx2 + 2*ng;
   int &ks = indcs.ks;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ix3", DevExeSpace(),0,(nvar-1),0,(ng-1),0,(n2-1),0,(n1-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     { 
-      ci0_(m,n,ks-k-1,j,i) =  ci0_(m,n,ks,j,i);
+      i0_(m,n,ks-k-1,j,i) =  i0_(m,n,ks,j,i);
     }   
   );
 
@@ -152,13 +152,13 @@ void Radiation::OutflowOuterX3(int m)
   int n2 = indcs.nx2 + 2*ng;
   int &ke = indcs.ke;
   int nvar = nangles;
-  auto &ci0_ = ci0;
+  auto &i0_ = i0;
 
   // project radiation variables in first active cell into ghost zones
   par_for("outflow_ox3", DevExeSpace(),0,(nvar-1),0,(ng-1),0,(n2-1),0,(n1-1),
     KOKKOS_LAMBDA(int n, int k, int j, int i)
     {   
-      ci0_(m,n,ke+k+1,j,i) =  ci0_(m,n,ke,j,i);
+      i0_(m,n,ke+k+1,j,i) =  i0_(m,n,ke,j,i);
     }
   );
 

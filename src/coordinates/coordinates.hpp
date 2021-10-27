@@ -32,7 +32,6 @@ struct CoordData
   DualArray1D<RegionSize> mb_size;  // physical size (array of length [# of MBs])
 
   // following data is only used in GR calculations to compute metric
-  bool is_minkowski;                // flag to specify Minkowski (flat) space
   Real bh_mass;                     // needed for GR metric
   Real bh_spin;                     // needed for GR metric
   Real bh_rmin;                     // needed for GR cons2prim

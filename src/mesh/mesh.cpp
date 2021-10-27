@@ -491,7 +491,7 @@ void Mesh::BuildTree(ParameterInput *pin)
 /**********/
 
   ResetLoadBalanceCounters();
-  if (global_variable::my_rank == 0) {PrintMeshDiagnostics();}
+  // if (global_variable::my_rank == 0) {PrintMeshDiagnostics();}
 
   // set initial time/cycle parameters
   time = pin->GetOrAddReal("time", "start_time", 0.0);
