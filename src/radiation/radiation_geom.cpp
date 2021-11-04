@@ -225,7 +225,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1-1); ++z) {
         for (int p=0; p<=(ncellsa2-1); ++p) {
@@ -265,7 +266,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1f, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1f, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1-1); ++z) {
         for (int p=0; p<=(ncellsa2-1); ++p) {
@@ -303,7 +305,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2f, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2f, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1-1); ++z) {
         for (int p=0; p<=(ncellsa2-1); ++p) {
@@ -342,7 +345,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3f = LeftEdgeX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3f, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3f, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1-1); ++z) {
         for (int p=0; p<=(ncellsa2-1); ++p) {
@@ -380,7 +384,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1); ++z) {
         for (int p=0; p<=(ncellsa2-1); ++p) {
@@ -425,7 +430,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int z=0; z<=(ncellsa1-1); ++z) {
         for (int p=0; p<=(ncellsa2); ++p) {

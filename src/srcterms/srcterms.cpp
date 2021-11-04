@@ -169,10 +169,11 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt)
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, true,
+      ComputeMetricAndInverse(x1v, x2v, x3v, true, coord.snake,
                               coord.bh_mass, coord.bh_spin, g_, gi_);
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       // Calculate proper distance to beam origin and minimum angle between directions
       Real dx1 = x1v - pos_1_;
