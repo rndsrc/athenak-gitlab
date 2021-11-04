@@ -98,7 +98,8 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
   gi[3][3] = -f * lu3*lu3 + 1.0;
 
   if (snake) {
-    Real k = m*M_PI;
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     // Set covariant metric
     g[0][0] = -1.0;
     g[0][1] = 0.0;
@@ -106,11 +107,11 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
     g[0][3] = 0.0;
     g[1][0] = 0.0;
     g[1][1] = 1.0;
-    g[1][2] = a*k*cos(k*y);
+    g[1][2] = a*m*M_PI*cos(m*M_PI*y);
     g[1][3] = 0.0;
     g[2][0] = 0.0;
-    g[2][1] = a*k*cos(k*y);
-    g[2][2] = 1.0 + SQR(a*k*cos(k*y));
+    g[2][1] = a*m*M_PI*cos(m*M_PI*y);
+    g[2][2] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
     g[2][3] = 0.0;
     g[3][0] = 0.0;
     g[3][1] = 0.0;
@@ -123,11 +124,11 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
     gi[0][2] = 0.0;
     gi[0][3] = 0.0;
     gi[1][0] = 0.0;
-    gi[1][1] = 1.0 + SQR(a*k*cos(k*y));
-    gi[1][2] = -a*k*cos(k*y);
+    gi[1][1] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
+    gi[1][2] = -a*m*M_PI*cos(m*M_PI*y);
     gi[1][3] = 0.0;
     gi[2][0] = 0.0;
-    gi[2][1] = -a*k*cos(k*y);
+    gi[2][1] = -a*m*M_PI*cos(m*M_PI*y);
     gi[2][2] = 1.0;
     gi[2][3] = 0.0;
     gi[3][0] = 0.0;
@@ -230,7 +231,8 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
   dg[3][3][3] = df_dx3*ll3*ll3 + f*dl3_dx3*ll3 + f*ll3*dl3_dx3;
 
   if (snake) {
-    Real k = m*M_PI;
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     dg[0][0][0] = 0.0;
     dg[0][0][1] = 0.0;
     dg[0][0][2] = 0.0;
@@ -271,11 +273,11 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
     dg[2][0][3] = 0.0;
     dg[2][1][0] = 0.0;
     dg[2][1][1] = 0.0;
-    dg[2][1][2] = -a*SQR(k)*sin(k*y);
+    dg[2][1][2] = -a*SQR(m*M_PI)*sin(m*M_PI*y);
     dg[2][1][3] = 0.0;
     dg[2][2][0] = 0.0;
-    dg[2][2][1] = -a*SQR(k)*sin(k*y);
-    dg[2][2][2] = -SQR(a)*SQR(k)*k*sin(2*k*y);
+    dg[2][2][1] = -a*SQR(m*M_PI)*sin(m*M_PI*y);
+    dg[2][2][2] = -SQR(a)*SQR(m*M_PI)*m*M_PI*sin(2*m*M_PI*y);
     dg[2][2][3] = 0.0;
     dg[2][3][0] = 0.0;
     dg[2][3][1] = 0.0;
@@ -326,7 +328,8 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
   e[3][3] = iwa*wb;
 
   if (snake) {
-    Real k = m*M_PI;
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     e[0][0] = 1.0;
     e[0][1] = 0.0;
     e[0][2] = 0.0;
@@ -336,7 +339,7 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
     e[1][2] = 0.0;
     e[1][3] = 0.0;
     e[2][0] = 0.0;
-    e[2][1] = -a*k*cos(k*y);
+    e[2][1] = -a*m*M_PI*cos(m*M_PI*y);
     e[2][2] = 1.0;
     e[2][3] = 0.0;
     e[3][0] = 0.0;
@@ -437,7 +440,8 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
 
 
   if (snake) {
-    Real k = m*M_PI;
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     de[0][0][0] = 0.0;
     de[0][0][1] = 0.0;
     de[0][0][2] = 0.0;
@@ -481,7 +485,7 @@ void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
     de[2][1][2] = 0.0;
     de[2][1][3] = 0.0;
     de[2][2][0] = 0.0;
-    de[2][2][1] = a*SQR(k)*sin(k*y);
+    de[2][2][1] = a*SQR(m*M_PI)*sin(m*M_PI*y);
     de[2][2][2] = 0.0;
     de[2][2][3] = 0.0;
     de[2][3][0] = 0.0;

@@ -68,17 +68,16 @@ void ComputeMetricAndInverse(Real x, Real y, Real z, bool ic, bool snake,
   ginv[I33] = -f * l_upper[3]*l_upper[3] + 1.0;
 
   if (snake) {
-    Real k = m*M_PI;
-    // @pdmullen: I'm going to cheat... Let the black hole spin a defined
-    // in the input file control the magnitude of sinusdoidal perturbation.
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     g[I00] = -1.0;
     g[I01] = 0.0;
     g[I02] = 0.0;
     g[I03] = 0.0;
     g[I11] = 1.0;
-    g[I12] = a*k*cos(k*y);
+    g[I12] = a*m*M_PI*cos(m*M_PI*y);
     g[I13] = 0.0;
-    g[I22] = 1.0 + SQR(a*k*cos(k*y));
+    g[I22] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
     g[I23] = 0.0;
     g[I33] = 1.0;
 
@@ -86,8 +85,8 @@ void ComputeMetricAndInverse(Real x, Real y, Real z, bool ic, bool snake,
     ginv[I01] = 0.0;
     ginv[I02] = 0.0;
     ginv[I03] = 0.0;
-    ginv[I11] = 1.0 + SQR(a*k*cos(k*y));
-    ginv[I12] = -a*k*cos(k*y);
+    ginv[I11] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
+    ginv[I12] = -a*m*M_PI*cos(m*M_PI*y);
     ginv[I13] = 0.0;
     ginv[I22] = 1.0;
     ginv[I23] = 0.0;
@@ -178,7 +177,8 @@ void ComputeMetricDerivatives(Real x, Real y, Real z, bool snake,
   dg_dx3[I33] = df_dx3*llower[3]*llower[3] + f*dl3_dx3*llower[3] + f*llower[3]*dl3_dx3;
 
   if (snake) {
-    Real k = m*M_PI;
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
     // Set x-derivatives of covariant components
     dg_dx1[I00] = 0.0;
     dg_dx1[I01] = 0.0;
@@ -197,9 +197,9 @@ void ComputeMetricDerivatives(Real x, Real y, Real z, bool snake,
     dg_dx2[I02] = 0.0;
     dg_dx2[I03] = 0.0;
     dg_dx2[I11] = 0.0;
-    dg_dx2[I12] = -a*SQR(k)*sin(k*y);
+    dg_dx2[I12] = -a*SQR(m*M_PI)*sin(m*M_PI*y);
     dg_dx2[I13] = 0.0;
-    dg_dx2[I22] = -SQR(a)*SQR(k)*k*sin(2.*k*y);
+    dg_dx2[I22] = -SQR(a)*SQR(m*M_PI)*m*M_PI*sin(2.*m*M_PI*y);
     dg_dx2[I23] = 0.0;
     dg_dx2[I33] = 0.0;
 
