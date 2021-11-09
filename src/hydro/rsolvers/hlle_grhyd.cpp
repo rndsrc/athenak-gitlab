@@ -59,7 +59,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos, const CoordData &c
     }
 
     Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, false,
+    ComputeMetricAndInverse(x1v, x2v, x3v, false, coord.snake,
                             coord.bh_mass, coord.bh_spin, g_, gi_);
 
     const Real
