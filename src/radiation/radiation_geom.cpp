@@ -342,7 +342,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
         Real n0 = 0.;
@@ -397,7 +398,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1f, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1f, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
         Real n1 = 0.0;
@@ -433,7 +435,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2f, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2f, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
         Real n2 = 0.0;
@@ -470,7 +473,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3f = LeftEdgeX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3f, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3f, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
         Real n3 = 0.0;
@@ -508,7 +512,8 @@ void Radiation::InitCoordinateFrame() {
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.bh_mass, coord.bh_spin, e, e_cov, omega);
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
         for (int nb=0; nb<num_neighbors_.d_view(lm); ++nb) {
