@@ -28,30 +28,26 @@ void Radiation::SetMoments(DvceArray5D<Real> &prim)
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
-  auto &aindcs = amesh_indcs;
-  int zs = aindcs.zs; int ze = aindcs.ze;
-  int ps = aindcs.ps; int pe = aindcs.pe;
-
   int &nmb = pmy_pack->nmb_thispack;
 
   auto mcoord_ = moments_coord;
-  auto n0_ =n0;
-  auto solid_angle_ =solid_angle;
+  auto nmu_ = nmu;
+  auto n0_n_mu_ = n0_n_mu;
+  auto solid_angle_ = solid_angle;
 
   par_for("set_moments",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       mcoord_(m,0,k,j,i) = 0.0;
-      for (int z=zs; z<=ze; ++z) {
-        for (int p=ps; p<=pe; ++p) {
-          int zp = AngleInd(z,p,false,false,aindcs);
-          mcoord_(m,0,k,j,i) += (SQR(n0_(m,z,p,k,j,i))
-                                 *prim(m,zp,k,j,i)*solid_angle_.d_view(z,p));
-        }
+      for (int lm=0; lm<nangles; ++lm) {
+        mcoord_(m,0,k,j,i) += (SQR(nmu_(m,lm,k,j,i,0))  // TODO FIXME cf n^0 n_0
+                               *prim(m,lm,k,j,i)*solid_angle_.d_view(lm));
+        //mcoord_(m,0,k,j,i) += (n0_n_mu_(m,lm,k,j,i,0) 
+        //                    * prim(m,lm,k,j,i) * solid_angle_.d_view(lm));
       }
     }
   );
-
+  
   return;
 }
 
