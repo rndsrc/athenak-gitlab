@@ -27,31 +27,34 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   i0("prim",1,1,1,1,1),
   i1("cons1",1,1,1,1,1),
   iflx("ciflx",1,1,1,1,1),
-  ia1flx("cia1flx",1,1,1,1,1),
-  ia2flx("cia2flx",1,1,1,1,1),
+  iaflx("ciaflx",1,1,1,1,1,1),
 
-  // angle and lengths...yuck...(TODO: @pdmullen) be smarter about this
-  zetaf("zetaf",1),
-  zetav("zetav",1),
-  dzetaf("dzetaf",1),
-  psif("psif",1),
-  psiv("psiv",1),
-  dpsif("dpsif",1),
-  zeta_length("zlen",1,1),
-  psi_length("plen",1,1),
-  solid_angle("solidang",1,1),
+  // TODO FIXME in the future, it might make sense to get rid
+  // of some of these and compute them on the fly
+  solid_angle("solidang",1),
 
-  // coordinate frame quantities...yuck...(TODO: @pdmullen) be smarter about this
-  nh_cc("nh_cc",1,1,1),
-  nh_fc("nh_fc",1,1,1),
-  nh_cf("nh_cf",1,1,1),
-  n0("n0",1,1,1,1,1,1),
-  n0_n_0("n0_n_0",1,1,1,1,1,1),
-  n1_n_0("n1_n_0",1,1,1,1,1,1),
-  n2_n_0("n2_n_0",1,1,1,1,1,1),
-  n3_n_0("n3_n_0",1,1,1,1,1,1),
-  na1_n_0("na1_n_0",1,1,1,1,1,1),
-  na2_n_0("na2_n_0",1,1,1,1,1,1),
+  nh_c("nh_c",1,1),
+  nh_f("nh_f",1,1,1),
+  xi_mn("xi_mn",1,1),
+  eta_mn("eta_mn",1,1),
+
+  amesh_normals("ameshnorm",1,1,1,1),
+  ameshp_normals("ameshpnorm",1,1),
+
+  amesh_indices("ameshind",1,1,1),
+  ameshp_indices("ameshpind",1),
+
+  num_neighbors("numneigh",1),
+  ind_neighbors("indneigh",1,1),
+  arc_lengths("arclen",1,1),
+
+  // coordinate frame quantities
+  nmu("nmu",1,1,1,1,1,1),
+  n0_n_mu("n0_n_mu",1,1,1,1,1,1),
+  n1_n_0("n1_n_0",1,1,1,1,1),
+  n2_n_0("n2_n_0",1,1,1,1,1),
+  n3_n_0("n3_n_0",1,1,1,1,1),
+  na_n_0("na_n_0",1,1,1,1,1,1),
 
   // moments of the radiation field
   moments_coord("moments",1,1,1,1,1)
@@ -75,8 +78,10 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
 
   // allocate memory for conserved and primitive variables,
   // angles, and coordinate frame data
-  amesh_indcs.nzeta = pin->GetInteger("radiation", "nzeta");
-  amesh_indcs.npsi = pin->GetInteger("radiation", "npsi");
+  nlevels = pin->GetInteger("radiation", "nlevel");
+  amesh_indcs.nlevel = nlevels;
+  nangles = 5 * 2*amesh_indcs.nlevel*amesh_indcs.nlevel + 2;
+  amesh_indcs.nangles = nangles;
 
   int nmb = ppack->nmb_thispack;
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
@@ -84,39 +89,34 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
   int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
 
-  amesh_indcs.ng = indcs.ng;
-  int ncellsa1 = amesh_indcs.nzeta + 2*(amesh_indcs.ng);
-  int ncellsa2 = amesh_indcs.npsi + 2*(amesh_indcs.ng);
-  nangles = ncellsa1*ncellsa2;
-
-  amesh_indcs.zs = amesh_indcs.ng;
-  amesh_indcs.ze = amesh_indcs.nzeta + amesh_indcs.ng - 1;
-  amesh_indcs.ps = amesh_indcs.ng;
-  amesh_indcs.pe = amesh_indcs.npsi + amesh_indcs.ng - 1;
-
   Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);
   Kokkos::realloc(moments_coord,nmb,1,ncells3,ncells2,ncells1);
 
   // Setup angular mesh and coordinate frame quantities
-  Kokkos::realloc(zetaf,ncellsa1+1);
-  Kokkos::realloc(zetav,ncellsa1);
-  Kokkos::realloc(dzetaf,ncellsa1);
-  Kokkos::realloc(psif,ncellsa2+1);
-  Kokkos::realloc(psiv,ncellsa2);
-  Kokkos::realloc(dpsif,ncellsa2);
-  Kokkos::realloc(zeta_length,ncellsa1,ncellsa2+1);
-  Kokkos::realloc(psi_length,ncellsa1+1,ncellsa2);
-  Kokkos::realloc(solid_angle,ncellsa1,ncellsa2);
-  Kokkos::realloc(nh_cc,4,ncellsa1,ncellsa2);
-  Kokkos::realloc(nh_fc,4,ncellsa1+1,ncellsa2);
-  Kokkos::realloc(nh_cf,4,ncellsa1,ncellsa2+1);
-  Kokkos::realloc(n0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(n0_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(n1_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1+1);
-  Kokkos::realloc(n2_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2+1,ncells1);
-  Kokkos::realloc(n3_n_0,nmb,ncellsa1,ncellsa2,ncells3+1,ncells2,ncells1);
-  Kokkos::realloc(na1_n_0,nmb,ncellsa1+1,ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(na2_n_0,nmb,ncellsa1,ncellsa2+1,ncells3,ncells2,ncells1);
+  Kokkos::realloc(solid_angle, nangles);
+
+  Kokkos::realloc(amesh_normals, 5, 2+amesh_indcs.nlevel, 2+2*amesh_indcs.nlevel, 3);
+  Kokkos::realloc(ameshp_normals, 2, 3);
+
+  Kokkos::realloc(amesh_indices, 5, 2+amesh_indcs.nlevel, 2+2*amesh_indcs.nlevel);
+  Kokkos::realloc(ameshp_indices, 2);
+
+  Kokkos::realloc(num_neighbors, nangles);
+  Kokkos::realloc(ind_neighbors, nangles, 6);
+  Kokkos::realloc(arc_lengths, nangles, 6);
+
+  Kokkos::realloc(nh_c, nangles, 4);
+  Kokkos::realloc(nh_f, nangles, 6, 4);
+  Kokkos::realloc(xi_mn, nangles, 6);
+  Kokkos::realloc(eta_mn, nangles, 6);
+
+  Kokkos::realloc(nmu, nmb, nangles, ncells3, ncells2, ncells1, 4);
+  Kokkos::realloc(n0_n_mu, nmb, nangles, ncells3, ncells2, ncells1, 4);
+  Kokkos::realloc(n1_n_0, nmb, nangles, ncells3, ncells2, ncells1+1);
+  Kokkos::realloc(n2_n_0, nmb, nangles, ncells3, ncells2+1, ncells1);
+  Kokkos::realloc(n3_n_0, nmb, nangles, ncells3+1, ncells2, ncells1);
+  Kokkos::realloc(na_n_0, nmb, nangles, ncells3, ncells2, ncells1, 6);
+
   InitAngularMesh();
   InitCoordinateFrame();
 
@@ -162,8 +162,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     Kokkos::realloc(iflx.x1f,nmb,nangles,ncells3,ncells2,ncells1);
     Kokkos::realloc(iflx.x2f,nmb,nangles,ncells3,ncells2,ncells1);
     Kokkos::realloc(iflx.x3f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(ia1flx,nmb,((ncellsa1+1)*ncellsa2),ncells3,ncells2,ncells1);
-    Kokkos::realloc(ia2flx,nmb,(ncellsa1*(ncellsa2+1)),ncells3,ncells2,ncells1);
+    Kokkos::realloc(iaflx,nmb,nangles,ncells3,ncells2,ncells1,6);
   }
 
 }

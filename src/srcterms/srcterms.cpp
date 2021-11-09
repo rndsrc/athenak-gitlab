@@ -130,15 +130,13 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt)
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
 
-  auto &aindcs = pmy_pack->prad->amesh_indcs;
-  int zs = aindcs.zs, ze = aindcs.ze;
-  int ps = aindcs.ps, pe = aindcs.pe;
+  auto nangles_ = pmy_pack->prad->nangles;
 
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto coord = pmy_pack->coord.coord_data;
 
-  auto nh_cc_ = pmy_pack->prad->nh_cc;
-  auto n0_n_0_ = pmy_pack->prad->n0_n_0;
+  auto nh_c_ = pmy_pack->prad->nh_c;
+  auto n0_n_mu_ = pmy_pack->prad->n0_n_mu;
 
   Real &pos_1_ = pos_1;
   Real &pos_2_ = pos_2;
@@ -206,18 +204,15 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt)
       Real dtc3 = (e[3][0]*dc0 + e[3][1]*dc1 + e[3][2]*dc2 + e[3][3]*dc3)/(-dtc0);
 
       // Go through angles
-      for (int z = zs; z <= ze; ++z) {
-        for (int p = ps; p <= pe; ++p) {
-          int zp = AngleInd(z,p,false,false,aindcs);
-          Real mu = (nh_cc_.d_view(1,z,p) * dtc1
-                   + nh_cc_.d_view(2,z,p) * dtc2
-                   + nh_cc_.d_view(3,z,p) * dtc3);
-          Real dcons_dt = 0.0;
-          if (dx_sq < SQR(width_/2.0) && mu > mu_min) {
-            dcons_dt = dii_dt_;
-          }
-          i0(m,zp,k,j,i) += dcons_dt*bdt;
+      for (int lm=0; lm<nangles_; ++lm) {
+        Real mu = (nh_c_.d_view(lm,1) * dtc1
+                 + nh_c_.d_view(lm,2) * dtc2
+                 + nh_c_.d_view(lm,3) * dtc3);
+        Real dcons_dt = 0.;
+        if (dx_sq < SQR(width_/2.0) && mu > mu_min) {
+          dcons_dt = dii_dt_;
         }
+        i0(m,lm,k,j,i) += dcons_dt*bdt;
       }
     }
   );

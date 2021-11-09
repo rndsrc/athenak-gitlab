@@ -25,7 +25,7 @@ namespace radiation {
 KOKKOS_INLINE_FUNCTION
 void SpatialFlux(TeamMember_t const &member,
      const int m, const int k, const int j,  const int il, const int iu,
-     const DvceArray6D<Real> nn, struct AMeshIndcs aindcs,
+     const DvceArray5D<Real> nn, struct AMeshIndcs aindcs,
      const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx);
 
 //----------------------------------------------------------------------------------------
@@ -41,8 +41,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
 
   auto &aindcs = amesh_indcs;
-  int zs = aindcs.zs, ze = aindcs.ze;
-  int ps = aindcs.ps, pe = aindcs.pe;
   
   int nvars = nangles;
   int nmb1 = pmy_pack->nmb_thispack - 1;
@@ -54,8 +52,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   auto n1_n_0_ = n1_n_0;
   auto n2_n_0_ = n2_n_0;
   auto n3_n_0_ = n3_n_0;
-  auto na1_n_0_ = na1_n_0;
-  auto na2_n_0_ = na2_n_0;
+  auto na_n_0_ = na_n_0;
 
   //--------------------------------------------------------------------------------------
   // i-direction
@@ -212,84 +209,52 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   }
 
   //--------------------------------------------------------------------------------------
-  // z-direction.
-  // Angular Flux
-  auto flxa1 = ia1flx;
-  auto zetaf_ = zetaf;
-  auto zetav_ = zetav;
+  // Angular Fluxes
+  auto flxa_ = iaflx;
+  auto eta_mn_ = eta_mn;
+  auto xi_mn_ = xi_mn;
 
-  par_for("rflux_a1", DevExeSpace(), 0, nmb1, ks, ke, js, je, zs, ze+1, ps, pe,
-    KOKKOS_LAMBDA(int m, int k, int j, int z, int p)
+  par_for("rflux_a1", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-      int zpll = AngleInd(z-2, p, false, false, aindcs);
-      int zpl  = AngleInd(z-1, p, false, false, aindcs);
-      int zpc  = AngleInd(z  , p, true , false, aindcs);
-      int zpr  = AngleInd(z  , p, false, false, aindcs);
-      int zprr = AngleInd(z+1, p, false, false, aindcs);
-      Real dxl = zetaf_.d_view(z) - zetav_.d_view(z-1);
-      Real dxr = zetav_.d_view(z) - zetaf_.d_view(z);
-      for (int i = is; i <= ie; ++i) {
-        Real ill = i0_(m,zpll,k,j,i);
-        Real il  = i0_(m,zpl, k,j,i);
-        Real ir  = i0_(m,zpr, k,j,i);
-        Real irr = i0_(m,zprr,k,j,i);
-        Real dql = il - ill;
-        Real dqc = ir - il;
-        Real dqr = irr - ir;
-        Real dq2l = dql*dqc;
-        Real dq2r = dqc*dqr;
-        Real dqml = (dq2l > 0.0) ? 2.0*dq2l / (dql + dqc) : 0.0;
-        Real dqmr = (dq2r > 0.0) ? 2.0*dq2r / (dqc + dqr) : 0.0;
-        Real n_tmp = na1_n_0_(m,z,p,k,j,i);
-        Real iil = il + dxl*dqml;
-        Real iir = ir - dxr*dqmr;
-        if (n_tmp < 0.0) {
-          flxa1(m,zpc,k,j,i) = n_tmp*iil;
-        } else {
-          flxa1(m,zpc,k,j,i) = n_tmp*iir;
+        Real S_xi, S_eta;
+        int nb_1, nb_2;
+        
+        for (int lm = 0; lm < nangles; ++lm){
+        
+          Real Im = i0_(m,lm,k,j,i);
+          
+          Real S_MAPR_av = 1.0e16;
+          Real S_MAPR_xi, S_MAPR_eta;
+         
+          int neighbors[6];
+          int num_neighbors = GetNeighbors(lm, neighbors); 
+ 
+          for (int nb = 0; nb < num_neighbors; ++nb){
+          
+            nb_1 = nb;
+            nb_2 = (nb+1)%num_neighbors;
+            
+            Real Imn   = i0_(m,neighbors[nb_1],k,j,i);
+            Real Imnp1 = i0_(m,neighbors[nb_2],k,j,i);
+            
+            Real denom = 1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)-xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2));
+            S_xi = (eta_mn_.d_view(lm,nb_1)*(Imnp1-Im)-eta_mn_.d_view(lm,nb_2)*(Imn-Im))*denom;
+            S_eta = -(xi_mn_.d_view(lm,nb_1)*(Imnp1-Im)-xi_mn_.d_view(lm,nb_2)*(Imn-Im))*denom;
+            
+            if (std::sqrt(S_xi*S_xi+S_eta*S_eta) < S_MAPR_av) {
+              S_MAPR_xi = S_xi;
+              S_MAPR_eta = S_eta;
+              S_MAPR_av = std::sqrt(S_xi*S_xi+S_eta*S_eta);
+            }
+          }
+              
+          for (int nb = 0; nb < num_neighbors; ++nb){
+            Real I_edge = Im + 0.5*S_MAPR_xi*xi_mn_.d_view(lm,nb_1) + 0.5*S_MAPR_eta*eta_mn_.d_view(lm,nb_1);
+            flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb) * I_edge;
+          }
+        
         }
-      }
-    }
-  );
-
-  //--------------------------------------------------------------------------------------
-  // p-direction.
-  // Angular Flux
-  auto flxa2 = ia2flx;
-  auto psiv_ = psiv;
-  auto psif_ = psif;
-
-  par_for("rflux_a2", DevExeSpace(), 0, nmb1, ks, ke, js, je, zs, ze, ps, pe+1,
-    KOKKOS_LAMBDA(int m, int k, int j, int z, int p)
-    {
-      int zpll = AngleInd(z, p-2, false, false, aindcs);
-      int zpl  = AngleInd(z, p-1, false, false, aindcs);
-      int zpc  = AngleInd(z, p  , false, true , aindcs);
-      int zpr  = AngleInd(z, p  , false, false, aindcs);
-      int zprr = AngleInd(z, p+1, false, false, aindcs);
-      Real dxl = psif_.d_view(p) - psiv_.d_view(p-1);
-      Real dxr = psiv_.d_view(p) - psif_.d_view(p  );
-      for (int i = is; i <= ie; ++i) {
-        Real ill = i0_(m,zpll,k,j,i);
-        Real il  = i0_(m,zpl, k,j,i);
-        Real ir  = i0_(m,zpr, k,j,i);
-        Real irr = i0_(m,zprr,k,j,i);
-        Real dql = il - ill;
-        Real dqc = ir - il;
-        Real dqr = irr - ir;
-        Real dq2l = dql*dqc;
-        Real dq2r = dqc*dqr;
-        Real dqml = (dq2l > 0.0) ? 2.0*dq2l / (dql + dqc) : 0.0;
-        Real dqmr = (dq2r > 0.0) ? 2.0*dq2r / (dqc + dqr) : 0.0;
-        Real n_tmp = na2_n_0_(m,z,p,k,j,i);
-        Real iil = il + dxl * dqml;
-        Real iir = ir - dxr * dqmr;
-        if (n_tmp < 0.0) {
-          flxa2(m,zpc,k,j,i) = n_tmp*iil;
-        } else {
-          flxa2(m,zpc,k,j,i) = n_tmp*iir;
-        }
-      }
     }
   );
 
@@ -303,17 +268,14 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 KOKKOS_INLINE_FUNCTION
 void SpatialFlux(TeamMember_t const &member,
      const int m, const int k, const int j,  const int il, const int iu,
-     const DvceArray6D<Real> nn, struct AMeshIndcs aindcs,
+     const DvceArray5D<Real> nn, struct AMeshIndcs aindcs,
      const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx)
 {
   par_for_inner(member, il, iu, [&](const int i)
   {
-    for (int z = aindcs.zs-aindcs.ng; z <= aindcs.ze+aindcs.ng; ++z) {
-      for (int p = aindcs.ps-aindcs.ng; p <= aindcs.pe+aindcs.ng; ++p) {
-        int zp = AngleInd(z, p, false, false, aindcs);
-        flx(m,zp,k,j,i) = (nn(m,z,p,k,j,i)
-                           * (nn(m,z,p,k,j,i) < 0.0 ? iil(zp,i) : iir(zp,i)));
-      }
+    // TODO FIXME  think about unified layout for angular fluxes
+    for (int lm=0; lm < aindcs.nangles; ++lm) {
+      flx(m,lm,k,j,i) = (nn(m,lm,k,j,i) * (nn(m,lm,k,j,i) < 0.0 ? iil(lm,i) : iir(lm,i)));
     }
   });
 
