@@ -35,15 +35,14 @@ void Radiation::SetMoments(DvceArray5D<Real> &prim)
   auto n0_n_mu_ = n0_n_mu;
   auto solid_angle_ = solid_angle;
 
+  // TODO(@gnwong, @pdmullen) presently, this sets only R^00
   par_for("set_moments",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       mcoord_(m,0,k,j,i) = 0.0;
       for (int lm=0; lm<nangles; ++lm) {
-        mcoord_(m,0,k,j,i) += (SQR(nmu_(m,lm,k,j,i,0))  // TODO FIXME cf n^0 n_0
+        mcoord_(m,0,k,j,i) += (SQR(nmu_(m,lm,k,j,i,0))
                                *prim(m,lm,k,j,i)*solid_angle_.d_view(lm));
-        //mcoord_(m,0,k,j,i) += (n0_n_mu_(m,lm,k,j,i,0) 
-        //                    * prim(m,lm,k,j,i) * solid_angle_.d_view(lm));
       }
     }
   );

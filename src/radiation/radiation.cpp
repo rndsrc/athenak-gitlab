@@ -29,7 +29,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   iflx("ciflx",1,1,1,1,1),
   iaflx("ciaflx",1,1,1,1,1,1),
 
-  // TODO FIXME in the future, it might make sense to get rid
+  // TODO(@gnwong, @pdmullen) in the future, it might make sense to get rid
   // of some of these and compute them on the fly
   solid_angle("solidang",1),
 

@@ -44,7 +44,7 @@ struct RadiationTaskIDs
 struct AMeshIndcs
 {
   int nlevel;
-  int nangles;  // TODO FIXME could generate this from nlevel, 
+  int nangles;  // TODO(@gnwong, @pdmullen) could generate this from nlevel,
                 // also could use base nlevel member to remove
                 // this struct entirely.
 };
@@ -57,7 +57,7 @@ namespace radiation {
 class Radiation
 {
 public:
-  static const int NOT_A_PATCH = -1;
+  static const int not_a_patch = -1;
 
 public:
   Radiation(MeshBlockPack *ppack, ParameterInput *pin);

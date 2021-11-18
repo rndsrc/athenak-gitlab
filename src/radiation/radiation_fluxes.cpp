@@ -217,44 +217,47 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   par_for("rflux_a1", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
-        Real S_xi, S_eta;
-        int nb_1, nb_2;
-        
-        for (int lm = 0; lm < nangles; ++lm){
-        
-          Real Im = i0_(m,lm,k,j,i);
-          
-          Real S_MAPR_av = 1.0e16;
-          Real S_MAPR_xi, S_MAPR_eta;
-         
-          int neighbors[6];
-          int num_neighbors = GetNeighbors(lm, neighbors); 
- 
-          for (int nb = 0; nb < num_neighbors; ++nb){
-          
-            nb_1 = nb;
-            nb_2 = (nb+1)%num_neighbors;
-            
-            Real Imn   = i0_(m,neighbors[nb_1],k,j,i);
-            Real Imnp1 = i0_(m,neighbors[nb_2],k,j,i);
-            
-            Real denom = 1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)-xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2));
-            S_xi = (eta_mn_.d_view(lm,nb_1)*(Imnp1-Im)-eta_mn_.d_view(lm,nb_2)*(Imn-Im))*denom;
-            S_eta = -(xi_mn_.d_view(lm,nb_1)*(Imnp1-Im)-xi_mn_.d_view(lm,nb_2)*(Imn-Im))*denom;
-            
-            if (std::sqrt(S_xi*S_xi+S_eta*S_eta) < S_MAPR_av) {
-              S_MAPR_xi = S_xi;
-              S_MAPR_eta = S_eta;
-              S_MAPR_av = std::sqrt(S_xi*S_xi+S_eta*S_eta);
-            }
+      Real s_xi, s_eta;
+      int nb_1, nb_2;
+
+      for (int lm=0; lm<nangles; ++lm){
+        Real im = i0_(m,lm,k,j,i);
+
+        Real s_mapr_av = 1.0e16;
+        Real s_mapr_xi, s_mapr_eta;
+
+        int neighbors[6];
+        int num_neighbors = GetNeighbors(lm, neighbors);
+
+        for (int nb=0; nb<num_neighbors; ++nb){
+
+          nb_1 = nb;
+          nb_2 = (nb+1)%num_neighbors;
+
+          Real imn   = i0_(m,neighbors[nb_1],k,j,i);
+          Real imnp1 = i0_(m,neighbors[nb_2],k,j,i);
+
+          Real denom = (1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)
+                             - xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2)));
+          s_xi = (eta_mn_.d_view(lm,nb_1)*(imnp1-im)
+                  -eta_mn_.d_view(lm,nb_2)*(imn-im))*denom;
+          s_eta = -(xi_mn_.d_view(lm,nb_1)*(imnp1-im)
+                    -xi_mn_.d_view(lm,nb_2)*(imn-im))*denom;
+
+          if (sqrt(SQR(s_xi)+SQR(s_eta)) < s_mapr_av) {
+            s_mapr_xi = s_xi;
+            s_mapr_eta = s_eta;
+            s_mapr_av = sqrt(SQR(s_xi)+SQR(s_eta));
           }
-              
-          for (int nb = 0; nb < num_neighbors; ++nb){
-            Real I_edge = Im + 0.5*S_MAPR_xi*xi_mn_.d_view(lm,nb_1) + 0.5*S_MAPR_eta*eta_mn_.d_view(lm,nb_1);
-            flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb) * I_edge;
-          }
-        
         }
+
+        for (int nb=0; nb<num_neighbors; ++nb) {
+          Real i_edge = (im + 0.5*s_mapr_xi*xi_mn_.d_view(lm,nb_1)
+                         + 0.5*s_mapr_eta*eta_mn_.d_view(lm,nb_1));
+          flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb) * i_edge;
+        }
+
+      }
     }
   );
 
@@ -273,7 +276,7 @@ void SpatialFlux(TeamMember_t const &member,
 {
   par_for_inner(member, il, iu, [&](const int i)
   {
-    // TODO FIXME  think about unified layout for angular fluxes
+    // TODO(@gnwong, @pdmullen) think about a unified layout for spatial/angular fluxes
     for (int lm=0; lm < aindcs.nangles; ++lm) {
       flx(m,lm,k,j,i) = (nn(m,lm,k,j,i) * (nn(m,lm,k,j,i) < 0.0 ? iil(lm,i) : iir(lm,i)));
     }

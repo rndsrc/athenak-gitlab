@@ -26,15 +26,15 @@ namespace radiation {
 //! \brief Initialize angular mesh
 
 void Radiation::InitAngularMesh() {
-
-  Real SinAng = 2.0/std::sqrt(5.0);
-  Real CosAng = 1.0/std::sqrt(5.0);
-  Real P1[3] = {0.0, 0.0, 1.0};
-  Real P2[3] = {SinAng, 0.0, CosAng};
-  Real P3[3] = {SinAng*std::cos(0.2*M_PI), SinAng*std::sin(0.2*M_PI), -CosAng};
-  Real P4[3] = {SinAng*std::cos(-0.4*M_PI), SinAng*std::sin(-0.4*M_PI), CosAng};
-  Real P5[3] = {SinAng*std::cos(-0.2*M_PI), SinAng*std::sin(-0.2*M_PI), -CosAng};
-  Real P6[3] = {0.0, 0.0, -1.0};  
+  int nlev = nlevels;
+  Real sin_ang = 2.0/sqrt(5.0);
+  Real cos_ang = 1.0/sqrt(5.0);
+  Real p1[3] = {0.0, 0.0, 1.0};
+  Real p2[3] = {sin_ang, 0.0, cos_ang};
+  Real p3[3] = {sin_ang*cos(0.2*M_PI),  sin_ang*sin(0.2*M_PI),  -cos_ang};
+  Real p4[3] = {sin_ang*cos(-0.4*M_PI), sin_ang*sin(-0.4*M_PI),  cos_ang};
+  Real p5[3] = {sin_ang*cos(-0.2*M_PI), sin_ang*sin(-0.2*M_PI), -cos_ang};
+  Real p6[3] = {0.0, 0.0, -1.0};
 
   // get coordinates of each face center, i.e., the normal component 
   auto amesh_normals_ = amesh_normals;
@@ -50,19 +50,17 @@ void Radiation::InitAngularMesh() {
 
   // now move on and start by filling in one of the five patches
   // we only fill in the center (ignoring ghost values)
-  
   int row_index = 1;
 
-  for (int l=0; l<nlevels; ++l) {
-
+  for (int l=0; l<nlev; ++l) {
     int col_index = 1;
     
-    for (int m = l; m < nlevels; ++m){
-      Real x = ((m-l+1)*P2[0] + (nlevels-m-1)*P1[0] + l*P4[0])/(float)(nlevels);
-      Real y = ((m-l+1)*P2[1] + (nlevels-m-1)*P1[1] + l*P4[1])/(float)(nlevels);
-      Real z = ((m-l+1)*P2[2] + (nlevels-m-1)*P1[2] + l*P4[2])/(float)(nlevels);
+    for (int m=l; m<nlev; ++m) {
+      Real x = ((m-l+1)*p2[0] + (nlev-m-1)*p1[0] + l*p4[0])/(Real)(nlev);
+      Real y = ((m-l+1)*p2[1] + (nlev-m-1)*p1[1] + l*p4[1])/(Real)(nlev);
+      Real z = ((m-l+1)*p2[2] + (nlev-m-1)*p1[2] + l*p4[2])/(Real)(nlev);
       
-      Real norm = std::sqrt(x*x + y*y + z*z);
+      Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
 
       amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
       amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
@@ -71,12 +69,15 @@ void Radiation::InitAngularMesh() {
       col_index += 1;
     }
     
-    for (int m = nlevels-l; m < nlevels; ++m){
-      Real x = ((nlevels-l)*P2[0] + (m-nlevels+l+1)*P5[0] + (nlevels-m-1)*P4[0])/(float)(nlevels);
-      Real y = ((nlevels-l)*P2[1] + (m-nlevels+l+1)*P5[1] + (nlevels-m-1)*P4[1])/(float)(nlevels);
-      Real z = ((nlevels-l)*P2[2] + (m-nlevels+l+1)*P5[2] + (nlevels-m-1)*P4[2])/(float)(nlevels);
+    for (int m=nlev-l; m<nlev; ++m) {
+      Real x = ((nlev-l)*p2[0] + (m-nlev+l+1)*p5[0]
+                + (nlev-m-1)*p4[0])/(Real)(nlev);
+      Real y = ((nlev-l)*p2[1] + (m-nlev+l+1)*p5[1]
+                + (nlev-m-1)*p4[1])/(Real)(nlev);
+      Real z = ((nlev-l)*p2[2] + (m-nlev+l+1)*p5[2]
+                + (nlev-m-1)*p4[2])/(Real)(nlev);
       
-      Real norm = std::sqrt(x*x + y*y + z*z);
+      Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
      
       amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
       amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
@@ -85,12 +86,12 @@ void Radiation::InitAngularMesh() {
       col_index += 1;
     }
     
-    for (int m = l; m < nlevels; ++m){
-      Real x = ((m-l+1)*P3[0] + (nlevels-m-1)*P2[0] + l*P5[0])/(float)(nlevels);
-      Real y = ((m-l+1)*P3[1] + (nlevels-m-1)*P2[1] + l*P5[1])/(float)(nlevels);
-      Real z = ((m-l+1)*P3[2] + (nlevels-m-1)*P2[2] + l*P5[2])/(float)(nlevels);
+    for (int m=l; m<nlev; ++m) {
+      Real x = ((m-l+1)*p3[0] + (nlev-m-1)*p2[0] + l*p5[0])/(Real)(nlev);
+      Real y = ((m-l+1)*p3[1] + (nlev-m-1)*p2[1] + l*p5[1])/(Real)(nlev);
+      Real z = ((m-l+1)*p3[2] + (nlev-m-1)*p2[2] + l*p5[2])/(Real)(nlev);
       
-      Real norm = std::sqrt(x*x + y*y + z*z);
+      Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
      
       amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
       amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
@@ -99,16 +100,19 @@ void Radiation::InitAngularMesh() {
       col_index += 1;
     }
     
-    for (int m = nlevels-l; m < nlevels; ++m){
-      Real x = ((nlevels-l)*P3[0] + (m-nlevels+l+1)*P6[0] + (nlevels-m-1)*P5[0])/(float)(nlevels);
-      Real y = ((nlevels-l)*P3[1] + (m-nlevels+l+1)*P6[1] + (nlevels-m-1)*P5[1])/(float)(nlevels);
-      Real z = ((nlevels-l)*P3[2] + (m-nlevels+l+1)*P6[2] + (nlevels-m-1)*P5[2])/(float)(nlevels);
+    for (int m=nlev-l; m<nlev; ++m) {
+      Real x = ((nlev-l)*p3[0] + (m-nlev+l+1)*p6[0]
+                + (nlev-m-1)*p5[0])/(Real)(nlev);
+      Real y = ((nlev-l)*p3[1] + (m-nlev+l+1)*p6[1]
+                + (nlev-m-1)*p5[1])/(Real)(nlev);
+      Real z = ((nlev-l)*p3[2] + (m-nlev+l+1)*p6[2]
+                + (nlev-m-1)*p5[2])/(Real)(nlev);
       
-      Real norm = std::sqrt(x*x + y*y + z*z);
+      Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
      
-     amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
-     amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
-     amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
+      amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
+      amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
+      amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
 
       col_index += 1;
     }
@@ -118,39 +122,39 @@ void Radiation::InitAngularMesh() {
 
   // now fill the other four patches by rotating the first one. only set 
   // the internal (non-ghost) values
-  for (int patch = 1; patch < 5; ++patch){
-    for (int l=1; l<1+nlevels; ++l) {
-      for (int m=1; m<1+2*nlevels; ++m) {
+  for (int patch=1; patch<5; ++patch) {
+    for (int l=1; l<1+nlev; ++l) {
+      for (int m=1; m<1+2*nlev; ++m) {
 
         Real x0 = amesh_normals_.h_view(0,l,m,0);
         Real y0 = amesh_normals_.h_view(0,l,m,1);
         Real z0 = amesh_normals_.h_view(0,l,m,2);
 
-        amesh_normals_.h_view(patch,l,m,0) = x0 * std::cos(patch*0.4*M_PI) + y0 * std::sin(patch*0.4*M_PI);
-        amesh_normals_.h_view(patch,l,m,1) = y0 * std::cos(patch*0.4*M_PI) - x0 * std::sin(patch*0.4*M_PI);
+        amesh_normals_.h_view(patch,l,m,0) = (x0*cos(patch*0.4*M_PI)
+                                              + y0*sin(patch*0.4*M_PI));
+        amesh_normals_.h_view(patch,l,m,1) = (y0*cos(patch*0.4*M_PI)
+                                              - x0*sin(patch*0.4*M_PI));
         amesh_normals_.h_view(patch,l,m,2) = z0;
       }
     }
   }
 
-  // TODO maybe figure out how to make this a neat function / remove entirely
-  {
-    auto blocks = amesh_normals_;
-    auto nlev = nlevels;
-    for (int i=0; i<3; ++i) { 
-      for (int bl=0; bl<5; ++bl){
-        for (int k=0; k<nlev; ++k){
-          blocks.h_view(bl,0,k+1,i)           = blocks.h_view((bl+4)%5,k+1,1,i);
-          blocks.h_view(bl,0,k+nlev+1,i)      = blocks.h_view((bl+4)%5,nlev,k+1,i);
-          blocks.h_view(bl,k+1,2*nlev+1,i)    = blocks.h_view((bl+4)%5,nlev,k+nlev+1,i);
-          blocks.h_view(bl,k+2,0,i)           = blocks.h_view((bl+1)%5,1,k+1,i);
-          blocks.h_view(bl,nlev+1,k+1,i)      = blocks.h_view((bl+1)%5,1,k+nlev+1,i);
-          blocks.h_view(bl,nlev+1,k+nlev+1,i) = blocks.h_view((bl+1)%5,k+2,2*nlev,i);
-        }
-        blocks.h_view(bl,1,0,i)           = ameshp_normals_.h_view(0,i);
-        blocks.h_view(bl,nlev+1,2*nlev,i) = ameshp_normals_.h_view(1,i);
-        blocks.h_view(bl,0,2*nlev+1,i)    = blocks.h_view(bl,0,2*nlev,i);
+  // TODO(@gnwong, @pdmullen) maybe figure out how to make this a
+  // neat function or remove entirely
+  auto blocks_n = amesh_normals_;
+  for (int i=0; i<3; ++i) {
+    for (int bl=0; bl<5; ++bl) {
+      for (int k=0; k<nlev; ++k) {
+        blocks_n.h_view(bl,0,k+1,i)           = blocks_n.h_view((bl+4)%5,k+1,1,i);
+        blocks_n.h_view(bl,0,k+nlev+1,i)      = blocks_n.h_view((bl+4)%5,nlev,k+1,i);
+        blocks_n.h_view(bl,k+1,2*nlev+1,i)    = blocks_n.h_view((bl+4)%5,nlev,k+nlev+1,i);
+        blocks_n.h_view(bl,k+2,0,i)           = blocks_n.h_view((bl+1)%5,1,k+1,i);
+        blocks_n.h_view(bl,nlev+1,k+1,i)      = blocks_n.h_view((bl+1)%5,1,k+nlev+1,i);
+        blocks_n.h_view(bl,nlev+1,k+nlev+1,i) = blocks_n.h_view((bl+1)%5,k+2,2*nlev,i);
       }
+      blocks_n.h_view(bl,1,0,i)           = ameshp_normals_.h_view(0,i);
+      blocks_n.h_view(bl,nlev+1,2*nlev,i) = ameshp_normals_.h_view(1,i);
+      blocks_n.h_view(bl,0,2*nlev+1,i)    = blocks_n.h_view(bl,0,2*nlev,i);
     }
   }
 
@@ -165,34 +169,33 @@ void Radiation::InitAngularMesh() {
   auto ameshp_indices_ = ameshp_indices;
 
   for (int patch=0; patch<5; ++patch) {
-    for (int l = 0; l < nlevels; ++l){
-      for (int m = 0; m < 2*nlevels; ++m){
+    for (int l = 0; l < nlev; ++l) {
+      for (int m = 0; m < 2*nlev; ++m) {
         // set center (non-ghost) values
-        amesh_indices_.h_view(patch,l+1,m+1) = patch*2*nlevels*nlevels + l*2*nlevels + m;
+        amesh_indices_.h_view(patch,l+1,m+1) = patch*2*SQR(nlev) + l*2*nlev + m;
       }
     }
   }
 
-  ameshp_indices_.h_view(0) = 5*2*nlevels*nlevels;
-  ameshp_indices_.h_view(1) = 5*2*nlevels*nlevels + 1;
+  ameshp_indices_.h_view(0) = 5*2*SQR(nlev);
+  ameshp_indices_.h_view(1) = 5*2*SQR(nlev) + 1;
 
-  // TODO maybe figure out how to make this a neat function / remove entirely
-  {
-    auto blocks = amesh_indices_;
-    auto nlev = nlevels;
-    for (int bl=0; bl<5; ++bl){
-      for (int k=0; k<nlev; ++k){
-        blocks.h_view(bl,0,k+1)           = blocks.h_view((bl+4)%5,k+1,1);
-        blocks.h_view(bl,0,k+nlev+1)      = blocks.h_view((bl+4)%5,nlev,k+1);
-        blocks.h_view(bl,k+1,2*nlev+1)    = blocks.h_view((bl+4)%5,nlev,k+nlev+1);
-        blocks.h_view(bl,k+2,0)           = blocks.h_view((bl+1)%5,1,k+1);
-        blocks.h_view(bl,nlev+1,k+1)      = blocks.h_view((bl+1)%5,1,k+nlev+1);
-        blocks.h_view(bl,nlev+1,k+nlev+1) = blocks.h_view((bl+1)%5,k+2,2*nlev);
-      }
-      blocks.h_view(bl,1,0)           = ameshp_indices_.h_view(0);
-      blocks.h_view(bl,nlev+1,2*nlev) = ameshp_indices_.h_view(1);
-      blocks.h_view(bl,0,2*nlev+1)    = blocks.h_view(bl,0,2*nlev);
+  auto blocks_i = amesh_indices_;
+
+  // TODO(@gnwong, @pdmullen) maybe figure out how to make this a
+  // neat function or remove entirely
+  for (int bl=0; bl<5; ++bl) {
+    for (int k=0; k<nlev; ++k) {
+      blocks_i.h_view(bl,0,k+1)           = blocks_i.h_view((bl+4)%5,k+1,1);
+      blocks_i.h_view(bl,0,k+nlev+1)      = blocks_i.h_view((bl+4)%5,nlev,k+1);
+      blocks_i.h_view(bl,k+1,2*nlev+1)    = blocks_i.h_view((bl+4)%5,nlev,k+nlev+1);
+      blocks_i.h_view(bl,k+2,0)           = blocks_i.h_view((bl+1)%5,1,k+1);
+      blocks_i.h_view(bl,nlev+1,k+1)      = blocks_i.h_view((bl+1)%5,1,k+nlev+1);
+      blocks_i.h_view(bl,nlev+1,k+nlev+1) = blocks_i.h_view((bl+1)%5,k+2,2*nlev);
     }
+    blocks_i.h_view(bl,1,0)           = ameshp_indices_.h_view(0);
+    blocks_i.h_view(bl,nlev+1,2*nlev) = ameshp_indices_.h_view(1);
+    blocks_i.h_view(bl,0,2*nlev+1)    = blocks_i.h_view(bl,0,2*nlev);
   }
 
   amesh_indices_.template modify<HostMemSpace>();
@@ -208,18 +211,17 @@ void Radiation::InitAngularMesh() {
   auto arc_lengths_ = arc_lengths;
 
   for (int lm=0; lm<nangles; ++lm) {
-
-    double dual_edge[6];
+    Real dual_edge[6];
     int neighbors[6];
 
     solid_angle_.h_view(lm) = ComputeWeightAndDualEdges(lm, dual_edge);
     num_neighbors_.h_view(lm) = GetNeighbors(lm, neighbors);
 
     for (int nb=0; nb<6; ++nb) {
-      ind_neighbors_.h_view(lm, nb) = neighbors[nb];  // TODO is it necessary to save this information?
+      // TODO(@gnwong, @pdmullen) is it necessary to save this information?
+      ind_neighbors_.h_view(lm, nb) = neighbors[nb];
       arc_lengths_.h_view(lm, nb) = dual_edge[nb];
     }
-
   }
 
   solid_angle_.template modify<HostMemSpace>();
@@ -236,12 +238,12 @@ void Radiation::InitAngularMesh() {
   auto eta_mn_ = eta_mn;
 
   for (int lm=0; lm<nangles; ++lm) {
-    double xi_coord[6];
-    double eta_coord[6];
+    Real xi_coord[6];
+    Real eta_coord[6];
 
     ComputeXiEta(lm, xi_coord, eta_coord);
 
-    for(int nb = 0; nb < 6; ++nb){
+    for (int nb = 0; nb < 6; ++nb) {
       xi_mn_.h_view(lm,nb) = xi_coord[nb];
       eta_mn_.h_view(lm,nb) = eta_coord[nb];
     }
@@ -253,8 +255,8 @@ void Radiation::InitAngularMesh() {
   xi_mn_.template sync<DevExeSpace>();
   eta_mn_.template sync<DevExeSpace>();
 
-  // TODO FIXME make this prettier
-  double rotangles[2];
+  // TODO(@gnwong, @pdmullen) make this prettier
+  Real rotangles[2];
   OptimalAngles(rotangles);
   RotateGrid(rotangles[0], rotangles[1]);
 
@@ -262,8 +264,7 @@ void Radiation::InitAngularMesh() {
   auto nh_f_ = nh_f;
 
   for (int lm=0; lm<nangles; ++lm) {
-
-    double x,y,z;
+    Real x, y, z;
     GetGridCartPosition(lm, &x,&y,&z);
     
     nh_c_.h_view(lm,0) = 1.0;
@@ -272,8 +273,8 @@ void Radiation::InitAngularMesh() {
     nh_c_.h_view(lm,3) = z;
    
     int nn = num_neighbors_.h_view(lm);
-    for (int nb = 0; nb < nn; ++nb){
-      double xm, ym, zm;
+    for (int nb=0; nb<nn; ++nb) {
+      Real xm, ym, zm;
 
       GetGridCartPositionMid(lm, ind_neighbors_.h_view(lm,nb), &xm,&ym,&zm);
       
@@ -283,13 +284,18 @@ void Radiation::InitAngularMesh() {
       nh_f_.h_view(lm,nb,3) = zm;
     }
     
-    if (nn == 5) {
-      nh_f_.h_view(lm,5,0) = std::numeric_limits<double>::quiet_NaN();
-      nh_f_.h_view(lm,5,1) = std::numeric_limits<double>::quiet_NaN();
-      nh_f_.h_view(lm,5,2) = std::numeric_limits<double>::quiet_NaN();
-      nh_f_.h_view(lm,5,3) = std::numeric_limits<double>::quiet_NaN();
+    // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
+    // We should not being using std library.  Setting to -1.0 for now.
+    if (nn==5) {
+      // nh_f_.h_view(lm,5,0) = std::numeric_limits<Real>::quiet_NaN();
+      // nh_f_.h_view(lm,5,1) = std::numeric_limits<Real>::quiet_NaN();
+      // nh_f_.h_view(lm,5,2) = std::numeric_limits<Real>::quiet_NaN();
+      // nh_f_.h_view(lm,5,3) = std::numeric_limits<Real>::quiet_NaN();
+      nh_f_.h_view(lm,5,0) = -1.0;
+      nh_f_.h_view(lm,5,1) = -1.0;
+      nh_f_.h_view(lm,5,2) = -1.0;
+      nh_f_.h_view(lm,5,3) = -1.0;
     }
-
   }
 
   nh_c_.template modify<HostMemSpace>();
@@ -517,18 +523,19 @@ void Radiation::InitCoordinateFrame() {
 
       for (int lm=0; lm<nangles; ++lm) {
         for (int nb=0; nb<num_neighbors_.d_view(lm); ++nb) {
-
-            Real zeta_f = std::acos(nh_f_.d_view(lm,nb,3));
-            Real psi_f  = std::atan2(nh_f_.d_view(lm,nb,2), nh_f_.d_view(lm,nb,1));
+            Real zeta_f = acos(nh_f_.d_view(lm,nb,3));
+            Real psi_f  = atan2(nh_f_.d_view(lm,nb,2), nh_f_.d_view(lm,nb,1));
         
             Real na1 = 0.0;
             Real na2 = 0.0;
             for (int n = 0; n < 4; ++n) {
               for (int p = 0; p < 4; ++p) {
-                na1 += 1.0 / std::sin(zeta_f) * nh_f_.d_view(lm,nb,n) * nh_f_.d_view(lm,nb,p) 
-                    * (nh_f_.d_view(lm,nb,0) * omega[3][n][p] - nh_f_.d_view(lm,nb,3) * omega[0][n][p]);
-                na2 += 1.0 / SQR(std::sin(zeta_f)) * nh_f_.d_view(lm,nb,n) * nh_f_.d_view(lm,nb,p)
-                    * (nh_f_.d_view(lm,nb,2) * omega[1][n][p] - nh_f_.d_view(lm,nb,1) * omega[n][p][2]);
+                na1 += (1.0/sin(zeta_f)*nh_f_.d_view(lm,nb,n)*nh_f_.d_view(lm,nb,p)
+                        * (nh_f_.d_view(lm,nb,0) * omega[3][n][p]
+                        -  nh_f_.d_view(lm,nb,3) * omega[0][n][p]));
+                na2 += (1.0/SQR(sin(zeta_f))*nh_f_.d_view(lm,nb,n)*nh_f_.d_view(lm,nb,p)
+                        * (nh_f_.d_view(lm,nb,2) * omega[1][n][p]
+                        -  nh_f_.d_view(lm,nb,1) * omega[n][p][2]));
               }
             }
             
@@ -552,39 +559,38 @@ void Radiation::InitCoordinateFrame() {
   return;
 }
 
-// TODO FIXME implement new function that returns num neighbors using if statements 
-// instead of also computing the neighbors too
+// TODO(@gnwong, @pdmullen) implement new function that returns num neighbors using
+// if statements instead of also computing the neighbors too
 int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
   int num_neighbors;
 
-  auto nlev_ = nlevels;
+  int nlev = nlevels;
   auto amesh_indices_ = amesh_indices;
  
   // handle north pole 
-  if (lm == 10*nlev_*nlev_){
+  if (lm==10*nlev*nlev) {
 
-    for(int bl = 0; bl < 5; ++bl){
+    for (int bl = 0; bl < 5; ++bl) {
       neighbors[bl] = amesh_indices_.d_view(bl,1,1);
     }
 
-    neighbors[5] = NOT_A_PATCH;
+    neighbors[5] = not_a_patch;
     num_neighbors = 5;
 
-  // handle south pole
-  } else if (lm == 10*nlev_*nlev_ + 1){
+  } else if (lm == 10*nlev*nlev + 1) {  // handle south pole
 
-    for(int bl = 0; bl < 5; ++bl){
-      neighbors[bl] = amesh_indices_.d_view(bl,nlev_,2*nlev_);
+    for (int bl = 0; bl < 5; ++bl) {
+      neighbors[bl] = amesh_indices_.d_view(bl,nlev,2*nlev);
     }
 
-    neighbors[5] = NOT_A_PATCH;
+    neighbors[5] = not_a_patch;
     num_neighbors = 5;
     
   } else {
   
-    int ibl0 =  lm / (2*nlev_*nlev_);
-    int ibl1 = (lm % (2*nlev_*nlev_)) / (2*nlev_);
-    int ibl2 = (lm % (2*nlev_*nlev_)) % (2*nlev_);
+    int ibl0 =  lm / (2*nlev*nlev);
+    int ibl1 = (lm % (2*nlev*nlev)) / (2*nlev);
+    int ibl2 = (lm % (2*nlev*nlev)) % (2*nlev);
   
     neighbors[0] = amesh_indices_.d_view(ibl0, ibl1+1, ibl2+2);
     neighbors[1] = amesh_indices_.d_view(ibl0, ibl1+2, ibl2+1);
@@ -592,9 +598,9 @@ int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
     neighbors[3] = amesh_indices_.d_view(ibl0, ibl1+1, ibl2);
     neighbors[4] = amesh_indices_.d_view(ibl0, ibl1  , ibl2+1);
    
-    // TODO check carefully, see if it can be inline optimized 
-    if (lm % (2*nlev_*nlev_) == nlev_-1 || lm % (2*nlev_*nlev_) == 2*nlev_-1){
-      neighbors[5] = NOT_A_PATCH;
+    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
+    if (lm % (2*nlev*nlev) == nlev-1 || lm % (2*nlev*nlev) == 2*nlev-1) {
+      neighbors[5] = not_a_patch;
       num_neighbors = 5;
     } else {
       neighbors[5] = amesh_indices_.d_view(ibl0, ibl1, ibl2+2);
@@ -606,57 +612,60 @@ int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
   return num_neighbors;
 }
 
-double Radiation::ComputeWeightAndDualEdges(int lm, double length[6]) const {
-  // TODO FIXME: how safe? assert n >= 0 && n < numverts?
+Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
+  // TODO(@gnwong, @pdmullen) how safe? assert n >= 0 && n < numverts?
 
   int nvec[6];
   int nnum = GetNeighbors(lm, nvec);
   
-  double x0, y0, z0;
+  Real x0, y0, z0;
   GetGridCartPosition(lm, &x0,&y0,&z0);
 
-  //fprintf(stderr, "%d -> %g %g %g %d\n", lm, x0,y0,z0, nnum);
+  Real weight = 0.0;
   
-  double weight = 0.0;
+  for (int nb = 0; nb < nnum; ++nb) {
   
-  for (int nb = 0; nb < nnum; ++nb){
-  
-    double xn1, yn1, zn1;
-    double xn2, yn2, zn2;
-    double xn3, yn3, zn3;
+    Real xn1, yn1, zn1;
+    Real xn2, yn2, zn2;
+    Real xn3, yn3, zn3;
     
     GetGridCartPosition(nvec[(nb + nnum - 1)%nnum],&xn1,&yn1,&zn1);
     GetGridCartPosition(nvec[nb],                  &xn2,&yn2,&zn2);
     GetGridCartPosition(nvec[(nb + 1)%nnum],       &xn3,&yn3,&zn3);
     
-    double xc1, yc1, zc1;
-    double xc2, yc2, zc2;
+    Real xc1, yc1, zc1;
+    Real xc2, yc2, zc2;
     
     CircumcenterNormalized(x0,xn1,xn2,y0,yn1,yn2,z0,zn1,zn2,&xc1,&yc1,&zc1);
     CircumcenterNormalized(x0,xn2,xn3,y0,yn2,yn3,z0,zn2,zn3,&xc2,&yc2,&zc2);
     
-    double scalprod_c1 = x0*xc1 + y0*yc1 + z0*zc1;
-    double scalprod_c2 = x0*xc2 + y0*yc2 + z0*zc2;
-    double scalprod_12 = xc1*xc2 + yc1*yc2 + zc1*zc2;
+    Real scalprod_c1 = x0*xc1 + y0*yc1 + z0*zc1;
+    Real scalprod_c2 = x0*xc2 + y0*yc2 + z0*zc2;
+    Real scalprod_12 = xc1*xc2 + yc1*yc2 + zc1*zc2;
             
-    double numerator = std::abs(x0*(yc1*zc2-yc2*zc1)+y0*(xc2*zc1-xc1*zc2)+z0*(xc1*yc2-yc1*xc2));
-    double denominator = 1.0+scalprod_c1+scalprod_c2+scalprod_12;
+    Real numerator = fabs(x0*(yc1*zc2-yc2*zc1) +
+                            y0*(xc2*zc1-xc1*zc2) +
+                            z0*(xc1*yc2-yc1*xc2));
+    Real denominator = 1.0+scalprod_c1+scalprod_c2+scalprod_12;
         
-    weight += 2.0*std::atan(numerator/denominator);
+    weight += 2.0*atan(numerator/denominator);
     
-    length[nb] = std::acos(scalprod_12);
+    length[nb] = acos(scalprod_12);
   
   }
   
-  if (nnum == 5){
-    length[5] = std::numeric_limits<double>::quiet_NaN();
+  // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
+  // We should not being using std library.  Setting to -1.0 for now.
+  if (nnum == 5) {
+    // length[5] = std::numeric_limits<Real>::quiet_NaN();
+    length[5] = -1.0;
   }
   
   return weight;
 }
 
-void Radiation::GetGridCartPosition(int lm, double *x, double *y, double *z) const {
-  // TODO FIXME: should we assert n >= 0 and n < numverties? how safe are we?
+void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z) const {
+  // TODO(@gnwong, @pdmullen) should we assert n >= 0 and n < numverties? how safe are we?
 
   auto nlevels_ = nlevels;
 
@@ -667,8 +676,8 @@ void Radiation::GetGridCartPosition(int lm, double *x, double *y, double *z) con
   int ibl1 = (lm % (2*nlevels_*nlevels_)) / (2*nlevels_);
   int ibl2 = (lm % (2*nlevels_*nlevels_)) % (2*nlevels_);
   
-  if (ibl0 == 5){ 
-    *x = ameshp_normals_.d_view(ibl2, 0);  // TODO is it okay for this to be [dh]_view?
+  if (ibl0 == 5) {
+    *x = ameshp_normals_.d_view(ibl2, 0);  // TODO(@gnwong, @pdmullen) okay as [dh]_view?
     *y = ameshp_normals_.d_view(ibl2, 1);
     *z = ameshp_normals_.d_view(ibl2, 2);
   } else {
@@ -678,138 +687,139 @@ void Radiation::GetGridCartPosition(int lm, double *x, double *y, double *z) con
   }
 }
 
-void Radiation::GetGridCartPositionMid(int lm, int nb, double *x, double *y, double *z) const {
-  // TODO FIXME: should we assert?  (n good, nb good, (n,nb) are neighbors)
-
-  double x1, y1, z1;
-  double x2, y2, z2;
+void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z) const {
+  // TODO(@gnwong, @pdmullen) should we assert?  (n good, nb good, (n,nb) are neighbors)
+  Real x1, y1, z1;
+  Real x2, y2, z2;
   
   GetGridCartPosition(lm,&x1,&y1,&z1);
   GetGridCartPosition(nb,&x2,&y2,&z2);
   
-  double xm = 0.5*(x1+x2);
-  double ym = 0.5*(y1+y2);
-  double zm = 0.5*(z1+z2);
+  Real xm = 0.5*(x1+x2);
+  Real ym = 0.5*(y1+y2);
+  Real zm = 0.5*(z1+z2);
       
-  double norm = std::sqrt(xm*xm+ym*ym+zm*zm);
+  Real norm = sqrt(SQR(xm)+SQR(ym)+SQR(zm));
   
   *x = xm/norm;
   *y = ym/norm;
   *z = zm/norm;
 }
 
-void Radiation::CircumcenterNormalized(double x1, double x2, double x3, 
-                                       double y1, double y2, double y3, 
-                                       double z1, double z2, double z3, 
-                                       double *x, double *y, double *z) const {
-  double a = std::sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
-  double b = std::sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
-  double c = std::sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
-  double denom = 1.0/((a+c+b)*(a+c-b)*(a+b-c)*(b+c-a));
-  double x_c = (x1*a*a*(b*b+c*c-a*a)+x2*b*b*(c*c+a*a-b*b)+x3*c*c*(a*a+b*b-c*c))*denom;
-  double y_c = (y1*a*a*(b*b+c*c-a*a)+y2*b*b*(c*c+a*a-b*b)+y3*c*c*(a*a+b*b-c*c))*denom;
-  double z_c = (z1*a*a*(b*b+c*c-a*a)+z2*b*b*(c*c+a*a-b*b)+z3*c*c*(a*a+b*b-c*c))*denom;
-  double norm_c = std::sqrt(x_c*x_c+y_c*y_c+z_c*z_c);
+void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
+                                       Real y1, Real y2, Real y3,
+                                       Real z1, Real z2, Real z3,
+                                       Real *x, Real *y, Real *z) const {
+  Real a = sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
+  Real b = sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
+  Real c = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
+  Real denom = 1.0/((a+c+b)*(a+c-b)*(a+b-c)*(b+c-a));
+  Real x_c = (x1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+x2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + x3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real y_c = (y1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+y2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + y3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real z_c = (z1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+z2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + z3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real norm_c = sqrt(SQR(x_c)+SQR(y_c)+SQR(z_c));
   *x = x_c/norm_c;
   *y = y_c/norm_c;
   *z = z_c/norm_c;
 }
 
 
-void Radiation::GetGridPositionPolar(int ic, double * theta, double * phi) const {
-  //assert(ic >= 0 && ic < NumVertices());
-  // TODO REWRITE ?
-  
-  double x_, y_, z_;
+void Radiation::GetGridPositionPolar(int ic, Real * theta, Real * phi) const {
+  // TODO(@gnwong, @pdmullen) rewrite?
+  // assert(ic >= 0 && ic < NumVertices());
+  Real x_, y_, z_;
   GetGridCartPosition(ic,&x_,&y_,&z_);
   
-  *theta = std::acos(z_);
-  *phi   = std::atan2(y_,x_);
+  *theta = acos(z_);
+  *phi   = atan2(y_,x_);
 }
 
-void Radiation::GreatCircleParam(double zeta1, double zeta2, double psi1, double psi2, double * apar, double * psi0) const {
-  Real atilde = (std::sin(psi2)/std::tan(zeta1)-std::sin(psi1)/std::tan(zeta2))/std::sin(psi2-psi1);
-  Real btilde = (std::cos(psi2)/std::tan(zeta1)-std::cos(psi1)/std::tan(zeta2))/std::sin(psi1-psi2);
-  *psi0 = std::atan2(btilde, atilde);
-  *apar = std::sqrt(atilde*atilde+btilde*btilde);
+void Radiation::GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2, Real * apar, Real * psi0) const {
+  Real atilde = (sin(psi2)/tan(zeta1)-sin(psi1)/tan(zeta2))/sin(psi2-psi1);
+  Real btilde = (cos(psi2)/tan(zeta1)-cos(psi1)/tan(zeta2))/sin(psi1-psi2);
+  *psi0 = atan2(btilde, atilde);
+  *apar = sqrt(atilde*atilde+btilde*btilde);
 }
 
-void Radiation::UnitFluxDir(int ic1, int ic2, double * dtheta, double * dphi) const {
-  //assert(ic1 >= 0 && ic1 < NumVertices());
-  //assert(ic2 >= 0 && ic2 < NumVertices());
-  //assert(AreNeighbors(ic1, ic2));
-  
-  double zeta1, psi1;
+void Radiation::UnitFluxDir(int ic1, int ic2, Real * dtheta, Real * dphi) const {
+  // TODO(@gnwong, @pdmullen) should we assert?
+  // assert(ic1 >= 0 && ic1 < NumVertices());
+  // assert(ic2 >= 0 && ic2 < NumVertices());
+  // assert(AreNeighbors(ic1, ic2));
+  Real zeta1, psi1;
   
   GetGridPositionPolar(ic1,&zeta1,&psi1);
   
-  double xm, ym, zm;
+  Real xm, ym, zm;
   GetGridCartPositionMid(ic1,ic2,&xm,&ym,&zm);
   
-  double zetam = std::acos(zm);
-  double psim  = std::atan2(ym,xm);
+  Real zetam = acos(zm);
+  Real psim  = atan2(ym,xm);
   
-  double a_par, p_par;
+  Real a_par, p_par;
   
-  if (std::abs(psim-psi1) < 1.0e-10 || std::abs(std::abs(zm)-1) < 1.0e-10 || std::abs(std::abs(std::cos(zeta1))-1) < 1.0e-10){
-    *dtheta = std::copysign(1.0,zetam-zeta1);
+  if (fabs(psim-psi1) < 1.0e-10 ||
+      fabs(fabs(zm)-1) < 1.0e-10 ||
+      fabs(fabs(cos(zeta1))-1) < 1.0e-10) {
+    *dtheta = copysign(1.0,zetam-zeta1);
     *dphi = 0.0;
-  }
-  else{
+  } else{
     GreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
-    double zeta_deriv = a_par*std::sin(psim-p_par)/(1.0+a_par*a_par*std::cos(psim-p_par)*std::cos(psim-p_par));
-    double denom = 1.0/std::sqrt(zeta_deriv*zeta_deriv+std::sin(zetam)*std::sin(zetam));
-    double signfactor = std::copysign(1.0,psim-psi1)*std::copysign(1.0,M_PI-std::abs(psim-psi1));
+    Real zeta_deriv = a_par*sin(psim-p_par)/(1.0+a_par*a_par*cos(psim-p_par)*cos(psim-p_par));
+    Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetam)*sin(zetam));
+    Real signfactor = copysign(1.0,psim-psi1)*copysign(1.0,M_PI-fabs(psim-psi1));
     *dtheta = signfactor * zeta_deriv * denom;
     *dphi   = signfactor * denom;
   }
-
 }
 
-void Radiation::OptimalAngles(double ang[2]) const {
+void Radiation::OptimalAngles(Real ang[2]) const {
   int nzeta = 200;
   int npsi = 200;
   
-  double maxangle = ArcLength(0,1);
+  Real maxangle = ArcLength(0,1);
 
-  double deltazeta = maxangle/nzeta;
-  double deltapsi = M_PI/npsi;
+  Real deltazeta = maxangle/nzeta;
+  Real deltapsi = M_PI/npsi;
   
-  double zeta;
-  double psi;
+  Real zeta;
+  Real psi;
   
-  double vx, vy, vz;
-  double vrx, vry, vrz;
+  Real vx, vy, vz;
+  Real vrx, vry, vrz;
 
-  double vmax = 0.0;
+  Real vmax = 0.0;
   
-  for(int l = 0; l < nzeta; l++){
+  for (int l = 0; l < nzeta; l++) {
     zeta = (l+1)*deltazeta;
-    for(int k = 0; k < npsi; k++){
+    for (int k = 0; k < npsi; k++) {
       psi = (k+1)*deltapsi;
       
-      double kx = - std::sin(psi);
-      double ky = std::cos(psi);
-      double vmin_curr = 1.0;
+      Real kx = - sin(psi);
+      Real ky = cos(psi);
+      Real vmin_curr = 1.0;
       
-      for (int i = 0; i < nangles; ++i){
+      for (int i = 0; i < nangles; ++i) {
         GetGridCartPosition(i,&vx,&vy,&vz);
-        vrx = vx*std::cos(zeta)+ky*vz*std::sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-        vry = vy*std::cos(zeta)-kx*vz*std::sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-        vrz = vz*std::cos(zeta)+(kx*vy-ky*vx)*std::sin(zeta);
+        vrx = vx*cos(zeta)+ky*vz*sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-cos(zeta));
+        vry = vy*cos(zeta)-kx*vz*sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-cos(zeta));
+        vrz = vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta);
         
-        if(std::abs(vrx) < vmin_curr){
-          vmin_curr = std::abs(vrx);
+        if (fabs(vrx) < vmin_curr) {
+          vmin_curr = fabs(vrx);
         }
-        if(std::abs(vry) < vmin_curr){
-          vmin_curr = std::abs(vry);
+        if (fabs(vry) < vmin_curr) {
+          vmin_curr = fabs(vry);
         }
-        if(std::abs(vrz) < vmin_curr){
-          vmin_curr = std::abs(vrz);
+        if (fabs(vrz) < vmin_curr) {
+          vmin_curr = fabs(vrz);
         }
       }
       
-      if(vmin_curr > vmax){
+      if (vmin_curr > vmax) {
         vmax = vmin_curr;
         ang[0] = zeta;
         ang[1] = psi;
@@ -820,27 +830,28 @@ void Radiation::OptimalAngles(double ang[2]) const {
   
 }
 
-void Radiation::RotateGrid(double zeta, double psi) {
-  double kx = -std::sin(psi);
-  double ky = std::cos(psi);
-  double vx, vy, vz;
-  double vrx, vry, vrz;
+void Radiation::RotateGrid(Real zeta, Real psi) {
+  Real kx = -sin(psi);
+  Real ky = cos(psi);
+  Real vx, vy, vz;
+  Real vrx, vry, vrz;
 
-  auto nlev_ = nlevels;
+  int nlev = nlevels;
   auto amesh_normals_ = amesh_normals;
   auto ameshp_normals_ = ameshp_normals;
   
-  for (int bl = 0; bl < 5; ++bl){
-    for (int l = 0; l < nlev_; ++l){
-      for (int m = 0; m < 2*nlev_; ++m){
-        
+  for (int bl = 0; bl < 5; ++bl) {
+    for (int l = 0; l < nlev; ++l) {
+      for (int m = 0; m < 2*nlev; ++m) {
         vx = amesh_normals_.h_view(bl, l+1, m+1, 0);
         vy = amesh_normals_.h_view(bl, l+1, m+1, 1);
         vz = amesh_normals_.h_view(bl, l+1, m+1, 2);
 
-        vrx = vx*std::cos(zeta)+ky*vz*std::sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-        vry = vy*std::cos(zeta)-kx*vz*std::sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-        vrz = vz*std::cos(zeta)+(kx*vy-ky*vx)*std::sin(zeta);
+        vrx = (vx*cos(zeta)+ky*vz*sin(zeta)
+               + kx*(kx*vx+ky*vy)*(1.0-cos(zeta)));
+        vry = (vy*cos(zeta)-kx*vz*sin(zeta)
+               + ky*(kx*vx+ky*vy)*(1.0-cos(zeta)));
+        vrz = (vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta));
 
         amesh_normals_.h_view(bl, l+1, m+1, 0) = vrx;
         amesh_normals_.h_view(bl, l+1, m+1, 1) = vry;
@@ -848,103 +859,99 @@ void Radiation::RotateGrid(double zeta, double psi) {
       }
     }
   }
-  for (int pl = 0; pl < 2; ++pl) {
-
+  for (int pl=0; pl<2; ++pl) {
     vx = ameshp_normals_.h_view(pl, 0);
     vy = ameshp_normals_.h_view(pl, 1);
     vz = ameshp_normals_.h_view(pl, 2);
 
-    vrx = vx*std::cos(zeta)+ky*vz*std::sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-    vry = vy*std::cos(zeta)-kx*vz*std::sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-std::cos(zeta));
-    vrz = vz*std::cos(zeta)+(kx*vy-ky*vx)*std::sin(zeta);
+    vrx = vx*cos(zeta)+ky*vz*sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-cos(zeta));
+    vry = vy*cos(zeta)-kx*vz*sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-cos(zeta));
+    vrz = vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta);
     
     ameshp_normals_.h_view(pl, 0) = vrx;
     ameshp_normals_.h_view(pl, 1) = vrx;
     ameshp_normals_.h_view(pl, 2) = vrx;
   }
  
-  // TODO make this prettier?
-  {
-    auto blocks = amesh_normals_;
-    auto nlev = nlevels;
-    for (int i=0; i<3; ++i) {
-      for (int bl=0; bl<5; ++bl){
-        for (int k=0; k<nlev; ++k){
-          blocks.h_view(bl,0,k+1,i)           = blocks.h_view((bl+4)%5,k+1,1,i);
-          blocks.h_view(bl,0,k+nlev+1,i)      = blocks.h_view((bl+4)%5,nlev,k+1,i);
-          blocks.h_view(bl,k+1,2*nlev+1,i)    = blocks.h_view((bl+4)%5,nlev,k+nlev+1,i);
-          blocks.h_view(bl,k+2,0,i)           = blocks.h_view((bl+1)%5,1,k+1,i);
-          blocks.h_view(bl,nlev+1,k+1,i)      = blocks.h_view((bl+1)%5,1,k+nlev+1,i);
-          blocks.h_view(bl,nlev+1,k+nlev+1,i) = blocks.h_view((bl+1)%5,k+2,2*nlev,i);
-        }
-        blocks.h_view(bl,1,0,i)           = ameshp_normals_.h_view(0,i);
-        blocks.h_view(bl,nlev+1,2*nlev,i) = ameshp_normals_.h_view(1,i);
-        blocks.h_view(bl,0,2*nlev+1,i)    = blocks.h_view(bl,0,2*nlev,i);
+  auto blocks_n = amesh_normals_;
+  // TODO (@gnwong, @pdmullen) make this prettier?
+  for (int i=0; i<3; ++i) {
+    for (int bl=0; bl<5; ++bl) {
+      for (int k=0; k<nlev; ++k) {
+        blocks_n.h_view(bl,0,k+1,i)           = blocks_n.h_view((bl+4)%5,k+1,1,i);
+        blocks_n.h_view(bl,0,k+nlev+1,i)      = blocks_n.h_view((bl+4)%5,nlev,k+1,i);
+        blocks_n.h_view(bl,k+1,2*nlev+1,i)    = blocks_n.h_view((bl+4)%5,nlev,k+nlev+1,i);
+        blocks_n.h_view(bl,k+2,0,i)           = blocks_n.h_view((bl+1)%5,1,k+1,i);
+        blocks_n.h_view(bl,nlev+1,k+1,i)      = blocks_n.h_view((bl+1)%5,1,k+nlev+1,i);
+        blocks_n.h_view(bl,nlev+1,k+nlev+1,i) = blocks_n.h_view((bl+1)%5,k+2,2*nlev,i);
       }
+      blocks_n.h_view(bl,1,0,i)           = ameshp_normals_.h_view(0,i);
+      blocks_n.h_view(bl,nlev+1,2*nlev,i) = ameshp_normals_.h_view(1,i);
+      blocks_n.h_view(bl,0,2*nlev+1,i)    = blocks_n.h_view(bl,0,2*nlev,i);
     }
   }
 }
 
-void Radiation::ComputeXiEta(int lm, double xi[6], double eta[6]) const {
-  // TODO could assert here
-
-  double x0, y0, z0;
+void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6]) const {
+  // TODO(@gnwong, @pdmullen) could assert here
+  Real x0, y0, z0;
   GetGridCartPosition(lm, &x0,&y0,&z0);
   
   int nvec[6];
   int nn = GetNeighbors(lm, nvec);
   
-  double A_angle = 0;
+  Real a_angle = 0;
   
-  for (int nb = 0; nb < nn; ++nb){
+  for (int nb = 0; nb < nn; ++nb) {
   
-    double xn1, yn1, zn1;
-    double xn2, yn2, zn2;
+    Real xn1, yn1, zn1;
+    Real xn2, yn2, zn2;
     
     GetGridCartPosition(nvec[nb],         &xn1,&yn1,&zn1);
     GetGridCartPosition(nvec[(nb + 1)%nn],&xn2,&yn2,&zn2);
           
-    double n1_x = y0*zn1 - yn1*z0;
-    double n1_y = z0*xn1 - zn1*x0;
-    double n1_z = x0*yn1 - xn1*y0;
+    Real n1_x = y0*zn1 - yn1*z0;
+    Real n1_y = z0*xn1 - zn1*x0;
+    Real n1_z = x0*yn1 - xn1*y0;
  
-    double n2_x = y0*zn2 - yn2*z0;
-    double n2_y = z0*xn2 - zn2*x0;
-    double n2_z = x0*yn2 - xn2*y0;
+    Real n2_x = y0*zn2 - yn2*z0;
+    Real n2_y = z0*xn2 - zn2*x0;
+    Real n2_z = x0*yn2 - xn2*y0;
 
-    double norm1 = std::sqrt(n1_x*n1_x+n1_y*n1_y+n1_z*n1_z);
-    double norm2 = std::sqrt(n2_x*n2_x+n2_y*n2_y+n2_z*n2_z);
+    Real norm1 = sqrt(SQR(n1_x)+SQR(n1_y)+SQR(n1_z));
+    Real norm2 = sqrt(SQR(n2_x)+SQR(n2_y)+SQR(n2_z));
 
-    double cosA = std::min((n1_x*n2_x+n1_y*n2_y+n1_z*n2_z)/(norm1*norm2),1.0);
+    Real cos_a = fmin((n1_x*n2_x+n1_y*n2_y+n1_z*n2_z)/(norm1*norm2),1.0);
 
-    double scalprod_c1 = x0*xn1 + y0*yn1 + z0*zn1;
+    Real scalprod_c1 = x0*xn1 + y0*yn1 + z0*zn1;
 
-    double c_len = std::acos(scalprod_c1);
+    Real c_len = acos(scalprod_c1);
     
-    xi[nb] = c_len*std::cos(A_angle);
-    eta[nb] = c_len*std::sin(A_angle);
+    xi[nb] = c_len*cos(a_angle);
+    eta[nb] = c_len*sin(a_angle);
           
-    A_angle += std::acos(cosA);
-    
+    a_angle += acos(cos_a);
   }
   
-  if (nn == 5){
-    xi[5] = std::numeric_limits<double>::quiet_NaN();
-    eta[5] = std::numeric_limits<double>::quiet_NaN();
+  // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
+  // We should not being using std library.  Setting to -1.0 for now.
+  if (nn==5) {
+    // xi[5] = std::numeric_limits<Real>::quiet_NaN();
+    // eta[5] = std::numeric_limits<Real>::quiet_NaN();
+    xi[5] = -1.0;
+    eta[5] = -1.0;
   }
-
 }
 
 
-double Radiation::ArcLength(int ic1, int ic2) const {
-
-  double x1, y1, z1;
+Real Radiation::ArcLength(int ic1, int ic2) const {
+  Real x1, y1, z1;
   GetGridCartPosition(ic1,&x1,&y1,&z1);
 
-  double x2, y2, z2;
+  Real x2, y2, z2;
   GetGridCartPosition(ic2,&x2,&y2,&z2);
 
-  return std::acos(x1*x2+y1*y2+z1*z2);
+  return acos(x1*x2+y1*y2+z1*z2);
 }
 
 } // namespace radiation
