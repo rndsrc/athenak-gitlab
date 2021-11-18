@@ -111,7 +111,7 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim)
 
       // Extract components of metric
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, false,
+      ComputeMetricAndInverse(x1v, x2v, x3v, false, coord.snake,
                               coord.bh_mass, coord.bh_spin, g_, gi_);
 
       // Only execute cons2prim if outside excised region
@@ -289,7 +289,7 @@ void IdealGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &
       Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
       Real g_[NMETRIC], gi_[NMETRIC];
-      ComputeMetricAndInverse(x1v, x2v, x3v, false,
+      ComputeMetricAndInverse(x1v, x2v, x3v, false, coord.snake,
                               coord.bh_mass, coord.bh_spin, g_, gi_);
 
       const Real
