@@ -61,9 +61,9 @@ void Radiation::AngularMeshBoundaries()
 
       Real rad = sqrt(SQR(x1v)+SQR(x2v)+SQR(x3v));
 
-      // Excusion radius
-      if (rad < coord.bh_rmin) {
-        for (int n=0; n<nangles; ++n) {
+      // Zero intensity if inside excision radius or less than 0
+      for (int n=0; n<nangles; ++n) {
+        if (rad < coord.bh_rmin || i0_(m,n,k,j,i) < 0.0) {
           i0_(m,n,k,j,i) = 0.0;
         }
       }
