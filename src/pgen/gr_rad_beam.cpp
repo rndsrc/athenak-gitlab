@@ -4,7 +4,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file gr_rad_beam.cpp
-//  \brief Beam test for radiation (in flat space)
+//  \brief Beam test for radiation
 
 // C++ headers
 #include <algorithm>  // min, max

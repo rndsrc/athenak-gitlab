@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file gr_rad_beam.cpp
-//  \brief Beam test for radiation (in flat space)
+//! \file gr_rad_hohlraum.cpp
+//  \brief Hohlraum test (flat space)
 
 // C++ headers
 #include <algorithm>  // min, max
