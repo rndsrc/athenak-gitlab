@@ -34,8 +34,7 @@ void Radiation::AngularMeshBoundaries()
   int &ks = indcs.ks; int &ke = indcs.ke;
 
   auto &aindcs = pmy_pack->prad->amesh_indcs;
-  int zs = aindcs.zs; int ze = aindcs.ze;
-  int ps = aindcs.ps; int pe = aindcs.pe;
+  int nangles = aindcs.nangles;
 
   int &nmb = pmy_pack->nmb_thispack;
   auto coord = pmy_pack->coord.coord_data;
@@ -62,46 +61,10 @@ void Radiation::AngularMeshBoundaries()
 
       Real rad = sqrt(SQR(x1v)+SQR(x2v)+SQR(x3v));
 
-      // Excusion radius
-      if (rad < coord.bh_rmin) {
-        for (int n=0; n<nangles; ++n) {
+      // Zero intensity if inside excision radius or less than 0
+      for (int n=0; n<nangles; ++n) {
+        if (rad < coord.bh_rmin || i0_(m,n,k,j,i) < 0.0) {
           i0_(m,n,k,j,i) = 0.0;
-        }
-      }
-
-      // Populate angular ghost zones in azimuthal angle
-      for (int z=zs; z<=ze; ++z) {
-        for (int p=ps-aindcs.ng; p<=ps-1; ++p) {
-          int p_src = pe - ps + 1 + p;
-          int zp = AngleInd(z,p,false,false,aindcs);
-          int zp_src = AngleInd(z,p_src,false,false,aindcs);
-          i0_(m,zp,k,j,i) = i0_(m,zp_src,k,j,i);
-        }
-        for (int p=pe+1; p<=pe+aindcs.ng; ++p) {
-          int p_src = ps - pe - 1 + p;
-          int zp = AngleInd(z,p,false,false,aindcs);
-          int zp_src = AngleInd(z,p_src,false,false,aindcs);
-          i0_(m,zp,k,j,i) = i0_(m,zp_src,k,j,i);
-        }
-      }
-
-      // Populate angular ghost zones in polar angle
-      for (int z=zs-aindcs.ng; z<=zs-1; ++z) {
-        for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
-          int z_src = 2*zs - 1 - z;
-          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
-          int zp = AngleInd(z,p,false,false,aindcs);
-          int zp_src = AngleInd(z_src,p_src,false,false,aindcs);
-          i0_(m,zp,k,j,i) = i0_(m,zp_src,k,j,i);
-        }
-      }
-      for (int z=ze+1; z<=ze+aindcs.ng; ++z) {
-        for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
-          int z_src = 2*ze + 1 - z;
-          int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
-          int zp = AngleInd(z,p,false,false,aindcs);
-          int zp_src = AngleInd(z_src,p_src,false,false,aindcs);
-          i0_(m,zp,k,j,i) = i0_(m,zp_src,k,j,i);
         }
       }
     }
