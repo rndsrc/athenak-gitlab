@@ -82,6 +82,9 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage)
       Real max_dv1 = 0.0, max_dv2 = 0.0, max_dv3 = 0.0;
 
       if (is_general_relativistic_) {
+        // ERM: Setting max_dv*=1 should be safe for Cartesian KS, however, for
+        // other metrics containing large shift terms, a more involved computation
+        // of the timestep is required.  See MR !11.
         max_dv1 = 1.0;
         max_dv2 = 1.0;
         max_dv3 = 1.0;
