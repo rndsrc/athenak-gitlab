@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file gr_rad_beam.cpp
-//  \brief Beam test for radiation (in flat space)
+//! \file gr_rad_hohlraum.cpp
+//  \brief Hohlraum test (flat space)
 
 // C++ headers
 #include <algorithm>  // min, max
@@ -48,8 +48,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &ks = indcs.ks; int &ke = indcs.ke;
 
   auto &aindcs = pmbp->prad->amesh_indcs;
-  int &zs = aindcs.zs; int &ze = aindcs.ze;
-  int &ps = aindcs.ps; int &pe = aindcs.pe;
+  nangles_ = aindcs.nangles;
 
   auto &i0 = pmbp->prad->i0;
   int nmb1 = (pmbp->nmb_thispack-1);
@@ -61,14 +60,12 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   ii_ox2 = pin->GetReal("problem", "ii_ox2") / (4.*M_PI);
   ii_ix3 = pin->GetReal("problem", "ii_ix3") / (4.*M_PI);
   ii_ox3 = pin->GetReal("problem", "ii_ox3") / (4.*M_PI);
-  nangles_ = pmbp->prad->nangles;
 
-  par_for("rad_beam",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i)
+  par_for("rad_beam",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
     {
       // radiation field
-      int zp = AngleInd(z,p,false,false,aindcs);
-      i0(m,zp,k,j,i) = 0.0;
+      i0(m,lm,k,j,i) = 0.0;
     }
   );
 

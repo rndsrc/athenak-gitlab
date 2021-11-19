@@ -126,6 +126,8 @@ using DualArray2D = Kokkos::DualView<T **, LayoutWrapper, DevMemSpace>;
 template <typename T>
 using DualArray3D = Kokkos::DualView<T ***, LayoutWrapper, DevMemSpace>;
 template <typename T>
+using DualArray4D = Kokkos::DualView<T ****, LayoutWrapper, DevMemSpace>;
+template <typename T>
 using DualArray6D = Kokkos::DualView<T ******, LayoutWrapper, DevMemSpace>;
 template <typename T>
 using DualArray7D = Kokkos::DualView<T *******, LayoutWrapper, DevMemSpace>;

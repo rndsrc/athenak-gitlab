@@ -17,7 +17,7 @@
 //! \brief computes covariant and contravariant components of Cartesian tetrad for CKS
 
 KOKKOS_INLINE_FUNCTION
-void ComputeTetrad(Real x, Real y, Real z, Real m, Real a,
+void ComputeTetrad(Real x, Real y, Real z, bool snake, Real m, Real a,
                    Real e[][4], Real ecov[][4], Real omega[][4][4])
 {
   // calculate coordinate quantities
@@ -96,6 +96,46 @@ void ComputeTetrad(Real x, Real y, Real z, Real m, Real a,
   gi[3][1] = -f * lu3*lu1;
   gi[3][2] = -f * lu3*lu2;
   gi[3][3] = -f * lu3*lu3 + 1.0;
+
+  if (snake) {
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
+    // Set covariant metric
+    g[0][0] = -1.0;
+    g[0][1] = 0.0;
+    g[0][2] = 0.0;
+    g[0][3] = 0.0;
+    g[1][0] = 0.0;
+    g[1][1] = 1.0;
+    g[1][2] = a*m*M_PI*cos(m*M_PI*y);
+    g[1][3] = 0.0;
+    g[2][0] = 0.0;
+    g[2][1] = a*m*M_PI*cos(m*M_PI*y);
+    g[2][2] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
+    g[2][3] = 0.0;
+    g[3][0] = 0.0;
+    g[3][1] = 0.0;
+    g[3][2] = 0.0;
+    g[3][3] = 1.0;
+
+    // Set contravariant metric
+    gi[0][0] = -1.0;
+    gi[0][1] = 0.0;
+    gi[0][2] = 0.0;
+    gi[0][3] = 0.0;
+    gi[1][0] = 0.0;
+    gi[1][1] = 1.0 + SQR(a*m*M_PI*cos(m*M_PI*y));
+    gi[1][2] = -a*m*M_PI*cos(m*M_PI*y);
+    gi[1][3] = 0.0;
+    gi[2][0] = 0.0;
+    gi[2][1] = -a*m*M_PI*cos(m*M_PI*y);
+    gi[2][2] = 1.0;
+    gi[2][3] = 0.0;
+    gi[3][0] = 0.0;
+    gi[3][1] = 0.0;
+    gi[3][2] = 0.0;
+    gi[3][3] = 1.0;
+  }
 
   // Set derivatives of covariant metric
   Real qa = 2.0*SQR(r) - SQR(rad) + SQR(a);
@@ -190,6 +230,78 @@ void ComputeTetrad(Real x, Real y, Real z, Real m, Real a,
   dg[3][3][2] = df_dx3*ll3*ll2 + f*dl3_dx3*ll2 + f*ll3*dl2_dx3;
   dg[3][3][3] = df_dx3*ll3*ll3 + f*dl3_dx3*ll3 + f*ll3*dl3_dx3;
 
+  if (snake) {
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
+    dg[0][0][0] = 0.0;
+    dg[0][0][1] = 0.0;
+    dg[0][0][2] = 0.0;
+    dg[0][0][3] = 0.0;
+    dg[0][1][0] = 0.0;
+    dg[0][1][1] = 0.0;
+    dg[0][1][2] = 0.0;
+    dg[0][1][3] = 0.0;
+    dg[0][2][0] = 0.0;
+    dg[0][2][1] = 0.0;
+    dg[0][2][2] = 0.0;
+    dg[0][2][3] = 0.0;
+    dg[0][3][0] = 0.0;
+    dg[0][3][1] = 0.0;
+    dg[0][3][2] = 0.0;
+    dg[0][3][3] = 0.0;
+
+    dg[1][0][0] = 0.0;
+    dg[1][0][1] = 0.0;
+    dg[1][0][2] = 0.0;
+    dg[1][0][3] = 0.0;
+    dg[1][1][0] = 0.0;
+    dg[1][1][1] = 0.0;
+    dg[1][1][2] = 0.0;
+    dg[1][1][3] = 0.0;
+    dg[1][2][0] = 0.0;
+    dg[1][2][1] = 0.0;
+    dg[1][2][2] = 0.0;
+    dg[1][2][3] = 0.0;
+    dg[1][3][0] = 0.0;
+    dg[1][3][1] = 0.0;
+    dg[1][3][2] = 0.0;
+    dg[1][3][3] = 0.0;
+
+    dg[2][0][0] = 0.0;
+    dg[2][0][1] = 0.0;
+    dg[2][0][2] = 0.0;
+    dg[2][0][3] = 0.0;
+    dg[2][1][0] = 0.0;
+    dg[2][1][1] = 0.0;
+    dg[2][1][2] = -a*SQR(m*M_PI)*sin(m*M_PI*y);
+    dg[2][1][3] = 0.0;
+    dg[2][2][0] = 0.0;
+    dg[2][2][1] = -a*SQR(m*M_PI)*sin(m*M_PI*y);
+    dg[2][2][2] = -SQR(a)*SQR(m*M_PI)*m*M_PI*sin(2*m*M_PI*y);
+    dg[2][2][3] = 0.0;
+    dg[2][3][0] = 0.0;
+    dg[2][3][1] = 0.0;
+    dg[2][3][2] = 0.0;
+    dg[2][3][3] = 0.0;
+
+    dg[3][0][0] = 0.0;
+    dg[3][0][1] = 0.0;
+    dg[3][0][2] = 0.0;
+    dg[3][0][3] = 0.0;
+    dg[3][1][0] = 0.0;
+    dg[3][1][1] = 0.0;
+    dg[3][1][2] = 0.0;
+    dg[3][1][3] = 0.0;
+    dg[3][2][0] = 0.0;
+    dg[3][2][1] = 0.0;
+    dg[3][2][2] = 0.0;
+    dg[3][2][3] = 0.0;
+    dg[3][3][0] = 0.0;
+    dg[3][3][1] = 0.0;
+    dg[3][3][2] = 0.0;
+    dg[3][3][3] = 0.0;
+  }
+
   // Set Cartesian tetrad
   Real wa = sqrt(1.0+f);
   Real wb = sqrt(1.0+f*(SQR(ll1)+SQR(ll2)));
@@ -214,6 +326,27 @@ void ComputeTetrad(Real x, Real y, Real z, Real m, Real a,
   e[3][1] = -f*iwa*iwb*ll1*ll3;
   e[3][2] = -f*iwa*iwb*ll2*ll3;
   e[3][3] = iwa*wb;
+
+  if (snake) {
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
+    e[0][0] = 1.0;
+    e[0][1] = 0.0;
+    e[0][2] = 0.0;
+    e[0][3] = 0.0;
+    e[1][0] = 0.0;
+    e[1][1] = 1.0;
+    e[1][2] = 0.0;
+    e[1][3] = 0.0;
+    e[2][0] = 0.0;
+    e[2][1] = -a*m*M_PI*cos(m*M_PI*y);
+    e[2][2] = 1.0;
+    e[2][3] = 0.0;
+    e[3][0] = 0.0;
+    e[3][1] = 0.0;
+    e[3][2] = 0.0;
+    e[3][3] = 1.0;
+  }
 
   // set derivatives of tetrad
   Real dwa_dx1 = 0.5*iwa*df_dx1;
@@ -305,6 +438,79 @@ void ComputeTetrad(Real x, Real y, Real z, Real m, Real a,
                  + (-iwa*iwb*df_dx3 + f*iwasq*iwb*dwa_dx3 + f*iwa*iwbsq*dwb_dx3)*ll2*ll3);
   de[3][3][3] = iwa*dwb_dx3 - iwasq*wb*dwa_dx3;
 
+
+  if (snake) {
+    // @pdmullen: I'm going to cheat... Let the black hole mass m and spin a control
+    // the magnitude and wavelength of the sinusdoidal perturbation, respectively.
+    de[0][0][0] = 0.0;
+    de[0][0][1] = 0.0;
+    de[0][0][2] = 0.0;
+    de[0][0][3] = 0.0;
+    de[0][1][0] = 0.0;
+    de[0][1][1] = 0.0;
+    de[0][1][2] = 0.0;
+    de[0][1][3] = 0.0;
+    de[0][2][0] = 0.0;
+    de[0][2][1] = 0.0;
+    de[0][2][2] = 0.0;
+    de[0][2][3] = 0.0;
+    de[0][3][0] = 0.0;
+    de[0][3][1] = 0.0;
+    de[0][3][2] = 0.0;
+    de[0][3][3] = 0.0;
+
+    de[1][0][0] = 0.0;
+    de[1][0][1] = 0.0;
+    de[1][0][2] = 0.0;
+    de[1][0][3] = 0.0;
+    de[1][1][0] = 0.0;
+    de[1][1][1] = 0.0;
+    de[1][1][2] = 0.0;
+    de[1][1][3] = 0.0;
+    de[1][2][0] = 0.0;
+    de[1][2][1] = 0.0;
+    de[1][2][2] = 0.0;
+    de[1][2][3] = 0.0;
+    de[1][3][0] = 0.0;
+    de[1][3][1] = 0.0;
+    de[1][3][2] = 0.0;
+    de[1][3][3] = 0.0;
+
+    de[2][0][0] = 0.0;
+    de[2][0][1] = 0.0;
+    de[2][0][2] = 0.0;
+    de[2][0][3] = 0.0;
+    de[2][1][0] = 0.0;
+    de[2][1][1] = 0.0;
+    de[2][1][2] = 0.0;
+    de[2][1][3] = 0.0;
+    de[2][2][0] = 0.0;
+    de[2][2][1] = a*SQR(m*M_PI)*sin(m*M_PI*y);
+    de[2][2][2] = 0.0;
+    de[2][2][3] = 0.0;
+    de[2][3][0] = 0.0;
+    de[2][3][1] = 0.0;
+    de[2][3][2] = 0.0;
+    de[2][3][3] = 0.0;
+
+
+    de[3][0][0] = 0.0;
+    de[3][0][1] = 0.0;
+    de[3][0][2] = 0.0;
+    de[3][0][3] = 0.0;
+    de[3][1][0] = 0.0;
+    de[3][1][1] = 0.0;
+    de[3][1][2] = 0.0;
+    de[3][1][3] = 0.0;
+    de[3][2][0] = 0.0;
+    de[3][2][1] = 0.0;
+    de[3][2][2] = 0.0;
+    de[3][2][3] = 0.0;
+    de[3][3][0] = 0.0;
+    de[3][3][1] = 0.0;
+    de[3][3][2] = 0.0;
+    de[3][3][3] = 0.0;
+  }
 
   // Calculate covariant tetrad
   for (int i = 0; i < 4; ++i) {
