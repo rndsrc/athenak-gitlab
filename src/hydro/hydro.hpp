@@ -17,6 +17,7 @@
 class EquationOfState;
 class Coordinates;
 class Viscosity;
+class Conduction;
 class SourceTerms;
 class Driver;
 
@@ -81,8 +82,9 @@ public:
   BValCC *pbval_u;
   HydroBoundaryFnPtr HydroBoundaryFunc[6];
 
-  // Object(s) for extra physics (viscosity, srcterms)
+  // Object(s) for extra physics (viscosity, thermal conduction, srcterms)
   Viscosity *pvisc = nullptr;
+  Conduction *pconduc = nullptr;
   SourceTerms *psrc = nullptr;
 
   // following only used for time-evolving flow

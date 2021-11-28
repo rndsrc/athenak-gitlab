@@ -19,6 +19,7 @@ add_executable(
 
         diffusion/resistivity.cpp
         diffusion/viscosity.cpp
+        diffusion/conduction.cpp
 
         driver/driver.cpp
 
