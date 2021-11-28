@@ -37,6 +37,7 @@ class SourceTerms
   bool const_accel;
   bool shearing_box;
   bool ism_cooling;
+  bool cooling;
 
   // magnitude and direction of constant accel
   Real const_accel_val;
@@ -54,9 +55,12 @@ class SourceTerms
   void AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                       const DvceArray5D<Real> &bcc, const Real dt);
   void AddSBoxEField(const DvceFaceFld4D<Real> &b0, DvceEdgeFld4D<Real> &efld);
+  void AddCoolingTerm(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
 
  private:
   MeshBlockPack* pmy_pack;
 };
+// TODO: finally remove this!!!
+Real CoolFn(Real temp);
 
 #endif // SRCTERMS_SRCTERMS_HPP_

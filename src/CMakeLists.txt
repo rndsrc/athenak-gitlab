@@ -83,6 +83,7 @@ add_executable(
 
         utils/change_rundir.cpp
         utils/show_config.cpp
+        utils/units.cpp
 )
 
 # custom problem generator to be included in compile
