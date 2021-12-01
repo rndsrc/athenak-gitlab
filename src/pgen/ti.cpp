@@ -3,7 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file therm_instab_nonlinear.cpp
+//! \file ti.cpp
 //! \brief Problem generator for nonlinear thermal instability
 
 #include "athena.hpp"

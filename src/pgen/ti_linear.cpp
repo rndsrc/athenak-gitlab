@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file therm_instab_linear.cpp
-//! \brief Problem generator for linear thermal instability
+//! \file ti_linear.cpp
+//! \brief Problem generator for linear thermal instability with thermal conduction
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -14,6 +14,7 @@
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "pgen.hpp"
+#include "diffusion/conduction.hpp"
 #include "srcterms/srcterms.hpp"
 #include "globals.hpp"
 #include "utils/units.hpp" 
@@ -24,11 +25,12 @@ static Real DLnLambdaDLnT(Real rho, Real temp);
 
 // calculate growth rate of perturbation
 static Real SolveCubic(const Real b, const Real c, const Real d);
-static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas, const Real k);
+static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas,
+                                         const Real kappa_iso, const Real k);
 
 //----------------------------------------------------------------------------------------
 //! \fn void ProblemGenerator::UserProblem()
-//! \brief Problem Generator for linear thermal instability
+//! \brief Problem Generator for linear thermal instability with conduction
 
 void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 {
@@ -57,9 +59,18 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   // velocity unit in unit of km/s
   Real vunit = pin->GetOrAddReal("problem","vunit",1.0)*physical_constants::kms; 
   units::punit->UpdateUnits(dunit, lunit, vunit, mu);
-
+  
   // Get temperature in Kelvin
   Real temp = pin->GetOrAddReal("problem","temp",1.0);
+
+  //Get thermal conductivity of isotropic thermal conduction
+  //Now only for hydro, mhd can be added in similar way
+  Real kappa_iso = 0.0;
+  if (pmbp->phydro->pconduc != nullptr) {
+    kappa_iso = pmbp->phydro->pconduc->kappa_iso;
+  } else {
+    kappa_iso = 0.0;
+  }
   
   //Find the equilibrium point of the cooling curve by n*Lambda-Gamma=0
   Real number_density=2.0e-26/CoolFn(temp);
@@ -91,23 +102,18 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     Real amp = pin->GetOrAddReal("problem","amplitude",1.0e-3);
     Real kx = 2.0*M_PI/(wave_len);
     // Calculate growth rate, omega in the linear perturbation theory
-    Real om = ThermalInstabilityGrowthRate(rho_0,pgas_0,kx);
+    Real om = ThermalInstabilityGrowthRate(rho_0,pgas_0,kappa_iso,kx);
 
+    
     // Print info
     if (global_variable::my_rank == 0) {
       std::cout << "  k = " << kx << std::endl;
       std::cout << "  omega = " << om << std::endl;
-      std::cout << "============= omega for different k  ==============" << std::endl;
-      for (int i=0; i<100; i++){
-        Real kx_tmp = 2.0*M_PI*i*i/100.0;
-        Real om_tmp = ThermalInstabilityGrowthRate(rho_0,pgas_0,kx_tmp);
-        std::cout << " k = " << kx_tmp << " omega = " << om_tmp << std::endl;
-      }
     }
     // End print info
 
     // Set initial conditions
-    par_for("pgen_thermal_instability", DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
+    par_for("pgen_ti_linear", DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
       KOKKOS_LAMBDA(int m, int k, int j, int i)
       {
         Real &x1min = size.d_view(m).x1min;
@@ -230,7 +236,8 @@ static Real SolveCubic(const Real b, const Real c, const Real d) {
 //! - input rho, pgas, and k are in code Units
 //! - output growth rate of instability in code Units
 
-static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas, const Real k) {
+static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas, 
+                                         const Real kappa_iso, const Real k) {
   Real gamma_adiabatic = 5.0/3.0;
   Real gm1 = gamma_adiabatic-1;
   // get Temperature in Kelvin
@@ -248,14 +255,34 @@ static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas, const 
   k_rho *= units::punit->length;
   // cs in code units 
   cs /= units::punit->velocity; 
+  
 
   Real d_ln_lambda_d_ln_temp = DLnLambdaDLnT(rho,temp);
   // k_temp in code units based on derivative
   Real k_temp = k_rho*d_ln_lambda_d_ln_temp;
+
+  // Calculate the term: k^2/k_kappa in code unit
+  Real k2_over_k_kappa = 0.0;
+  if(kappa_iso > 0.0){
+      k2_over_k_kappa = k*k/(pgas*cs/gm1/(temp/units::punit->temperature)/kappa_iso);
+  } else {
+      k2_over_k_kappa = 0.0;
+  }
+
+  if (global_variable::my_rank == 0) {
+      std::cout << "============ ThermalInstabilityGrowthRate =============" << std::endl;
+      std::cout << "  k_temp (code) = " << k_temp << std::endl;
+      std::cout << "  k_rho (code) = " << k_rho << std::endl;
+      std::cout << "  k2_over_k_kappa (code) = " << k2_over_k_kappa << std::endl;
+      std::cout << "  kappa_iso (code) = " << kappa_iso << std::endl;
+      std::cout << "  temperature (c.g.s) = " << temp << std::endl;
+    }
+  
+
   // get coefficients in cubic dispersion relation
-  Real b = cs*k_temp;
+  Real b = cs*(k_temp+k2_over_k_kappa);
   Real c = cs*cs*k*k;
-  Real d = cs*cs*cs*k*k*(k_temp - k_rho)/gamma_adiabatic;
+  Real d = cs*cs*cs*k*k*(k_temp - k_rho + k2_over_k_kappa)/gamma_adiabatic;
   // solve  dispersion relation for the growth rate
   Real growth_rate = SolveCubic(b,c,d);
   return growth_rate;
