@@ -70,7 +70,8 @@ void Units::SetUnitsConstants() {
   time = length/velocity;
   energy_density = pressure = density*velocity*velocity;
   magnetic_field = std::sqrt(4.*M_PI*pressure);
-  temperature = pressure/density*mu*constants::m_hydrogen/constants::k_boltz;
+  temperature = pressure/density*mu*
+                physical_constants::m_hydrogen/physical_constants::k_boltz;
 
   // Set unit_code for converting variables from physical (c.g.s) unit to code unit
   // i.e., var_in_code_unit = var_in_physical_unit * unit_code
@@ -81,16 +82,17 @@ void Units::SetUnitsConstants() {
   erg_code = gram_code*cm_code*cm_code/(second_code*second_code);
   kelvin_code = 1.0/temperature;
 
-  pc_code = constants::pc * cm_code;
-  kpc_code = constants::kpc * cm_code;
-  kms_code = constants::kms * cm_code/second_code;
-  m_hydrogen_code = constants::m_hydrogen * gram_code;
-  k_boltz_code = constants::k_boltz * erg_code/kelvin_code;
+  pc_code = physical_constants::pc * cm_code;
+  kpc_code = physical_constants::kpc * cm_code;
+  kms_code = physical_constants::kms * cm_code/second_code;
+  m_hydrogen_code = physical_constants::m_hydrogen * gram_code;
+  k_boltz_code = physical_constants::k_boltz * erg_code/kelvin_code;
 }
 
-// Initialize the global Units object with default parameters
-Real mu = 0.618;
-Real dunit = mu*constants::m_hydrogen; // density in code units is number density
-Real lunit = 1.0*constants::pc; // length in code units is parsec
-Real vunit = 1.0*constants::kms; // velocity in code units is km/s
-Units *punit = new Units(dunit, lunit, vunit, mu);
+// Initialize the global Units object with c.g.s units
+namespace units {
+  Real dunit = 1.0; // density in code units is 1 g/cm^3
+  Real lunit = 1.0; // length in code units is 1 cm
+  Real vunit = 1.0; // velocity in code units is 1 cm/s
+  Units *punit = new Units(dunit, lunit, vunit);
+}

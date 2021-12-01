@@ -44,20 +44,21 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   // mean particle mass in unit of hydrogen atom mass
   Real mu = pin->GetOrAddReal("problem","mu",0.618);
   // density unit in unit of number density
-  Real dunit = mu*constants::m_hydrogen; 
+  Real dunit = mu*physical_constants::m_hydrogen; 
   // length unit in unit of parsec
-  Real lunit = pin->GetOrAddReal("problem","lunit",1.0)*constants::pc; 
+  Real lunit = pin->GetOrAddReal("problem","lunit",1.0)*physical_constants::pc; 
   // velocity unit in unit of km/s
-  Real vunit = pin->GetOrAddReal("problem","vunit",1.0)*constants::kms; 
-  punit->UpdateUnits(dunit, lunit, vunit, mu);
+  Real vunit = pin->GetOrAddReal("problem","vunit",1.0)*physical_constants::kms; 
+  units::punit->UpdateUnits(dunit, lunit, vunit, mu);
 
   // Get temperature in Kelvin
   Real temp = pin->GetOrAddReal("problem","temp",1.0);
 
   // Find the equilibrium point of the cooling curve by n*Lambda-Gamma=0
   Real number_density=2.0e-26/CoolFn(temp);
-  Real rho_0 = number_density * punit->mu * constants::m_hydrogen / punit->density;
-  Real cs_iso = std::sqrt(temp/punit->temperature);
+  Real rho_0 = number_density*units::punit->mu*
+               physical_constants::m_hydrogen/units::punit->density;
+  Real cs_iso = std::sqrt(temp/units::punit->temperature);
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
@@ -72,7 +73,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
       std::cout << "============== Check Initialization ===============" << std::endl;
       std::cout << "  rho_0 (code) = " << rho_0 << std::endl;
       std::cout << "  sound speed (code) = " << cs << std::endl;
-      std::cout << "  mu = " << punit->mu << std::endl;
+      std::cout << "  mu = " << units::punit->mu << std::endl;
       std::cout << "  temperature (c.g.s) = " << temp << std::endl;
       std::cout << "  cooling function (c.g.s) = " << CoolFn(temp) << std::endl;
     }

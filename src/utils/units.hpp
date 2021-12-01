@@ -12,7 +12,7 @@
 #include "../athena.hpp"
 
 //! \brief Physical constants defined in c.g.s.
-namespace constants {
+namespace physical_constants {
 static const Real pc    = 3.085678e+18;    //Parsec
 static const Real kpc   = 3.085678e+21;    //Kiloparsec
 static const Real kms   = 1.0e+5;          //Kilometer per second
@@ -56,5 +56,9 @@ class Units {
   Real m_hydrogen_code;
   Real k_boltz_code;
 };
-extern Units *punit;
+
+namespace units {
+  extern Units *punit;
+}
+
 #endif // UTILS_UNITS_HPP_

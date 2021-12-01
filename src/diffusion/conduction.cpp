@@ -23,7 +23,8 @@ Conduction::Conduction(std::string block, MeshBlockPack *pp, ParameterInput *pin
 {
   // Read thermal conductivity of isotropic thermal conduction
   // Convert thermal conductivity from c.g.s unit to code unit 
-  Real kappa_code = punit->erg_code/punit->cm_code/punit->kelvin_code/punit->second_code;
+  Real kappa_code = units::punit->erg_code/units::punit->cm_code/
+                    units::punit->kelvin_code/units::punit->second_code;
   kappa_iso = pin->GetReal(block,"kappa_iso")*kappa_code;
   
   // timestep for thermal conduction on MeshBlock(s) in this pack

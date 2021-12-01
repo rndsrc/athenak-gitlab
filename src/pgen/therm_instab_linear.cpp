@@ -51,20 +51,21 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   // mean particle mass in unit of hydrogen atom mass
   Real mu = pin->GetOrAddReal("problem","mu",0.618);
   // density unit in unit of number density
-  Real dunit = mu*constants::m_hydrogen; 
+  Real dunit = mu*physical_constants::m_hydrogen; 
   // length unit in unit of parsec
-  Real lunit = pin->GetOrAddReal("problem","lunit",1.0)*constants::pc; 
+  Real lunit = pin->GetOrAddReal("problem","lunit",1.0)*physical_constants::pc; 
   // velocity unit in unit of km/s
-  Real vunit = pin->GetOrAddReal("problem","vunit",1.0)*constants::kms; 
-  punit->UpdateUnits(dunit, lunit, vunit, mu);
+  Real vunit = pin->GetOrAddReal("problem","vunit",1.0)*physical_constants::kms; 
+  units::punit->UpdateUnits(dunit, lunit, vunit, mu);
 
   // Get temperature in Kelvin
   Real temp = pin->GetOrAddReal("problem","temp",1.0);
   
   //Find the equilibrium point of the cooling curve by n*Lambda-Gamma=0
   Real number_density=2.0e-26/CoolFn(temp);
-  Real rho_0 = number_density * punit->mu * constants::m_hydrogen / punit->density;
-  Real cs_iso = std::sqrt(temp/punit->temperature);  
+  Real rho_0 = number_density*units::punit->mu*
+               physical_constants::m_hydrogen/units::punit->density;
+  Real cs_iso = std::sqrt(temp/units::punit->temperature);  
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
@@ -79,7 +80,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
       std::cout << "============== Check Initialization ===============" << std::endl;
       std::cout << "  rho_0 (code) = " << rho_0 << std::endl;
       std::cout << "  sound speed (code) = " << cs << std::endl;
-      std::cout << "  mu = " << punit->mu << std::endl;
+      std::cout << "  mu = " << units::punit->mu << std::endl;
       std::cout << "  temperature (c.g.s) = " << temp << std::endl;
       std::cout << "  cooling function (c.g.s) = " << CoolFn(temp) << std::endl;
     }
@@ -233,19 +234,20 @@ static Real ThermalInstabilityGrowthRate(const Real rho, const Real pgas, const 
   Real gamma_adiabatic = 5.0/3.0;
   Real gm1 = gamma_adiabatic-1;
   // get Temperature in Kelvin
-  Real temp = pgas/rho*punit->temperature;
+  Real temp = pgas/rho*units::punit->temperature;
   // number density in c.g.s
-  Real n_hydrogen = rho*punit->density/punit->mu/constants::m_hydrogen;
+  Real n_hydrogen = rho*units::punit->density/units::punit->mu/
+                    physical_constants::m_hydrogen;
   // pressure in c.g.s
-  Real press = pgas*punit->pressure;
+  Real press = pgas*units::punit->pressure;
   // sounds spped in c.g.s
-  Real cs = std::sqrt(gamma_adiabatic*pgas/rho)*punit->velocity;
+  Real cs = std::sqrt(gamma_adiabatic*pgas/rho)*units::punit->velocity;
   // krho in c.g.s
   Real k_rho = gm1*n_hydrogen*n_hydrogen*CoolFn(temp)/(press*cs);
   // krho in code units
-  k_rho *= punit->length;
+  k_rho *= units::punit->length;
   // cs in code units 
-  cs /= punit->velocity; 
+  cs /= units::punit->velocity; 
 
   Real d_ln_lambda_d_ln_temp = DLnLambdaDLnT(rho,temp);
   // k_temp in code units based on derivative

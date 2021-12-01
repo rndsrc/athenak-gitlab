@@ -294,15 +294,16 @@ void SourceTerms::AddCoolingTerm(DvceArray5D<Real> &u0, const DvceArray5D<Real> 
   par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
     KOKKOS_LAMBDA(const int m, const int k, const int j, const int i)
     {
-      // Typical normalization assumes:
+      // As a reference, one of typical normalizations assumes:
       // number density unit ~ 1 cm^-3, velocity unit ~ 500km/s, length unit ~ 1kpc
       
       // Temperature in c.g.s unit, typically normalized by ~ 2e7 K
-      Real temp = punit->temperature*w0(m,ITM,k,j,i)/w0(m,IDN,k,j,i)*gm1; 
+      Real temp = units::punit->temperature*w0(m,ITM,k,j,i)/w0(m,IDN,k,j,i)*gm1; 
       // Lambda_cooling in code unit, typically normalized by ~ 1e-22
-      Real lambda_cooling = CoolFn(temp)/(punit->energy_density/punit->time); 
+      Real lambda_cooling = CoolFn(temp)/
+                            (units::punit->energy_density/units::punit->time);
       // ISM heating in code unit, typically normalized by ~ 1e-22
-      Real gamma_heating = 2.0e-26/(punit->energy_density/punit->time);
+      Real gamma_heating = 2.0e-26/(units::punit->energy_density/units::punit->time);
 
       u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) * 
                          (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating);
