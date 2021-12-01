@@ -33,8 +33,7 @@ void Radiation::AngularMeshBoundaries()
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
-  auto &aindcs = pmy_pack->prad->amesh_indcs;
-  int nangles = aindcs.nangles;
+  int nangles_ = nangles;
 
   int &nmb = pmy_pack->nmb_thispack;
   auto coord = pmy_pack->coord.coord_data;
@@ -62,9 +61,9 @@ void Radiation::AngularMeshBoundaries()
       Real rad = sqrt(SQR(x1v)+SQR(x2v)+SQR(x3v));
 
       // Zero intensity if inside excision radius or less than 0
-      for (int n=0; n<nangles; ++n) {
-        if (rad < coord.bh_rmin || i0_(m,n,k,j,i) < 0.0) {
-          i0_(m,n,k,j,i) = 0.0;
+      for (int lm=0; lm<nangles_; ++lm) {
+        if (rad < coord.bh_rmin || i0_(m,lm,k,j,i) < 0.0) {
+          i0_(m,lm,k,j,i) = 0.0;
         }
       }
     }

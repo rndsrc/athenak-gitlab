@@ -37,18 +37,6 @@ struct RadiationTaskIDs
   TaskID clear;
 };
 
-//----------------------------------------------------------------------------------------
-//! \struct RegionIndcs
-//! \brief Cell indices and number of active and ghost cells in the angular mesh
-
-struct AMeshIndcs
-{
-  int nlevel;
-  int nangles;  // TODO(@gnwong, @pdmullen) could generate this from nlevel,
-                // also could use base nlevel member to remove
-                // this struct entirely.
-};
-
 namespace radiation {
 
 //----------------------------------------------------------------------------------------
@@ -67,6 +55,7 @@ public:
   // flags to denote hydro or mhd is enabled
   bool is_hydro_enabled = false;
   bool is_mhd_enabled = false;
+  bool is_rad_source_enabled = false;
 
   ReconstructionMethod recon_method;
   EquationOfState *peos;  // chosen EOS
@@ -74,6 +63,7 @@ public:
 
   int nlevels;  // number of levels in geodesic grid
   int nangles;  // number of angles
+  bool rotate_geo; // rotate geodesic grid (eliminating grid alignment)
 
   DvceArray5D<Real> i0;
   DvceArray5D<Real> moments_coord;
@@ -85,28 +75,27 @@ public:
   DualArray2D<Real> ameshp_normals;
 
   DvceArray6D<Real> nmu;
-  DvceArray6D<Real> n0_n_mu;
+  DvceArray6D<Real> n_mu;
   DvceArray5D<Real> n1_n_0;
   DvceArray5D<Real> n2_n_0;
   DvceArray5D<Real> n3_n_0;
   DvceArray6D<Real> na_n_0;
+  DvceArray6D<Real> norm_to_tet;
 
-  // TODO FIXME get rid of these arrays
+  // TODO(@gnwong) get rid of these arrays
   DualArray3D<Real> amesh_indices;  // includes ghost zones
   DualArray1D<Real> ameshp_indices;
   DualArray1D<int> num_neighbors;
   DualArray2D<int> ind_neighbors;
   DualArray2D<Real> arc_lengths;
 
-  // TODO FIXME almost certainly get rid of these arrays
+  // TODO(@gnwong) almost certainly get rid of these arrays
   DualArray2D<Real> nh_c;
   DualArray3D<Real> nh_f;
   DualArray2D<Real> xi_mn;
   DualArray2D<Real> eta_mn;
 
-  AMeshIndcs amesh_indcs;  // indices of cells in angular mesh
-
-  // Object containing boundary communication buffers and routines for u
+  // Object containing boundary communication buffers and routines for i
   BoundaryValueCC *pbval_ci;
 
   // following only used for time-evolving flow

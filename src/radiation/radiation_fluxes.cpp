@@ -24,9 +24,9 @@ namespace radiation {
 
 KOKKOS_INLINE_FUNCTION
 void SpatialFlux(TeamMember_t const &member,
-     const int m, const int k, const int j,  const int il, const int iu,
-     const DvceArray5D<Real> nn, struct AMeshIndcs aindcs,
-     const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx);
+     const int m, const int k, const int j,  const int il, const int iu, int nvar,
+     const DvceArray5D<Real> nn, const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir,
+     DvceArray5D<Real> flx);
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Radiation::CalcFluxes
@@ -39,8 +39,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
-
-  auto &aindcs = amesh_indcs;
   
   int nvars = nangles;
   int nmb1 = pmy_pack->nmb_thispack - 1;
@@ -89,8 +87,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
       member.team_barrier();
 
       // compute fluxes over [is,ie+1]
-      SpatialFlux(member, m, k, j, is, ie+1,
-                  n1_n_0_, aindcs, iil, iir, flx1);
+      SpatialFlux(member, m, k, j, is, ie+1, nvars, n1_n_0_, iil, iir, flx1);
       member.team_barrier();
 
     }
@@ -142,8 +139,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
           // compute fluxes over [js,je+1].  RS returns flux in input iir array
           if (j>(js-1)) {
-            SpatialFlux(member, m, k, j, is, ie,
-                        n2_n_0_, aindcs, iil, iir, flx2);
+            SpatialFlux(member, m, k, j, is, ie, nvars, n2_n_0_, iil, iir, flx2);
             member.team_barrier();
           }
   
@@ -198,8 +194,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
           // compute fluxes over [ks,ke+1].  RS returns flux in input iir array
           if (k>(ks-1)) {
-            SpatialFlux(member, m, k, j, is, ie,
-                        n3_n_0_, aindcs, iil, iir, flx3);
+            SpatialFlux(member, m, k, j, is, ie, nvars, n3_n_0_, iil, iir, flx3);
             member.team_barrier();
           }
 
@@ -220,7 +215,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
       Real s_xi, s_eta;
       int nb_1, nb_2;
 
-      for (int lm=0; lm<nangles; ++lm){
+      for (int lm=0; lm<nvars; ++lm) {
         Real im = i0_(m,lm,k,j,i);
 
         Real s_mapr_av = 1.0e16;
@@ -229,8 +224,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
         int neighbors[6];
         int num_neighbors = GetNeighbors(lm, neighbors);
 
-        for (int nb=0; nb<num_neighbors; ++nb){
-
+        for (int nb=0; nb<num_neighbors; ++nb) {
           nb_1 = nb;
           nb_2 = (nb+1)%num_neighbors;
 
@@ -254,7 +248,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
         for (int nb=0; nb<num_neighbors; ++nb) {
           Real i_edge = (im + 0.5*s_mapr_xi*xi_mn_.d_view(lm,nb_1)
                          + 0.5*s_mapr_eta*eta_mn_.d_view(lm,nb_1));
-          flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb) * i_edge;
+          flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb)*i_edge;
         }
 
       }
@@ -270,18 +264,17 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
 KOKKOS_INLINE_FUNCTION
 void SpatialFlux(TeamMember_t const &member,
-     const int m, const int k, const int j,  const int il, const int iu,
-     const DvceArray5D<Real> nn, struct AMeshIndcs aindcs,
-     const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir, DvceArray5D<Real> flx)
+     const int m, const int k, const int j,  const int il, const int iu, int nvar,
+     const DvceArray5D<Real> nn, const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir,
+     DvceArray5D<Real> flx)
 {
   par_for_inner(member, il, iu, [&](const int i)
   {
     // TODO(@gnwong, @pdmullen) think about a unified layout for spatial/angular fluxes
-    for (int lm=0; lm < aindcs.nangles; ++lm) {
-      flx(m,lm,k,j,i) = (nn(m,lm,k,j,i) * (nn(m,lm,k,j,i) < 0.0 ? iil(lm,i) : iir(lm,i)));
+    for (int lm=0; lm<nvar; ++lm) {
+      flx(m,lm,k,j,i) = (nn(m,lm,k,j,i)*(nn(m,lm,k,j,i) < 0.0 ? iil(lm,i) : iir(lm,i)));
     }
   });
-
   return;
 }
 

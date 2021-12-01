@@ -15,6 +15,8 @@
 #include "radiation/radiation.hpp"
 #include "eos/eos.hpp"
 
+#include <typeinfo>
+
 namespace radiation {
 
 //----------------------------------------------------------------------------------------
@@ -41,7 +43,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowInnerX1(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x1](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x1](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -53,7 +56,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowOuterX1(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x1](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x1](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -68,7 +72,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowInnerX2(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x2](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x2](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -80,7 +85,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowOuterX2(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x2](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x2](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -95,7 +101,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowInnerX3(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x3](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::inner_x3](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -107,7 +114,8 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
         OutflowOuterX3(m);
         break;
       case BoundaryFlag::user:
-        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x3](m, coord, eos, i0_);
+        pmy_pack->pmesh->BoundaryFunc[BoundaryFace::outer_x3](m, coord, eos, i0_,
+                                                              false, true);
         break;
       default:
         break;
@@ -115,4 +123,5 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
   }
   return TaskStatus::complete;
 }
+
 } // namespace radiation

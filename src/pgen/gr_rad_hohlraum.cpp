@@ -26,15 +26,20 @@
 //! \fn void MeshBlock::UserProblem(ParameterInput *pin)
 //  \brief Sets initial conditions for GR radiation beam test
 
-void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
-void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
-void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
-void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
-void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
-void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i);
+void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
+void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
+void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
+void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
+void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
+void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &i,
+                     bool hydro_flag, bool rad_flag);
 
 int nangles_;
-Real erad;            // initial radiation energy density
 Real ii_ix1, ii_ox1;  // x1-boundary radiation intensities
 Real ii_ix2, ii_ox2;  // x2-boundary radiation intensities
 Real ii_ix3, ii_ox3;  // x3-boundary radiation intensities
@@ -47,13 +52,11 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
-  auto &aindcs = pmbp->prad->amesh_indcs;
-  nangles_ = aindcs.nangles;
+  nangles_ = pmbp->prad->nangles;
 
   auto &i0 = pmbp->prad->i0;
   int nmb1 = (pmbp->nmb_thispack-1);
 
-  erad = pin->GetReal("problem", "erad");
   ii_ix1 = pin->GetReal("problem", "ii_ix1") / (4.*M_PI);
   ii_ox1 = pin->GetReal("problem", "ii_ox1") / (4.*M_PI);
   ii_ix2 = pin->GetReal("problem", "ii_ix2") / (4.*M_PI);
@@ -97,7 +100,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 //  \brief Sets boundary condition on inner X1 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -105,14 +109,17 @@ void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &is = indcs.is;
 
-  par_for("hohlraum_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,k,j,(is-i-1)) = ii_ix1;
+  if (rad_flag) {
+    par_for("hohlraum_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,k,j,(is-i-1)) = ii_ix1;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 
@@ -121,7 +128,8 @@ void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 //  \brief Sets boundary condition on outer X1 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -129,14 +137,17 @@ void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &ie = indcs.ie;
 
-  par_for("hohlraum_ox1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,k,j,(ie+i+1)) = ii_ox1;
+  if (rad_flag) {
+    par_for("hohlraum_ox1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,k,j,(ie+i+1)) = ii_ox1;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 
@@ -145,7 +156,8 @@ void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 //  \brief Sets boundary condition on inner X2 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -153,14 +165,17 @@ void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &js = indcs.js;
 
-  par_for("hohlraum_ix2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,k,(js-j-1),i) = ii_ix2;
+  if (rad_flag) {
+    par_for("hohlraum_ix2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,k,(js-j-1),i) = ii_ix2;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 
@@ -169,7 +184,8 @@ void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 //  \brief Sets boundary condition on outer X2 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -177,14 +193,17 @@ void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int &je = indcs.je;
 
-  par_for("hohlraum_ox2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,k,(je+j+1),i) = ii_ox2;
+  if (rad_flag) {
+    par_for("hohlraum_ox2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,k,(je+j+1),i) = ii_ox2;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 
@@ -193,7 +212,8 @@ void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 //  \brief Sets boundary condition on inner X3 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -201,14 +221,17 @@ void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n2 = indcs.nx2 + 2*ng;
   int &ks = indcs.ks;
 
-  par_for("hohlraum_ix3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,(ks-k-1),j,i) = ii_ix3;
+  if (rad_flag) {
+    par_for("hohlraum_ix3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,(ks-k-1),j,i) = ii_ix3;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 
@@ -217,7 +240,8 @@ void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 //  \brief Sets boundary condition on outer X3 boundary
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
-void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii)
+void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
+                     bool hydro_flag, bool rad_flag);
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -225,14 +249,17 @@ void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
   int n2 = indcs.nx2 + 2*ng;
   int &ke = indcs.ke;
 
-  par_for("hohlraum_ox3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      for (int n=0; n<nangles_; ++n) {
-        ii(m,n,(ke+k+1),j,i) = ii_ox3;
+  if (rad_flag) {
+    par_for("hohlraum_ox3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        for (int n=0; n<nangles_; ++n) {
+          ii(m,n,(ke+k+1),j,i) = ii_ox3;
+        }
       }
-    }
-  );
+    );
+  }
+
   return;
 }
 

@@ -302,6 +302,15 @@ OutputType::OutputType(OutputParameters opar, Mesh *pm) :
     case OutputVariable::rad_moments:
       if (pm->pmb_pack->prad == nullptr) ErrHydroOutput(out_params.block_name);
       outvars.emplace_back("r00",0,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r01",1,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r02",2,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r03",3,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r11",4,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r12",5,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r13",6,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r22",7,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r23",8,&(pm->pmb_pack->prad->moments_coord));
+      outvars.emplace_back("r33",9,&(pm->pmb_pack->prad->moments_coord));
       break;
 
     default:

@@ -258,7 +258,9 @@ void Radiation::InitAngularMesh() {
   // TODO(@gnwong, @pdmullen) make this prettier
   Real rotangles[2];
   OptimalAngles(rotangles);
-  RotateGrid(rotangles[0], rotangles[1]);
+  if (rotate_geo) {
+    RotateGrid(rotangles[0], rotangles[1]);
+  }
 
   auto nh_c_ = nh_c;
   auto nh_f_ = nh_f;
@@ -325,11 +327,11 @@ void Radiation::InitCoordinateFrame() {
   auto coord = pmy_pack->coord.coord_data;
 
   auto nmu_ = nmu;
-  auto n0_n_mu_ = n0_n_mu;
+  auto n_mu_ = n_mu;
   auto nh_c_ = nh_c;
   auto nh_f_ = nh_f;
 
-  par_for("rad_n0_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+  par_for("rad_nl_nu", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
@@ -352,32 +354,32 @@ void Radiation::InitCoordinateFrame() {
                     e, e_cov, omega);
 
       for (int lm=0; lm<nangles; ++lm) {
-        Real n0 = 0.;
-        Real n1 = 0.;
-        Real n2 = 0.;
-        Real n3 = 0.;
-        Real n_0 = 0.;
-        Real n_1 = 0.;
-        Real n_2 = 0.;
-        Real n_3 = 0.;
+        Real n0 = 0.0;
+        Real n1 = 0.0;
+        Real n2 = 0.0;
+        Real n3 = 0.0;
+        Real n_0 = 0.0;
+        Real n_1 = 0.0;
+        Real n_2 = 0.0;
+        Real n_3 = 0.0;
         for (int d=0; d<4; ++d) {
-          n0 += e[d][0] * nh_c_.d_view(lm,d);
-          n1 += e[d][1] * nh_c_.d_view(lm,d);
-          n2 += e[d][2] * nh_c_.d_view(lm,d);
-          n3 += e[d][3] * nh_c_.d_view(lm,d);
-          n_0 += e_cov[d][0] * nh_c_.d_view(lm,d);
-          n_1 += e_cov[d][1] * nh_c_.d_view(lm,d);
-          n_2 += e_cov[d][2] * nh_c_.d_view(lm,d);
-          n_3 += e[d][3] * nh_c_.d_view(lm,d);
+          n0 += e[d][0]*nh_c_.d_view(lm,d);
+          n1 += e[d][1]*nh_c_.d_view(lm,d);
+          n2 += e[d][2]*nh_c_.d_view(lm,d);
+          n3 += e[d][3]*nh_c_.d_view(lm,d);
+          n_0 += e_cov[d][0]*nh_c_.d_view(lm,d);
+          n_1 += e_cov[d][1]*nh_c_.d_view(lm,d);
+          n_2 += e_cov[d][2]*nh_c_.d_view(lm,d);
+          n_3 += e_cov[d][3]*nh_c_.d_view(lm,d);
         }
         nmu_(m,lm,k,j,i,0) = n0;
         nmu_(m,lm,k,j,i,1) = n1;
         nmu_(m,lm,k,j,i,2) = n2;
         nmu_(m,lm,k,j,i,3) = n3;
-        n0_n_mu_(m,lm,k,j,i,0) = n0 * n_0;
-        n0_n_mu_(m,lm,k,j,i,1) = n0 * n_1;
-        n0_n_mu_(m,lm,k,j,i,2) = n0 * n_2;
-        n0_n_mu_(m,lm,k,j,i,3) = n0 * n_3;
+        n_mu_(m,lm,k,j,i,0) = n_0;
+        n_mu_(m,lm,k,j,i,1) = n_1;
+        n_mu_(m,lm,k,j,i,2) = n_2;
+        n_mu_(m,lm,k,j,i,3) = n_3;
       }
     }
   );
@@ -556,6 +558,86 @@ void Radiation::InitCoordinateFrame() {
     }
   );
   
+  // Calculate norm_to_tet
+  auto norm_to_tet_ = norm_to_tet;
+
+  par_for("rad_norm_to_tet", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, n1,
+    KOKKOS_LAMBDA(int m, int k, int j, int i)
+    {
+      Real &x1min = coord.mb_size.d_view(m).x1min;
+      Real &x1max = coord.mb_size.d_view(m).x1max;
+      int nx1 = coord.mb_indcs.nx1;
+      Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+
+      Real &x2min = coord.mb_size.d_view(m).x2min;
+      Real &x2max = coord.mb_size.d_view(m).x2max;
+      int nx2 = coord.mb_indcs.nx2;
+      Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
+
+      Real &x3min = coord.mb_size.d_view(m).x3min;
+      Real &x3max = coord.mb_size.d_view(m).x3max;
+      int nx3 = coord.mb_indcs.nx3;
+      Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
+
+      Real g_[NMETRIC], gi_[NMETRIC];
+      ComputeMetricAndInverse(x1v, x2v, x3v, true, coord.snake,
+                              coord.bh_mass, coord.bh_spin, g_, gi_);
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
+                    e, e_cov, omega);
+
+      // Set Minkowski metric
+      Real eta[4][4];
+      eta[0][0] = -1.0;
+      eta[0][1] = 0.0;
+      eta[0][2] = 0.0;
+      eta[0][3] = 0.0;
+      eta[1][0] = 0.0;
+      eta[1][1] = 1.0;
+      eta[1][2] = 0.0;
+      eta[1][3] = 0.0;
+      eta[2][0] = 0.0;
+      eta[2][1] = 0.0;
+      eta[2][2] = 1.0;
+      eta[2][3] = 0.0;
+      eta[3][0] = 0.0;
+      eta[3][1] = 0.0;
+      eta[3][2] = 0.0;
+      eta[3][3] = 1.0;
+
+      // Calculate normal-to-coordinate transformation
+      Real norm_to_coord[4][4];
+      Real alpha = 1.0/sqrt(-gi_[I00]);
+      norm_to_coord[0][0] = 1.0/alpha;
+      norm_to_coord[1][0] = -alpha*gi_[I01];
+      norm_to_coord[2][0] = -alpha*gi_[I02];
+      norm_to_coord[3][0] = -alpha*gi_[I03];
+      norm_to_coord[0][1] = 0.0;
+      norm_to_coord[1][1] = 1.0;
+      norm_to_coord[2][1] = 0.0;
+      norm_to_coord[3][1] = 0.0;
+      norm_to_coord[0][2] = 0.0;
+      norm_to_coord[1][2] = 0.0;
+      norm_to_coord[2][2] = 1.0;
+      norm_to_coord[3][2] = 0.0;
+      norm_to_coord[0][3] = 0.0;
+      norm_to_coord[1][3] = 0.0;
+      norm_to_coord[2][3] = 0.0;
+      norm_to_coord[3][3] = 1.0;
+
+      for (int d1=0; d1<4; ++d1) {
+        for (int d2=0; d2<4; ++d2) {
+          norm_to_tet_(m,d1,d2,k,j,i) = 0.0;
+          for (int p=0; p<4; ++p) {
+            for (int q=0; q<4; ++q) {
+              norm_to_tet_(m,d1,d2,k,j,i) += eta[d1][p]*e_cov[p][q]*norm_to_coord[q][d2];
+            }
+          }
+        }
+      }
+    }
+  );
+
   return;
 }
 
@@ -793,16 +875,16 @@ void Radiation::OptimalAngles(Real ang[2]) const {
 
   Real vmax = 0.0;
   
-  for (int l = 0; l < nzeta; l++) {
+  for (int l=0; l<nzeta; ++l) {
     zeta = (l+1)*deltazeta;
-    for (int k = 0; k < npsi; k++) {
+    for (int k = 0; k < npsi; ++k) {
       psi = (k+1)*deltapsi;
       
       Real kx = - sin(psi);
       Real ky = cos(psi);
       Real vmin_curr = 1.0;
       
-      for (int i = 0; i < nangles; ++i) {
+      for (int i=0; i<nangles; ++i) {
         GetGridCartPosition(i,&vx,&vy,&vz);
         vrx = vx*cos(zeta)+ky*vz*sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-cos(zeta));
         vry = vy*cos(zeta)-kx*vz*sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-cos(zeta));
@@ -824,7 +906,6 @@ void Radiation::OptimalAngles(Real ang[2]) const {
         ang[0] = zeta;
         ang[1] = psi;
       }
-    
     }
   }
   
