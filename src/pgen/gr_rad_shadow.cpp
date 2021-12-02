@@ -30,6 +30,8 @@
 int nangles_;
 radiation::Radiation *my_prad;
 
+void OpacityShadow(const Real rho, const Real temp,
+                  Real& kappa_a, Real& kappa_s, Real& kappa_p);
 void ShadowInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &cc,
                    bool hydro_flag, bool rad_flag);
 
@@ -45,7 +47,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
-  nangles_ = pmbp->prad->.nangles;
+  nangles_ = pmbp->prad->nangles;
   my_prad = pmbp->prad;
 
   auto &coord = pmbp->coord.coord_data;
@@ -88,6 +90,9 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
       }
     );
   }
+
+  // Enroll opacity function
+  pmbp->prad->EnrollOpacityFunction(OpacityShadow);
 
   // Enroll boundary function
   if (pin->GetString("mesh", "ix1_bc")=="user") {
@@ -184,7 +189,7 @@ void ShadowInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &cc
                    + nh_c_.d_view(lm,3)*dtc3);
           Real theta = acos(mu)*180.0/M_PI;
           if (fabs(theta) < 20.0) {
-            cc(m,lm,k,j,(is-i-1)) = 100.0;
+            cc(m,lm,k,j,(is-i-1)) = 103.13;
           } else {
             cc(m,lm,k,j,(is-i-1)) = 0.0;
           }
@@ -193,4 +198,17 @@ void ShadowInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &cc
     );
   }
   return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void OpacityShadow(const Real rho, const Real temp,
+//                         Real& kappa_a, Real& kappa_s, Real& kappa_p)
+//  \brief Sets opacities for shadow problem
+
+void OpacityShadow(const Real rho, const Real temp,
+                   Real& kappa_a, Real& kappa_s, Real& kappa_p)
+{
+  kappa_a = rho*pow(temp, -3.5);
+  kappa_s = 0.0;
+  kappa_p = 0.0;
 }

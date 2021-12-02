@@ -26,6 +26,7 @@
 
 #include "radiation/radiation_tetrad.hpp"
 
+KOKKOS_INLINE_FUNCTION
 bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root);
 
 //----------------------------------------------------------------------------------------
@@ -79,9 +80,6 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
     source_terms_enabled = true;
     coupling = pin->GetBoolean(block, "coupling");
     arad = pin->GetReal(block, "arad");
-    sigma_a = pin->GetReal(block, "sigma_a");
-    sigma_p = pin->GetReal(block, "sigma_p");
-    sigma_s = pin->GetReal(block, "sigma_s");
   }
 
   // TODO: finish implementing cooling
@@ -260,9 +258,6 @@ void SourceTerms::AddRadiationSourceTerm(DvceArray5D<Real> &i0, DvceArray5D<Real
 
   // extract unit system and opacities
   auto arad_ = arad;
-  auto sigma_a_ = kappa_a;
-  auto sigma_p_ = kappa_p;
-  auto sigma_s_ = kappa_s;
 
   // extract geometric data
   auto nmu_ = pmy_pack->prad->nmu;
@@ -270,6 +265,8 @@ void SourceTerms::AddRadiationSourceTerm(DvceArray5D<Real> &i0, DvceArray5D<Real
   auto n_mu_ = pmy_pack->prad->n_mu;
   auto solid_angle_ = pmy_pack->prad->solid_angle;
   auto norm_to_tet_ = pmy_pack->prad->norm_to_tet;
+
+  auto OpacityFunc_ = pmy_pack->prad->OpacityFunc;
 
   // extract coupling flag
   bool coupling_ = coupling;
@@ -341,13 +338,18 @@ void SourceTerms::AddRadiationSourceTerm(DvceArray5D<Real> &i0, DvceArray5D<Real
         intensity_cm_[lm] *= 4.0*M_PI;
       }
 
-      // opacities
-      Real dtaucsigmaa = dt*sigma_a_/(uu0*sqrt(-gi_[I00]));
-      Real dtaucsigmas = dt*sigma_s_/(uu0*sqrt(-gi_[I00]));
-      Real dtaucsigmap = dt*sigma_p_/(uu0*sqrt(-gi_[I00]));
-      Real dtcsigmaa = dt*sigma_a_;
-      Real dtcsigmas = dt*sigma_s_;
-      Real dtcsigmap = dt*sigma_p_;
+      // set opacities
+      Real kappa_a = 0.0, kappa_s = 0.0, kappa_p = 0.0;
+      OpacityFunc_(rho, tgas, kappa_a, kappa_s, kappa_p);
+      Real sigma_a = rho*kappa_a;
+      Real sigma_s = rho*kappa_s;
+      Real sigma_p = rho*kappa_p;
+      Real dtaucsigmaa = dt*sigma_a/(uu0*sqrt(-gi_[I00]));
+      Real dtaucsigmas = dt*sigma_s/(uu0*sqrt(-gi_[I00]));
+      Real dtaucsigmap = dt*sigma_p/(uu0*sqrt(-gi_[I00]));
+      Real dtcsigmaa = dt*sigma_a;
+      Real dtcsigmas = dt*sigma_s;
+      Real dtcsigmap = dt*sigma_p;
 
       // Calculate polynomial coefficients
       Real suma1 = 0.0;
@@ -571,7 +573,9 @@ void SourceTerms::AddSBoxEField(const DvceFaceFld4D<Real> &b0, DvceEdgeFld4D<Rea
 //  \brief Exact solution for fourth order polynomial of
 //  the form coef4 * x^4 + x + tconst = 0.
 
-bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root) {
+KOKKOS_INLINE_FUNCTION
+bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root)
+{
   // Calculate real root of z^3 - 4*tconst/coef4 * z - 1/coef4^2 = 0
   Real asquar = coef4 * coef4;
   Real acubic = coef4 * asquar;

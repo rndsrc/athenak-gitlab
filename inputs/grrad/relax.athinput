@@ -50,30 +50,27 @@ nlevel = 2           # number of levels for geodesic mesh
 rotate_geo = false   # rotate geodesic grid
 rad_source = true    # radiation source term
 coupling = true      # coupling to fluid
-arad = 1.0
-sigma_a = 100.0
-sigma_s = 0.0
-sigma_p = 0.0
+arad = 1.0           # radiation constant
 reconstruct = plm    # reconstruction method
 
 <problem>
-erad = 1.0
-temp = 100.0
+erad = 1.0    # initial radiation energy density
+temp = 100.0  # initial temperature
 
 <output1>
-file_type   = tab          # output format
-data_format = %24.16e
-x1_slice    = 0.0
-x2_slice    = 0.0
-x3_slice    = 0.0
-variable    = hydro_w_p    # choice of variables to output
-dt          = 0.1          # output cadence
+file_type   = tab        # output format
+data_format = %24.16e    # output data format
+x1_slice    = 0.0        # x1 slice
+x2_slice    = 0.0        # x2 slice
+x3_slice    = 0.0        # x3 slice
+variable    = hydro_w_p  # choice of variables to output
+dt          = 0.1        # output cadence
 
 <output2>
 file_type   = tab          # output format
-data_format = %24.16e
-x1_slice    = 0.0
-x2_slice    = 0.0
-x3_slice    = 0.0
+data_format = %24.16e      # output data format
+x1_slice    = 0.0          # x1 slice
+x2_slice    = 0.0          # x2 slice
+x3_slice    = 0.0          # x3 slice
 variable    = rad_moments  # choice of variables to output
 dt          = 0.1          # output cadence

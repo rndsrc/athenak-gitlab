@@ -27,6 +27,8 @@
 
 #include "radiation/radiation_tetrad.hpp"
 
+void OpacityRelax(Real rho, Real temp, Real& kappa_a, Real& kappa_s, Real& kappa_p);
+
 //----------------------------------------------------------------------------------------
 //! \fn void MeshBlock::UserProblem(ParameterInput *pin)
 //  \brief Sets initial conditions for GR radiation beam test
@@ -95,5 +97,21 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     );
   }
 
+  // Enroll opacity function
+  pmbp->prad->EnrollOpacityFunction(OpacityRelax);
+
   return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void OpacityRelax(const Real rho, const Real temp,
+//                        Real& kappa_a, Real& kappa_s, Real& kappa_p)
+//  \brief Sets opacities for relaxation problem
+
+void OpacityRelax(const Real rho, const Real temp,
+                  Real& kappa_a, Real& kappa_s, Real& kappa_p)
+{
+  kappa_a = 100.0/rho;
+  kappa_s = 0.0;
+  kappa_p = 0.0;
 }

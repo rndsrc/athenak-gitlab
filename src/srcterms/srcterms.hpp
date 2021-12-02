@@ -56,9 +56,6 @@ class SourceTerms
 
   // Radiation source
   Real arad;
-  Real sigma_a;
-  Real sigma_p;
-  Real sigma_s;
   bool coupling;
 
   // physical constants and heating rate used with ISM cooling

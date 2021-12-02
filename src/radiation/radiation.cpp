@@ -17,6 +17,10 @@
 #include "radiation/radiation.hpp"
 
 namespace radiation {
+
+void NoOpOpacity(const Real rho, const Real temp,
+                 Real& kappa_a, Real& kappa_s, Real& kappa_p);
+
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures and parameters
 
@@ -75,6 +79,9 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
       << std::endl << "Radiation source term requires phydro, but "
       << "<hydro> block does not exist" << std::endl;
     std::exit(EXIT_FAILURE);
+  }
+  if (psrc->rad_source) {
+    OpacityFunc = NoOpOpacity;
   }
 
   // read time-evolution option [already error checked in driver constructor]
@@ -180,6 +187,29 @@ Radiation::~Radiation()
   delete peos;
   delete psrc;
   delete pbval_ci;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn EnrollOpacityFunction(BValFunc my_bc)
+//! \brief Enroll a user-defined boundary function
+
+void Radiation::EnrollOpacityFunction(OpacityFnPtr my_opacityfunc) {
+  OpacityFunc = my_opacityfunc;
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn NoOpOpacity
+//! \brief
+
+void NoOpOpacity(const Real rho, const Real temp,
+                 Real& kappa_a, Real& kappa_s, Real& kappa_p)
+{
+  std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+    << std::endl << "Radiation source term requires specifying opacity function, but "
+    << "no UserOpacityFunction enrolled" << std::endl;
+  std::exit(EXIT_FAILURE);
+  return;
 }
 
 } // namespace radiation

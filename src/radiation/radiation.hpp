@@ -38,6 +38,11 @@ struct RadiationTaskIDs
 };
 
 namespace radiation {
+using OpacityFnPtr = void (*)(const Real rho, const Real temp,
+                              Real& kappa_a, Real& kappa_s, Real& kappa_p);
+}
+
+namespace radiation {
 
 //----------------------------------------------------------------------------------------
 //! \class Hydro
@@ -97,6 +102,9 @@ public:
 
   // Object containing boundary communication buffers and routines for i
   BoundaryValueCC *pbval_ci;
+
+  // User-defined opacity function
+  OpacityFnPtr OpacityFunc;
 
   // following only used for time-evolving flow
   DvceArray5D<Real> i1;       // conserved variables at intermediate step
@@ -160,7 +168,11 @@ public:
   void OutflowInnerX3(int m);
   void OutflowOuterX3(int m);
 
+  // function to set boundary conditions on angular mesh
   void AngularMeshBoundaries();
+
+  // enroll user-defined opacity function
+  void EnrollOpacityFunction(OpacityFnPtr my_opacityfunc);
 
 private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Radiation
