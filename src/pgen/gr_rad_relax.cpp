@@ -27,6 +27,8 @@
 
 #include "radiation/radiation_tetrad.hpp"
 
+Real sigma_a;
+
 void OpacityRelax(Real rho, Real temp, Real& kappa_a, Real& kappa_s, Real& kappa_p);
 
 //----------------------------------------------------------------------------------------
@@ -48,13 +50,14 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 
   Real erad = pin->GetReal("problem", "erad");
   Real temp = pin->GetReal("problem", "temp");
+  sigma_a = pin->GetReal("problem", "sigma_a");
 
   auto nmu_ = pmbp->prad->nmu;
   auto solid_angle_ = pmbp->prad->solid_angle;
 
   if (pmbp->phydro != nullptr) {
     auto &w0 = pmbp->phydro->w0;
-    par_for("pgen_rekax1",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
+    par_for("pgen_relax1",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
       KOKKOS_LAMBDA(int m, int k, int j, int i)
       {
         Real &x1min = coord.mb_size.d_view(m).x1min;
@@ -82,7 +85,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 
   if (pmbp->prad != nullptr) {
     auto &i0 = pmbp->prad->i0;
-    par_for("pgen_rekax2",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
+    par_for("pgen_relax2",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
       KOKKOS_LAMBDA(int m, int k, int j, int i)
       {
         Real wght_erad = 0.0;
@@ -111,7 +114,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 void OpacityRelax(const Real rho, const Real temp,
                   Real& kappa_a, Real& kappa_s, Real& kappa_p)
 {
-  kappa_a = 100.0/rho;
+  kappa_a = sigma_a/rho;
   kappa_s = 0.0;
   kappa_p = 0.0;
 }
