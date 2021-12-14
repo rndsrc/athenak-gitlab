@@ -16,6 +16,7 @@
 #include "parameter_input.hpp"
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
+#include "eos/eos.hpp"
 #include "mesh/mesh.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
@@ -25,6 +26,8 @@
 
 #include "radiation/radiation_tetrad.hpp"
 
+KOKKOS_INLINE_FUNCTION
+bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root);
 
 //----------------------------------------------------------------------------------------
 // constructor, parses input file and initializes data structures and parameters
@@ -136,7 +139,6 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt)
   auto coord = pmy_pack->coord.coord_data;
 
   auto nh_c_ = pmy_pack->prad->nh_c;
-  auto n0_n_mu_ = pmy_pack->prad->n0_n_mu;
 
   Real &pos_1_ = pos_1;
   Real &pos_2_ = pos_2;

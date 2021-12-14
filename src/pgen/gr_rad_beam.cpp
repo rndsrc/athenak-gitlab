@@ -34,13 +34,12 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
-  auto &aindcs = pmbp->prad->amesh_indcs;
-  int nangles = aindcs.nangles;
+  int nangles_ = pmbp->prad->nangles;
 
   auto &i0 = pmbp->prad->i0;
   int nmb1 = (pmbp->nmb_thispack-1);
 
-  par_for("rad_beam",DevExeSpace(),0,nmb1,0,nangles-1,ks,ke,js,je,is,ie,
+  par_for("rad_beam",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
     {
       i0(m,lm,k,j,i) = 0.0;
