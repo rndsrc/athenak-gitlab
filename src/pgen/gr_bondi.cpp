@@ -64,12 +64,18 @@ struct bondi_pgen {
 
 } // namespace
 
-void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
-void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
-void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
-void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
-void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
-void FixedOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
+void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
+void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
+void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
+void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
+void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
+void FixedOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                   bool hydro_flag, bool rad_flag);
 
 //----------------------------------------------------------------------------------------
 //! \fn void ProblemGenerator::BondiAccretion_()
@@ -593,7 +599,8 @@ static Real TemperatureResidual(struct bondi_pgen pgen, Real t, Real r) {
 //  \brief Sets boundary condition on inner X1 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -602,22 +609,24 @@ void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &is = indcs.is;
   auto bondi_ = bondi;
 
-  par_for("fixed_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,k,j,(is-i-1),coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,k,j,(is-i-1)) = ud;
-      u(m,IEN,k,j,(is-i-1)) = ue;
-      u(m,IM1,k,j,(is-i-1)) = um1;
-      u(m,IM2,k,j,(is-i-1)) = um2;
-      u(m,IM3,k,j,(is-i-1)) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,k,j,(is-i-1),coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,k,j,(is-i-1)) = ud;
+        u(m,IEN,k,j,(is-i-1)) = ue;
+        u(m,IM1,k,j,(is-i-1)) = um1;
+        u(m,IM2,k,j,(is-i-1)) = um2;
+        u(m,IM3,k,j,(is-i-1)) = um3;
+      }
+    );
+  }
   return;
 }
 
@@ -626,7 +635,8 @@ void FixedInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
 //  \brief Sets boundary condition on outer X1 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -635,22 +645,24 @@ void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &ie = indcs.ie;
   auto bondi_ = bondi;
 
-  par_for("fixed_ox1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,k,j,(ie+i+1),coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,k,j,(ie+i+1)) = ud;
-      u(m,IEN,k,j,(ie+i+1)) = ue;
-      u(m,IM1,k,j,(ie+i+1)) = um1;
-      u(m,IM2,k,j,(ie+i+1)) = um2;
-      u(m,IM3,k,j,(ie+i+1)) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ox1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,k,j,(ie+i+1),coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,k,j,(ie+i+1)) = ud;
+        u(m,IEN,k,j,(ie+i+1)) = ue;
+        u(m,IM1,k,j,(ie+i+1)) = um1;
+        u(m,IM2,k,j,(ie+i+1)) = um2;
+        u(m,IM3,k,j,(ie+i+1)) = um3;
+      }
+    );
+  }
   return;
 }
 
@@ -659,7 +671,8 @@ void FixedOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
 //  \brief Sets boundary condition on inner X2 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -668,22 +681,24 @@ void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &js = indcs.js;
   auto bondi_ = bondi;
 
-  par_for("fixed_ix2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,k,(js-j-1),i,coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,k,(js-j-1),i) = ud;
-      u(m,IEN,k,(js-j-1),i) = ue;
-      u(m,IM1,k,(js-j-1),i) = um1;
-      u(m,IM2,k,(js-j-1),i) = um2;
-      u(m,IM3,k,(js-j-1),i) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ix2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,k,(js-j-1),i,coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,k,(js-j-1),i) = ud;
+        u(m,IEN,k,(js-j-1),i) = ue;
+        u(m,IM1,k,(js-j-1),i) = um1;
+        u(m,IM2,k,(js-j-1),i) = um2;
+        u(m,IM3,k,(js-j-1),i) = um3;
+      }
+    );
+  }
   return;
 }
 
@@ -692,7 +707,8 @@ void FixedInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
 //  \brief Sets boundary condition on outer X2 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -701,22 +717,24 @@ void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &je = indcs.je;
   auto bondi_ = bondi;
 
-  par_for("fixed_ox2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,k,(je+j+1),i,coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,k,(je+j+1),i) = ud;
-      u(m,IEN,k,(je+j+1),i) = ue;
-      u(m,IM1,k,(je+j+1),i) = um1;
-      u(m,IM2,k,(je+j+1),i) = um2;
-      u(m,IM3,k,(je+j+1),i) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ox2", DevExeSpace(),0,(n3-1),0,(ng-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,k,(je+j+1),i,coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,k,(je+j+1),i) = ud;
+        u(m,IEN,k,(je+j+1),i) = ue;
+        u(m,IM1,k,(je+j+1),i) = um1;
+        u(m,IM2,k,(je+j+1),i) = um2;
+        u(m,IM3,k,(je+j+1),i) = um3;
+      }
+    );
+  }
   return;
 }
 
@@ -725,7 +743,8 @@ void FixedOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
 //  \brief Sets boundary condition on inner X3 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -734,22 +753,24 @@ void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &ks = indcs.ks;
   auto bondi_ = bondi;
 
-  par_for("fixed_ix3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,(ks-k-1),j,i,coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,(ks-k-1),j,i) = ud;
-      u(m,IEN,(ks-k-1),j,i) = ue;
-      u(m,IM1,(ks-k-1),j,i) = um1;
-      u(m,IM2,(ks-k-1),j,i) = um2;
-      u(m,IM3,(ks-k-1),j,i) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ix3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,(ks-k-1),j,i,coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,(ks-k-1),j,i) = ud;
+        u(m,IEN,(ks-k-1),j,i) = ue;
+        u(m,IM1,(ks-k-1),j,i) = um1;
+        u(m,IM2,(ks-k-1),j,i) = um2;
+        u(m,IM3,(ks-k-1),j,i) = um3;
+      }
+    );
+  }
   return;
 }
 
@@ -758,7 +779,8 @@ void FixedInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
 //  \brief Sets boundary condition on outer X3 boundary
 // Note quantities at this boundary are held fixed to initial condition values
 
-void FixedOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void FixedOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                  bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -767,21 +789,23 @@ void FixedOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
   int &ke = indcs.ke;
   auto bondi_ = bondi;
 
-  par_for("fixed_ox3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      ComputePrimitiveSingle(m,(ke+k+1),j,i,coord,g_,gi_,bondi_,
-                             rho,pgas,uu1,uu2,uu3);
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
-                             ud, ue, um1, um2, um3);
-      u(m,IDN,(ke+k+1),j,i) = ud;
-      u(m,IEN,(ke+k+1),j,i) = ue;
-      u(m,IM1,(ke+k+1),j,i) = um1;
-      u(m,IM2,(ke+k+1),j,i) = um2;
-      u(m,IM3,(ke+k+1),j,i) = um3;
-    }
-  );
+  if (hydro_flag) {
+    par_for("fixed_ox3", DevExeSpace(),0,(ng-1),0,(n2-1),0,(n1-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+        ComputePrimitiveSingle(m,(ke+k+1),j,i,coord,g_,gi_,bondi_,
+                               rho,pgas,uu1,uu2,uu3);
+        Real ud, ue, um1, um2, um3;
+        eos.PrimToConsSingleGR(g_, gi_, rho, pgas, uu1, uu2, uu3,
+                               ud, ue, um1, um2, um3);
+        u(m,IDN,(ke+k+1),j,i) = ud;
+        u(m,IEN,(ke+k+1),j,i) = ue;
+        u(m,IM1,(ke+k+1),j,i) = um1;
+        u(m,IM2,(ke+k+1),j,i) = um2;
+        u(m,IM3,(ke+k+1),j,i) = um3;
+      }
+    );
+  }
   return;
 }

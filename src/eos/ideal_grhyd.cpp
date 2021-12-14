@@ -71,7 +71,7 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim)
   Real &dfloor_ = eos_data.density_floor;
 
   // Parameters
-  int const max_iterations = 25;
+  int const max_iterations = 15;
   Real const tol = 1.0e-12;
   Real const v_sq_max = 1.0 - tol;
 

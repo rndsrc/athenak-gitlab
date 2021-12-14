@@ -129,6 +129,7 @@ void Coordinates::InitMetric(ParameterInput *pin)
   coord_data.bh_mass = pin->GetOrAddReal("coord","m",1.0);
   coord_data.bh_spin = pin->GetOrAddReal("coord","a",0.0);
   coord_data.bh_rmin = pin->GetOrAddReal("coord","rmin",0.0);
+  coord_data.bh_excise = pin->GetOrAddBoolean("coord","excise",false);
   coord_data.snake = pin->GetOrAddBoolean("coord","snake",false);
 }
 

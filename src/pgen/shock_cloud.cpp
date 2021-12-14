@@ -31,7 +31,8 @@ Real shock_d, shock_m, shock_e;
 } // namespace
 
 // fixes BCs on L-x1 (left edge) of grid to postshock flow.
-void ShockCloudInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u);
+void ShockCloudInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                       bool hydro_flag, bool rad_flag);
 
 //----------------------------------------------------------------------------------------
 //! \fn ProblemGenerator::_()
@@ -136,7 +137,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 //  \brief Sets boundary condition on left X boundary (iib)
 // Note quantities at this boundary are held fixed at the downstream state
 
-void ShockCloudInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u)
+void ShockCloudInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &u,
+                       bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -148,15 +150,18 @@ void ShockCloudInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real>
   Real &shock_m_ = shock_m;
   Real &shock_e_ = shock_e;
 
-  par_for("outflow_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
-    KOKKOS_LAMBDA(int k, int j, int i)
-    {
-      u(m,IDN,k,j,is-i-1) = shock_d_;
-      u(m,IM1,k,j,is-i-1) = shock_m_;
-      u(m,IM2,k,j,is-i-1) = 0.0;
-      u(m,IM3,k,j,is-i-1) = 0.0;
-      u(m,IEN,k,j,is-i-1) = shock_e_;
-    }
-  );
+  if (hydro_flag) {
+    par_for("outflow_ix1", DevExeSpace(),0,(n3-1),0,(n2-1),0,(ng-1),
+      KOKKOS_LAMBDA(int k, int j, int i)
+      {
+        u(m,IDN,k,j,is-i-1) = shock_d_;
+        u(m,IM1,k,j,is-i-1) = shock_m_;
+        u(m,IM2,k,j,is-i-1) = 0.0;
+        u(m,IM3,k,j,is-i-1) = 0.0;
+        u(m,IEN,k,j,is-i-1) = shock_e_;
+      }
+    );
+  }
+
   return;
 }

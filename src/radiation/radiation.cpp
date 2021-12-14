@@ -17,6 +17,10 @@
 #include "radiation/radiation.hpp"
 
 namespace radiation {
+
+void NoOpOpacity(const Real rho, const Real temp,
+                 Real& kappa_a, Real& kappa_s, Real& kappa_p);
+
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures and parameters
 
@@ -24,37 +28,36 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   pmy_pack(ppack),
 
   // intensities and fluxes
-  i0("prim",1,1,1,1,1),
-  i1("cons1",1,1,1,1,1),
+  i0("i0",1,1,1,1,1),
+  i1("i1",1,1,1,1,1),
   iflx("ciflx",1,1,1,1,1),
   iaflx("ciaflx",1,1,1,1,1,1),
 
   // TODO(@gnwong, @pdmullen) in the future, it might make sense to get rid
   // of some of these and compute them on the fly
-  solid_angle("solidang",1),
-
   nh_c("nh_c",1,1),
   nh_f("nh_f",1,1,1),
   xi_mn("xi_mn",1,1),
   eta_mn("eta_mn",1,1),
+  arc_lengths("arclen",1,1),
+  solid_angle("solidang",1),
 
   amesh_normals("ameshnorm",1,1,1,1),
   ameshp_normals("ameshpnorm",1,1),
-
   amesh_indices("ameshind",1,1,1),
   ameshp_indices("ameshpind",1),
 
   num_neighbors("numneigh",1),
   ind_neighbors("indneigh",1,1),
-  arc_lengths("arclen",1,1),
 
   // coordinate frame quantities
   nmu("nmu",1,1,1,1,1,1),
-  n0_n_mu("n0_n_mu",1,1,1,1,1,1),
+  n_mu("n_mu",1,1,1,1,1,1),
   n1_n_0("n1_n_0",1,1,1,1,1),
   n2_n_0("n2_n_0",1,1,1,1,1),
   n3_n_0("n3_n_0",1,1,1,1,1),
   na_n_0("na_n_0",1,1,1,1,1,1),
+  norm_to_tet("norm_to_tet",1,1,1,1,1,1),
 
   // moments of the radiation field
   moments_coord("moments",1,1,1,1,1)
@@ -69,8 +72,22 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   // no-op, passed to boundary functions
   peos = new EquationOfState(ppack, pin);
 
-  // Source terms (constructor parses input file to initialize only srcterms needed)
+  // source terms (does not include coupling source term)
   psrc = new SourceTerms("radiation", ppack, pin);
+
+  // radiation source term (radiation+(M)HD)
+  rad_source = pin->GetOrAddBoolean("radiation","rad_source",false);
+  coupling = pin->GetOrAddBoolean("radiation","coupling",false);
+  arad = pin->GetOrAddReal("radiation", "arad", 1.0);
+  if (rad_source && (not is_hydro_enabled && not is_mhd_enabled)) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+      << std::endl << "Radiation source term requires phydro or pmhd, but "
+      << "neither <hydro> nor <mhd> block exist" << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+  if (rad_source) {
+    OpacityFunc = NoOpOpacity;
+  }
 
   // read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
@@ -79,9 +96,8 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   // allocate memory for conserved and primitive variables,
   // angles, and coordinate frame data
   nlevels = pin->GetInteger("radiation", "nlevel");
-  amesh_indcs.nlevel = nlevels;
-  nangles = 5 * 2*amesh_indcs.nlevel*amesh_indcs.nlevel + 2;
-  amesh_indcs.nangles = nangles;
+  nangles = 5 * 2*SQR(nlevels) + 2;
+  rotate_geo = pin->GetOrAddBoolean("radiation", "rotate_geo", true);
 
   int nmb = ppack->nmb_thispack;
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
@@ -90,15 +106,15 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
 
   Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);
-  Kokkos::realloc(moments_coord,nmb,1,ncells3,ncells2,ncells1);
+  Kokkos::realloc(moments_coord,nmb,10,ncells3,ncells2,ncells1);
 
   // Setup angular mesh and coordinate frame quantities
   Kokkos::realloc(solid_angle, nangles);
 
-  Kokkos::realloc(amesh_normals, 5, 2+amesh_indcs.nlevel, 2+2*amesh_indcs.nlevel, 3);
+  Kokkos::realloc(amesh_normals, 5, 2+nlevels, 2+2*nlevels, 3);
   Kokkos::realloc(ameshp_normals, 2, 3);
 
-  Kokkos::realloc(amesh_indices, 5, 2+amesh_indcs.nlevel, 2+2*amesh_indcs.nlevel);
+  Kokkos::realloc(amesh_indices, 5, 2+nlevels, 2+2*nlevels);
   Kokkos::realloc(ameshp_indices, 2);
 
   Kokkos::realloc(num_neighbors, nangles);
@@ -111,11 +127,12 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(eta_mn, nangles, 6);
 
   Kokkos::realloc(nmu, nmb, nangles, ncells3, ncells2, ncells1, 4);
-  Kokkos::realloc(n0_n_mu, nmb, nangles, ncells3, ncells2, ncells1, 4);
+  Kokkos::realloc(n_mu, nmb, nangles, ncells3, ncells2, ncells1, 4);
   Kokkos::realloc(n1_n_0, nmb, nangles, ncells3, ncells2, ncells1+1);
   Kokkos::realloc(n2_n_0, nmb, nangles, ncells3, ncells2+1, ncells1);
   Kokkos::realloc(n3_n_0, nmb, nangles, ncells3+1, ncells2, ncells1);
   Kokkos::realloc(na_n_0, nmb, nangles, ncells3, ncells2, ncells1, 6);
+  Kokkos::realloc(norm_to_tet, nmb, 4, 4, ncells3, ncells2, ncells1);
 
   InitAngularMesh();
   InitCoordinateFrame();
@@ -175,6 +192,29 @@ Radiation::~Radiation()
   delete peos;
   delete psrc;
   delete pbval_ci;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn EnrollOpacityFunction(BValFunc my_bc)
+//! \brief Enroll a user-defined boundary function
+
+void Radiation::EnrollOpacityFunction(OpacityFnPtr my_opacityfunc) {
+  OpacityFunc = my_opacityfunc;
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn NoOpOpacity
+//! \brief
+
+void NoOpOpacity(const Real rho, const Real temp,
+                 Real& kappa_a, Real& kappa_s, Real& kappa_p)
+{
+  std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+    << std::endl << "Radiation source term requires specifying opacity function, but "
+    << "no UserOpacityFunction enrolled" << std::endl;
+  std::exit(EXIT_FAILURE);
+  return;
 }
 
 } // namespace radiation
