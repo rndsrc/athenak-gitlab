@@ -29,6 +29,7 @@ struct RadiationTaskIDs
   TaskID copyci;
   TaskID flux;
   TaskID expl;
+  TaskID src;
   TaskID sendci;
   TaskID recvci;
   TaskID bcs;
@@ -65,6 +66,10 @@ public:
   ReconstructionMethod recon_method;
   EquationOfState *peos;  // chosen EOS
   SourceTerms *psrc = nullptr;
+
+  bool rad_source;
+  bool coupling;
+  bool arad;
 
   int nlevels;  // number of levels in geodesic grid
   int nangles;  // number of angles
@@ -122,6 +127,7 @@ public:
   TaskStatus ClearSend(Driver *d, int stage);
   TaskStatus CopyCons(Driver *d, int stage);
   TaskStatus ExpRKUpdate(Driver *d, int stage);
+  TaskStatus AddRadiationSourceTerm(Driver *d, int stage);
   TaskStatus SendCI(Driver *d, int stage);
   TaskStatus RecvCI(Driver *d, int stage);
   TaskStatus SetRadMoments(Driver *d, int stage);
@@ -167,9 +173,6 @@ public:
   void OutflowOuterX2(int m);
   void OutflowInnerX3(int m);
   void OutflowOuterX3(int m);
-
-  // function to set boundary conditions on angular mesh
-  void AngularMeshBoundaries();
 
   // enroll user-defined opacity function
   void EnrollOpacityFunction(OpacityFnPtr my_opacityfunc);

@@ -101,7 +101,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -129,7 +129,7 @@ void HohlraumInnerX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -157,7 +157,7 @@ void HohlraumOuterX1(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -185,7 +185,7 @@ void HohlraumInnerX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -213,7 +213,7 @@ void HohlraumOuterX2(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;
@@ -241,7 +241,7 @@ void HohlraumInnerX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &
 // Note quantities at this boundary are held Hohlraum to initial condition values
 
 void HohlraumOuterX3(int m, CoordData &coord, EOS_Data &eos, DvceArray5D<Real> &ii,
-                     bool hydro_flag, bool rad_flag);
+                     bool hydro_flag, bool rad_flag)
 {
   auto &indcs = coord.mb_indcs;
   int &ng = indcs.ng;

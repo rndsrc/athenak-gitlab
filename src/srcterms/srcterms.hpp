@@ -37,7 +37,6 @@ class SourceTerms
   bool const_accel;
   bool shearing_box;
   bool beam_source;
-  bool rad_source;
   bool ism_cooling;
 
   // magnitude and direction of constant accel
@@ -54,18 +53,12 @@ class SourceTerms
   Real spread;
   Real dii_dt;
 
-  // Radiation source
-  Real arad;
-  bool coupling;
-
   // physical constants and heating rate used with ISM cooling
   Real mbar, kboltz, hrate;
 
   // functions
   void AddConstantAccel(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
   void AddBeamSource(DvceArray5D<Real> &i0,const Real dt);
-  void AddRadiationSourceTerm(DvceArray5D<Real> &i0, DvceArray5D<Real> &i1,
-                              const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                       const DvceArray5D<Real> &bcc, const Real dt);

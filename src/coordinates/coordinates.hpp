@@ -35,6 +35,7 @@ struct CoordData
   Real bh_mass;                     // needed for GR metric
   Real bh_spin;                     // needed for GR metric
   Real bh_rmin;                     // needed for GR cons2prim
+  bool bh_excise;
   bool snake;
 
   // constructor

@@ -32,9 +32,6 @@ TaskStatus Radiation::ApplyPhysicalBCs(Driver* pdrive, int stage)
   auto &coord = pmy_pack->coord.coord_data;
   auto i0_ = i0;
 
-  // Angular boundaries
-  AngularMeshBoundaries();
-
   // Spatial boundaries
   for (int m=0; m<nmb; ++m) {
     // apply physical boundaries to inner_x1

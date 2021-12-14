@@ -72,15 +72,20 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   // no-op, passed to boundary functions
   peos = new EquationOfState(ppack, pin);
 
-  // Source terms (constructor parses input file to initialize only srcterms needed)
+  // source terms (does not include coupling source term)
   psrc = new SourceTerms("radiation", ppack, pin);
-  if (psrc->rad_source && not is_hydro_enabled) {
+
+  // radiation source term (radiation+(M)HD)
+  rad_source = pin->GetOrAddBoolean("radiation","rad_source",false);
+  coupling = pin->GetOrAddBoolean("radiation","coupling",false);
+  arad = pin->GetOrAddReal("radiation", "arad", 1.0);
+  if (rad_source && (not is_hydro_enabled && not is_mhd_enabled)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-      << std::endl << "Radiation source term requires phydro, but "
-      << "<hydro> block does not exist" << std::endl;
+      << std::endl << "Radiation source term requires phydro or pmhd, but "
+      << "neither <hydro> nor <mhd> block exist" << std::endl;
     std::exit(EXIT_FAILURE);
   }
-  if (psrc->rad_source) {
+  if (rad_source) {
     OpacityFunc = NoOpOpacity;
   }
 

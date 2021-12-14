@@ -217,40 +217,32 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
       for (int lm=0; lm<nvars; ++lm) {
         Real im = i0_(m,lm,k,j,i);
-
         Real s_mapr_av = 1.0e16;
         Real s_mapr_xi, s_mapr_eta;
-
         int neighbors[6];
         int num_neighbors = GetNeighbors(lm, neighbors);
-
         for (int nb=0; nb<num_neighbors; ++nb) {
           nb_1 = nb;
           nb_2 = (nb+1)%num_neighbors;
-
           Real imn   = i0_(m,neighbors[nb_1],k,j,i);
           Real imnp1 = i0_(m,neighbors[nb_2],k,j,i);
-
           Real denom = (1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)
                              - xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2)));
           s_xi = (eta_mn_.d_view(lm,nb_1)*(imnp1-im)
                   -eta_mn_.d_view(lm,nb_2)*(imn-im))*denom;
           s_eta = -(xi_mn_.d_view(lm,nb_1)*(imnp1-im)
                     -xi_mn_.d_view(lm,nb_2)*(imn-im))*denom;
-
           if (sqrt(SQR(s_xi)+SQR(s_eta)) < s_mapr_av) {
             s_mapr_xi = s_xi;
             s_mapr_eta = s_eta;
             s_mapr_av = sqrt(SQR(s_xi)+SQR(s_eta));
           }
         }
-
         for (int nb=0; nb<num_neighbors; ++nb) {
           Real i_edge = (im + 0.5*s_mapr_xi*xi_mn_.d_view(lm,nb_1)
                          + 0.5*s_mapr_eta*eta_mn_.d_view(lm,nb_1));
           flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb)*i_edge;
         }
-
       }
     }
   );
