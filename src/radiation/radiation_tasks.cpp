@@ -44,13 +44,11 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
   id.copyci = run.AddTask(&Radiation::CopyCons, this, none);
   id.flux = run.AddTask(&Radiation::CalcFluxes, this,id.copyci);
   id.expl  = run.AddTask(&Radiation::ExpRKUpdate, this, id.flux);
-  id.sendci = run.AddTask(&Radiation::SendCI, this, id.expl);
+  id.src = run.AddTask(&Radiation::AddRadiationSourceTerm, this, id.expl);
+  id.sendci = run.AddTask(&Radiation::SendCI, this, id.src);
   id.recvci = run.AddTask(&Radiation::RecvCI, this, id.sendci);
   id.bcs   = run.AddTask(&Radiation::ApplyPhysicalBCs, this, id.recvci);
   id.c2p   = run.AddTask(&Radiation::SetRadMoments, this, id.bcs);
-  if (!(is_hydro_enabled || is_mhd_enabled)) {
-    id.newdt = run.AddTask(&Radiation::NewTimeStep, this, id.c2p);
-  }
 
   // end task list
   id.clear = end.AddTask(&Radiation::ClearSend, this, none);
@@ -183,7 +181,7 @@ TaskStatus Radiation::RecvCI(Driver *pdrive, int stage)
 
 TaskStatus Radiation::SetRadMoments(Driver *pdrive, int stage)
 {
-  if (stage == 0) {
+  if (stage==0) {
     SetMoments(i0);
   }
   return TaskStatus::complete;

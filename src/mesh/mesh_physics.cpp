@@ -39,7 +39,7 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin, Driver *pdrive)
   if (pin->DoesBlockExist("hydro")) {
     phydro = new hydro::Hydro(this, pin);
     nphysics++;
-    if (not pin->DoesBlockExist("mhd")) {
+    if (not pin->DoesBlockExist("mhd") && not pin->DoesBlockExist("radiation")) {
       phydro->AssembleHydroTasks(start_tl, run_tl, end_tl);
     }
   } else {
@@ -51,7 +51,7 @@ void MeshBlockPack::AddPhysicsModules(ParameterInput *pin, Driver *pdrive)
   if (pin->DoesBlockExist("mhd")) {
     pmhd = new mhd::MHD(this, pin);   
     nphysics++;
-    if (not pin->DoesBlockExist("hydro")) {
+    if (not pin->DoesBlockExist("hydro") && not pin->DoesBlockExist("radiation")) {
       pmhd->AssembleMHDTasks(start_tl, run_tl, end_tl);
     }
   } else {
