@@ -22,12 +22,6 @@
 
 namespace radiation {
 
-KOKKOS_INLINE_FUNCTION
-void SpatialFlux(TeamMember_t const &member,
-     const int m, const int k, const int j,  const int il, const int iu, int nvar,
-     const DvceArray5D<Real> nn, const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir,
-     DvceArray5D<Real> flx);
-
 //----------------------------------------------------------------------------------------
 //! \fn  void Radiation::CalcFluxes
 //! \brief Compute radiation fluxes
@@ -38,13 +32,11 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
-  int ncells1 = indcs.nx1 + 2*(indcs.ng);
-  
-  int nvars = nangles;
+
+  int nangles_ = nangles;
   int nmb1 = pmy_pack->nmb_thispack - 1;
 
   const auto recon_method_ = recon_method;
-  auto &coord = pmy_pack->coord.coord_data;
   auto &i0_ = i0;
 
   auto n1_n_0_ = n1_n_0;
@@ -54,42 +46,39 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
 
   //--------------------------------------------------------------------------------------
   // i-direction
-
-  size_t scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 2;
-  int scr_level = 0;
   auto flx1 = iflx.x1f;
 
-  par_for_outer("rflux_x1",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je,
-    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j)
+  par_for("rflux_x1",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie+1,
+    KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
     {
-      ScrArray2D<Real> iil(member.team_scratch(scr_level), nvars, ncells1);
-      ScrArray2D<Real> iir(member.team_scratch(scr_level), nvars, ncells1);
-
-      // Reconstruct qR[i] and qL[i+1]
+      // compute x1flux
+      Real iil, iir, scr;
       switch (recon_method_)
       {
         case ReconstructionMethod::dc:
-          DonorCellX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          iil = i0_(m,lm,k,j,i-1);
+          iir = i0_(m,lm,k,j,i  );
           break;
         case ReconstructionMethod::plm:
-          PiecewiseLinearX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          PLM(i0_(m,lm,k,j,i-2), i0_(m,lm,k,j,i-1), i0_(m,lm,k,j,i  ), iil, scr);
+          PLM(i0_(m,lm,k,j,i-1), i0_(m,lm,k,j,i  ), i0_(m,lm,k,j,i+1), scr, iir);
           break;
         case ReconstructionMethod::ppm:
-          PiecewiseParabolicX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          PPM(i0_(m,lm,k,j,i-3), i0_(m,lm,k,j,i-2), i0_(m,lm,k,j,i-1),
+              i0_(m,lm,k,j,i  ), i0_(m,lm,k,j,i+1), iil, scr);
+          PPM(i0_(m,lm,k,j,i-2), i0_(m,lm,k,j,i-1), i0_(m,lm,k,j,i  ),
+              i0_(m,lm,k,j,i+1), i0_(m,lm,k,j,i+2), scr, iir);
           break;
         case ReconstructionMethod::wenoz:
-          WENOZX1(member, m, k, j, is-1, ie+1, i0_, iil, iir);
+          WENOZ(i0_(m,lm,k,j,i-3), i0_(m,lm,k,j,i-2), i0_(m,lm,k,j,i-1),
+                i0_(m,lm,k,j,i  ), i0_(m,lm,k,j,i+1), iil, scr);
+          WENOZ(i0_(m,lm,k,j,i-2), i0_(m,lm,k,j,i-1), i0_(m,lm,k,j,i  ),
+                i0_(m,lm,k,j,i+1), i0_(m,lm,k,j,i+2), scr, iir);
           break;
         default:
           break;
       }
-      // Sync all threads in the team so that scratch memory is consistent
-      member.team_barrier();
-
-      // compute fluxes over [is,ie+1]
-      SpatialFlux(member, m, k, j, is, ie+1, nvars, n1_n_0_, iil, iir, flx1);
-      member.team_barrier();
-
+      flx1(m,lm,k,j,i) = (n1_n_0_(m,lm,k,j,i)*(n1_n_0_(m,lm,k,j,i) < 0.0 ? iil : iir));
     }
   );
 
@@ -97,53 +86,39 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   // j-direction
 
   if (pmy_pack->pmesh->multi_d) {
-    scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 3;
     auto flx2 = iflx.x2f;
 
-    par_for_outer("rflux_x2",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke,
-      KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k)
+    par_for("rflux_x2",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je+1,is,ie,
+      KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
       {
-        ScrArray2D<Real> scr1(member.team_scratch(scr_level), nvars, ncells1);
-        ScrArray2D<Real> scr2(member.team_scratch(scr_level), nvars, ncells1);
-        ScrArray2D<Real> scr3(member.team_scratch(scr_level), nvars, ncells1);
-
-        for (int j=js-1; j<=je+1; ++j) {
-          // Permute scratch arrays.
-          auto iil     = scr1;
-          auto iil_jp1 = scr2;
-          auto iir     = scr3;
-          if ((j%2) == 0) {
-            iil     = scr2;
-            iil_jp1 = scr1;
-          }
-
-          // Reconstruct qR[j] and qL[j+1]
-          switch (recon_method_)
-          {
-            case ReconstructionMethod::dc:
-              DonorCellX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
-              break;
-            case ReconstructionMethod::plm:
-              PiecewiseLinearX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
-              break;
-            case ReconstructionMethod::ppm:
-              PiecewiseParabolicX2(member, m, k, j, is, ie, i0_, iil_jp1, iir);
-              break;
-            case ReconstructionMethod::wenoz:
-              WENOZX2(member, m, k, j, is-1, ie+1, i0_, iil_jp1, iir);
-              break;
-            default:
-              break;
-          }
-          member.team_barrier();
-
-          // compute fluxes over [js,je+1].  RS returns flux in input iir array
-          if (j>(js-1)) {
-            SpatialFlux(member, m, k, j, is, ie, nvars, n2_n_0_, iil, iir, flx2);
-            member.team_barrier();
-          }
-  
-        } // end of loop over j
+        // compute x1flux
+        Real iil, iir, scr;
+        switch (recon_method_)
+        {
+          case ReconstructionMethod::dc:
+            iil = i0_(m,lm,k,j-1,i);
+            iir = i0_(m,lm,k,j  ,i);
+            break;
+          case ReconstructionMethod::plm:
+            PLM(i0_(m,lm,k,j-2,i), i0_(m,lm,k,j-1,i), i0_(m,lm,k,j  ,i), iil, scr);
+            PLM(i0_(m,lm,k,j-1,i), i0_(m,lm,k,j  ,i), i0_(m,lm,k,j+1,i), scr, iir);
+            break;
+          case ReconstructionMethod::ppm:
+            PPM(i0_(m,lm,k,j-3,i), i0_(m,lm,k,j-2,i), i0_(m,lm,k,j-1,i),
+                i0_(m,lm,k,j  ,i), i0_(m,lm,k,j+1,i), iil, scr);
+            PPM(i0_(m,lm,k,j-2,i), i0_(m,lm,k,j-1,i), i0_(m,lm,k,j  ,i),
+                i0_(m,lm,k,j+1,i), i0_(m,lm,k,j+2,i), scr, iir);
+            break;
+          case ReconstructionMethod::wenoz:
+            WENOZ(i0_(m,lm,k,j-3,i), i0_(m,lm,k,j-2,i), i0_(m,lm,k,j-1,i),
+                  i0_(m,lm,k,j  ,i), i0_(m,lm,k,j+1,i), iil, scr);
+            WENOZ(i0_(m,lm,k,j-2,i), i0_(m,lm,k,j-1,i), i0_(m,lm,k,j  ,i),
+                  i0_(m,lm,k,j+1,i), i0_(m,lm,k,j+2,i), scr, iir);
+            break;
+          default:
+            break;
+        }
+        flx2(m,lm,k,j,i) = (n2_n_0_(m,lm,k,j,i)*(n2_n_0_(m,lm,k,j,i) < 0.0 ? iil : iir));
       }
     );
   }
@@ -152,53 +127,39 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   // k-direction. Note order of k,j loops switched
 
   if (pmy_pack->pmesh->three_d) {
-    scr_size = ScrArray2D<Real>::shmem_size(nvars, ncells1) * 3;
     auto flx3 = iflx.x3f;
 
-    par_for_outer("rflux_x3",DevExeSpace(), scr_size, scr_level, 0, nmb1, js, je,
-      KOKKOS_LAMBDA(TeamMember_t member, const int m, const int j)
+    par_for("rflux_x3",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke+1,js,je,is,ie,
+      KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
       {
-        ScrArray2D<Real> scr1(member.team_scratch(scr_level), nvars, ncells1);
-        ScrArray2D<Real> scr2(member.team_scratch(scr_level), nvars, ncells1);
-        ScrArray2D<Real> scr3(member.team_scratch(scr_level), nvars, ncells1);
-
-        for (int k=ks-1; k<=ke+1; ++k) {
-          // Permute scratch arrays.
-          auto iil     = scr1;
-          auto iil_kp1 = scr2;
-          auto iir     = scr3;
-          if ((k%2) == 0) {
-            iil     = scr2;
-            iil_kp1 = scr1;
-          }
-
-          // Reconstruct qR[k] and qL[k+1]
-          switch (recon_method_)
-          {
-            case ReconstructionMethod::dc:
-              DonorCellX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
-              break;
-            case ReconstructionMethod::plm:
-              PiecewiseLinearX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
-              break;
-            case ReconstructionMethod::ppm:
-              PiecewiseParabolicX3(member, m, k, j, is, ie, i0_, iil_kp1, iir);
-              break;
-            case ReconstructionMethod::wenoz:
-              WENOZX3(member, m, k, j, is-1, ie+1, i0_, iil_kp1, iir);
-              break;
-            default:
-              break;
-          }
-          member.team_barrier();
-
-          // compute fluxes over [ks,ke+1].  RS returns flux in input iir array
-          if (k>(ks-1)) {
-            SpatialFlux(member, m, k, j, is, ie, nvars, n3_n_0_, iil, iir, flx3);
-            member.team_barrier();
-          }
-
-        } // end loop over k
+        // compute x1flux
+        Real iil, iir, scr;
+        switch (recon_method_)
+        {
+          case ReconstructionMethod::dc:
+            iil = i0_(m,lm,k-1,j,i);
+            iir = i0_(m,lm,k  ,j,i);
+            break;
+          case ReconstructionMethod::plm:
+            PLM(i0_(m,lm,k-2,j,i), i0_(m,lm,k-1,j,i), i0_(m,lm,k  ,j,i), iil, scr);
+            PLM(i0_(m,lm,k-1,j,i), i0_(m,lm,k  ,j,i), i0_(m,lm,k+1,j,i), scr, iir);
+            break;
+          case ReconstructionMethod::ppm:
+            PPM(i0_(m,lm,k-3,j,i), i0_(m,lm,k-2,j,i), i0_(m,lm,k-1,j,i),
+                i0_(m,lm,k  ,j,i), i0_(m,lm,k+1,j,i), iil, scr);
+            PPM(i0_(m,lm,k-2,j,i), i0_(m,lm,k-1,j,i), i0_(m,lm,k  ,j,i),
+                i0_(m,lm,k+1,j,i), i0_(m,lm,k+2,j,i), scr, iir);
+            break;
+          case ReconstructionMethod::wenoz:
+            WENOZ(i0_(m,lm,k-3,j,i), i0_(m,lm,k-2,j,i), i0_(m,lm,k-1,j,i),
+                  i0_(m,lm,k  ,j,i), i0_(m,lm,k+1,j,i), iil, scr);
+            WENOZ(i0_(m,lm,k-2,j,i), i0_(m,lm,k-1,j,i), i0_(m,lm,k  ,j,i),
+                  i0_(m,lm,k+1,j,i), i0_(m,lm,k+2,j,i), scr, iir);
+            break;
+          default:
+            break;
+        }
+        flx3(m,lm,k,j,i) = (n3_n_0_(m,lm,k,j,i)*(n3_n_0_(m,lm,k,j,i) < 0.0 ? iil : iir));
       }
     );
   }
@@ -209,65 +170,40 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   auto eta_mn_ = eta_mn;
   auto xi_mn_ = xi_mn;
 
-  par_for("rflux_a1", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
+  par_for("rflux_a",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
     {
-      Real s_xi, s_eta;
-      int nb_1, nb_2;
-
-      for (int lm=0; lm<nvars; ++lm) {
-        Real im = i0_(m,lm,k,j,i);
-        Real s_mapr_av = 1.0e16;
-        Real s_mapr_xi, s_mapr_eta;
-        int neighbors[6];
-        int num_neighbors = GetNeighbors(lm, neighbors);
-        for (int nb=0; nb<num_neighbors; ++nb) {
-          nb_1 = nb;
-          nb_2 = (nb+1)%num_neighbors;
-          Real imn   = i0_(m,neighbors[nb_1],k,j,i);
-          Real imnp1 = i0_(m,neighbors[nb_2],k,j,i);
-          Real denom = (1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)
-                             - xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2)));
-          s_xi = (eta_mn_.d_view(lm,nb_1)*(imnp1-im)
-                  -eta_mn_.d_view(lm,nb_2)*(imn-im))*denom;
-          s_eta = -(xi_mn_.d_view(lm,nb_1)*(imnp1-im)
-                    -xi_mn_.d_view(lm,nb_2)*(imn-im))*denom;
-          if (sqrt(SQR(s_xi)+SQR(s_eta)) < s_mapr_av) {
-            s_mapr_xi = s_xi;
-            s_mapr_eta = s_eta;
-            s_mapr_av = sqrt(SQR(s_xi)+SQR(s_eta));
-          }
+      Real im = i0_(m,lm,k,j,i);
+      Real s_mapr_av = 1.0e16;
+      Real s_mapr_xi, s_mapr_eta;
+      int neighbors[6];
+      int num_neighbors = GetNeighbors(lm, neighbors);
+      for (int nb=0; nb<num_neighbors; ++nb) {
+        int nb_1 = nb;
+        int nb_2 = (nb+1)%num_neighbors;
+        Real imn   = i0_(m,neighbors[nb_1],k,j,i);
+        Real imnp1 = i0_(m,neighbors[nb_2],k,j,i);
+        Real denom = (1.0/(eta_mn_.d_view(lm,nb_1)*xi_mn_.d_view(lm,nb_2)
+                           - xi_mn_.d_view(lm,nb_1)*eta_mn_.d_view(lm,nb_2)));
+        Real s_xi = (eta_mn_.d_view(lm,nb_1)*(imnp1-im)
+                     - eta_mn_.d_view(lm,nb_2)*(imn-im))*denom;
+        Real s_eta = -(xi_mn_.d_view(lm,nb_1)*(imnp1-im)
+                       - xi_mn_.d_view(lm,nb_2)*(imn-im))*denom;
+        if (sqrt(SQR(s_xi)+SQR(s_eta)) < s_mapr_av) {
+          s_mapr_xi = s_xi;
+          s_mapr_eta = s_eta;
+          s_mapr_av = sqrt(SQR(s_xi)+SQR(s_eta));
         }
-        for (int nb=0; nb<num_neighbors; ++nb) {
-          Real i_edge = (im + 0.5*s_mapr_xi*xi_mn_.d_view(lm,nb_1)
-                         + 0.5*s_mapr_eta*eta_mn_.d_view(lm,nb_1));
-          flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb)*i_edge;
-        }
+      }
+      for (int nb=0; nb<num_neighbors; ++nb) {
+        Real i_edge = (im + 0.5*s_mapr_xi*xi_mn_.d_view(lm,nb)
+                       + 0.5*s_mapr_eta*eta_mn_.d_view(lm,nb));
+        flxa_(m,lm,k,j,i,nb) = na_n_0_(m,lm,k,j,i,nb)*i_edge;
       }
     }
   );
 
   return TaskStatus::complete;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn  void SpatialFlux
-//! \brief Inline function for computing radiation spatial fluxes
-
-KOKKOS_INLINE_FUNCTION
-void SpatialFlux(TeamMember_t const &member,
-     const int m, const int k, const int j,  const int il, const int iu, int nvar,
-     const DvceArray5D<Real> nn, const ScrArray2D<Real> &iil, const ScrArray2D<Real> &iir,
-     DvceArray5D<Real> flx)
-{
-  par_for_inner(member, il, iu, [&](const int i)
-  {
-    // TODO(@gnwong, @pdmullen) think about a unified layout for spatial/angular fluxes
-    for (int lm=0; lm<nvar; ++lm) {
-      flx(m,lm,k,j,i) = (nn(m,lm,k,j,i)*(nn(m,lm,k,j,i) < 0.0 ? iil(lm,i) : iir(lm,i)));
-    }
-  });
-  return;
 }
 
 } // namespace radiation

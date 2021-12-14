@@ -143,24 +143,25 @@ public:
 
   // Helper geometry functions for geodesic mesh. Implemented in radiation_geom.cpp
   int GetNeighbors(int lm, int neighbors[6]) const;
-  double ComputeWeightAndDualEdges(int lm, double length[6]) const;
-  void GetGridCartPosition(int n, double *x, double *y, double *z) const;
-  void GetGridCartPositionMid(int n, int nb, double *x, double *y, double *z) const;
+  Real ComputeWeightAndDualEdges(int lm, Real length[6]) const;
+  void GetGridCartPosition(int n, Real *x, Real *y, Real *z) const;
+  void GetGridCartPositionMid(int n, int nb, Real *x, Real *y, Real *z) const;
 
-  void CircumcenterNormalized(double x1, double x2, double x3,
-                              double y1, double y2, double y3,
-                              double z1, double z2, double z3,
-                              double *x, double *y, double *z) const;
+  void CircumcenterNormalized(Real x1, Real x2, Real x3,
+                              Real y1, Real y2, Real y3,
+                              Real z1, Real z2, Real z3,
+                              Real *x, Real *y, Real *z) const;
  
-  void GetGridPositionPolar(int ic, double *theta, double *phi) const;
-  void GreatCircleParam(double zeta1, double zeta2, double psi1, double psi2, double *apar, double *psi0) const;
-  void UnitFluxDir(int ic1, int ic2, double *dtheta, double *dphi) const;
-  void OptimalAngles(double ang[2]) const;
-  void RotateGrid(double zeta, double psi);
+  void GetGridPositionPolar(int ic, Real *theta, Real *phi) const;
+  void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
+                        Real *apar, Real *psi0) const;
+  void UnitFluxDir(int ic1, int ic2, Real *dtheta, Real *dphi) const;
+  void OptimalAngles(Real ang[2]) const;
+  void RotateGrid(Real zeta, Real psi);
 
   // TODO inline this
-  double ArcLength(int ic1, int ic2) const;
-  void ComputeXiEta(int lm, double xi[6], double eta[6]) const;
+  Real ArcLength(int ic1, int ic2) const;
+  void ComputeXiEta(int lm, Real xi[6], Real eta[6]) const;
 
   // Moments functions
   void SetMoments(DvceArray5D<Real> &prim);

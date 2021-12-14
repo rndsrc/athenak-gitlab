@@ -25,7 +25,8 @@ namespace radiation {
 //! \fn  void Radiation::InitMesh()
 //! \brief Initialize angular mesh
 
-void Radiation::InitAngularMesh() {
+void Radiation::InitAngularMesh()
+{
   int nlev = nlevels;
   Real sin_ang = 2.0/sqrt(5.0);
   Real cos_ang = 1.0/sqrt(5.0);
@@ -277,7 +278,8 @@ void Radiation::InitAngularMesh() {
 //! \fn  void Radiation::InitCoordinateFrame()
 //! \brief Initialize frame related quantities.
 
-void Radiation::InitCoordinateFrame() {
+void Radiation::InitCoordinateFrame()
+{
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -586,7 +588,8 @@ void Radiation::InitCoordinateFrame() {
 
 // TODO(@gnwong, @pdmullen) implement new function that returns num neighbors using
 // if statements instead of also computing the neighbors too
-int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
+int Radiation::GetNeighbors(int lm, int neighbors[6])
+const {
   int num_neighbors;
   int nlev = nlevels;
   auto amesh_indices_ = amesh_indices;
@@ -628,7 +631,8 @@ int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
   return num_neighbors;
 }
 
-Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
+Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6])
+const {
   // TODO(@gnwong, @pdmullen) how safe? assert n >= 0 && n < numverts?
   int nvec[6];
   int nnum = GetNeighbors(lm, nvec);
@@ -665,7 +669,8 @@ Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
   return weight;
 }
 
-void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z) const {
+void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z)
+const {
   // TODO(@gnwong, @pdmullen) should we assert n >= 0 and n < numverties? how safe are we?
   auto nlevels_ = nlevels;
   auto amesh_normals_ = amesh_normals;
@@ -684,7 +689,8 @@ void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z) const {
   }
 }
 
-void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z) const {
+void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z)
+const {
   // TODO(@gnwong, @pdmullen) should we assert?  (n good, nb good, (n,nb) are neighbors)
   Real x1, y1, z1;
   Real x2, y2, z2;
@@ -702,7 +708,8 @@ void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z
 void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
                                        Real y1, Real y2, Real y3,
                                        Real z1, Real z2, Real z3,
-                                       Real *x, Real *y, Real *z) const {
+                                       Real *x, Real *y, Real *z)
+const {
   Real a = sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
   Real b = sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
   Real c = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
@@ -740,7 +747,8 @@ const {
   *apar = sqrt(atilde*atilde+btilde*btilde);
 }
 
-void Radiation::UnitFluxDir(int ic1, int ic2, Real * dtheta, Real * dphi) const {
+void Radiation::UnitFluxDir(int ic1, int ic2, Real *dtheta, Real *dphi)
+const {
   Real zeta1, psi1;
   GetGridPositionPolar(ic1,&zeta1,&psi1);
   Real xm, ym, zm;
@@ -764,7 +772,8 @@ void Radiation::UnitFluxDir(int ic1, int ic2, Real * dtheta, Real * dphi) const 
   }
 }
 
-void Radiation::OptimalAngles(Real ang[2]) const {
+void Radiation::OptimalAngles(Real ang[2])
+const {
   int nzeta = 200;
   int npsi = 200;
   Real maxangle = ArcLength(0,1);
@@ -807,7 +816,8 @@ void Radiation::OptimalAngles(Real ang[2]) const {
   
 }
 
-void Radiation::RotateGrid(Real zeta, Real psi) {
+void Radiation::RotateGrid(Real zeta, Real psi)
+{
   Real kx = -sin(psi);
   Real ky = cos(psi);
   Real vx, vy, vz;
@@ -863,7 +873,8 @@ void Radiation::RotateGrid(Real zeta, Real psi) {
   }
 }
 
-void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6]) const {
+void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6])
+const {
   // TODO(@gnwong, @pdmullen) could assert here
   Real x0, y0, z0;
   GetGridCartPosition(lm, &x0,&y0,&z0);
@@ -898,8 +909,8 @@ void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6]) const {
   }
 }
 
-
-Real Radiation::ArcLength(int ic1, int ic2) const {
+Real Radiation::ArcLength(int ic1, int ic2)
+const {
   Real x1, y1, z1;
   GetGridCartPosition(ic1,&x1,&y1,&z1);
   Real x2, y2, z2;

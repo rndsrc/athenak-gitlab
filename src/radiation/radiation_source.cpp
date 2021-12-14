@@ -33,7 +33,7 @@ bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root);
 
 TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
 {
-  if (stage != (pdriver->nexp_stages)) {
+  if (not rad_source || stage != (pdriver->nexp_stages)) {
     return TaskStatus::complete; // only execute last stage
   }
 
@@ -41,7 +41,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
-  auto nangles_ = nangles;
+  int nangles_ = nangles;
 
   Real dt_ = pmy_pack->pmesh->dt;
   int nmb1 = pmy_pack->nmb_thispack - 1;
@@ -80,6 +80,14 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
   par_for("rad_source",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
+      // scratch arrays
+      Real *omega_cm_ = new Real[nangles_];
+      Real *intensity_cm_ = new Real[nangles_];
+      Real *n0_cm_= new Real[nangles_];
+      Real *vncsigma2_ = new Real[nangles_];
+      Real *di_cm_ = new Real[nangles_];
+
+      // coordinates
       Real &x1min = coord.mb_size.d_view(m).x1min;
       Real &x1max = coord.mb_size.d_view(m).x1max;
       int nx1 = coord.mb_indcs.nx1;
@@ -125,16 +133,13 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
 
       // compute intensities and solid angles in comoving frame
       Real wght_sum_ = 0.0;
-      Real omega_cm_[nangles_];
-      Real intensity_cm_[nangles_];
-      Real n0_cm_[nangles_];
       for (int lm=0; lm<nangles_; ++lm) {
         Real un_tet = (u_tet_[1]*nh_c_.d_view(lm,1) +
                        u_tet_[2]*nh_c_.d_view(lm,2) +
                        u_tet_[3]*nh_c_.d_view(lm,3));
         n0_cm_[lm] = (u_tet_[0]*nh_c_.d_view(lm,0) - un_tet);
         omega_cm_[lm] = solid_angle_.d_view(lm)/SQR(n0_cm_[lm]);
-        intensity_cm_[lm] = i1(m,lm,k,j,i)*SQR(SQR(n0_cm_[lm]));
+        intensity_cm_[lm] = i1_(m,lm,k,j,i)*SQR(SQR(n0_cm_[lm]));
         wght_sum_ += omega_cm_[lm];
       }
 
@@ -162,7 +167,6 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
       Real suma2 = 0.0;
       Real suma3 = 0.0;
       Real jr_cm = 0.0;
-      Real vncsigma2_[nangles_];
       for (int lm=0; lm<nangles_; ++lm) {
         Real n0_local = nmu_(m,lm,k,j,i,0);
         Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm_[lm]);
@@ -178,7 +182,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
       // compute coefficients
       Real coef[2] = {0.0};
       coef[1] = ((dtaucsigmaa+dtaucsigmap-(dtaucsigmaa+dtaucsigmap)*suma1
-                  / (1.0-suma3))*arad*(gamma_-1.0)/rho);
+                  / (1.0-suma3))*arad_*(gamma_-1.0)/rho);
       coef[0] = (-tgas-(dtaucsigmaa+dtaucsigmap)*suma2*(gamma_-1.0)/(rho*(1.0-suma3)));
 
       // Calculate new gas temperature
@@ -194,13 +198,12 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
       }
 
       // Update the comoving frame specific intensity
-      Real di_cm[nangles_];
       if (not badcell) {
         // Calculate emission coefficient and updated jr_cm
-        Real emission = arad*SQR(SQR(tgasnew));
+        Real emission = arad_*SQR(SQR(tgasnew));
         jr_cm = (suma1*emission + suma2)/(1.0 - suma3);
         for (int lm=0; lm<nangles_; ++lm) {
-          di_cm[lm] = ( (  (dtcsigmas-dtcsigmap)*jr_cm
+          di_cm_[lm] = ( (  (dtcsigmas-dtcsigmap)*jr_cm
                          + (dtcsigmaa+dtcsigmap)*emission
                          - (dtcsigmas+dtcsigmaa)*intensity_cm_[lm])*vncsigma2_[lm]);
         }
@@ -208,7 +211,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
 
       // Apply radiation-fluid coupling to radiation in coordinate frame
       for (int lm=0; lm<nangles_; ++lm) {
-        i0(m,lm,k,j,i) = (i0(m,lm,k,j,i) + (di_cm[lm]/(4.0*M_PI*SQR(SQR(n0_cm_[lm])))));
+        i0_(m,lm,k,j,i) = (i0_(m,lm,k,j,i)+(di_cm_[lm]/(4.0*M_PI*SQR(SQR(n0_cm_[lm])))));
       }
 
       // apply coupling to hydro
@@ -217,14 +220,14 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
         Real m_old[4] = {0.0}, m_new[4] = {0.0};
         for (int lm=0; lm<nangles_; ++lm) {
           Real sa = solid_angle_.d_view(lm);
-          m_old[0] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,0)*i1(m,lm,k,j,i)*sa);
-          m_old[1] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,1)*i1(m,lm,k,j,i)*sa);
-          m_old[2] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,2)*i1(m,lm,k,j,i)*sa);
-          m_old[3] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,3)*i1(m,lm,k,j,i)*sa);
-          m_new[0] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,0)*i0(m,lm,k,j,i)*sa);
-          m_new[1] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,1)*i0(m,lm,k,j,i)*sa);
-          m_new[2] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,2)*i0(m,lm,k,j,i)*sa);
-          m_new[3] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,3)*i0(m,lm,k,j,i)*sa);
+          m_old[0] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,0)*i1_(m,lm,k,j,i)*sa);
+          m_old[1] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,1)*i1_(m,lm,k,j,i)*sa);
+          m_old[2] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,2)*i1_(m,lm,k,j,i)*sa);
+          m_old[3] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,3)*i1_(m,lm,k,j,i)*sa);
+          m_new[0] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,0)*i0_(m,lm,k,j,i)*sa);
+          m_new[1] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,1)*i0_(m,lm,k,j,i)*sa);
+          m_new[2] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,2)*i0_(m,lm,k,j,i)*sa);
+          m_new[3] += (nmu_(m,lm,k,j,i,0)*n_mu_(m,lm,k,j,i,3)*i0_(m,lm,k,j,i)*sa);
         }
 
         // update conserved variables
@@ -233,6 +236,13 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
         // u0_(m,IM2,k,j,i) += (m_old[2] - m_new[2]);
         // u0_(m,IM3,k,j,i) += (m_old[3] - m_new[3]);
       }
+
+      // delete scratch arrays
+      delete [] omega_cm_;
+      delete [] intensity_cm_;
+      delete [] n0_cm_;
+      delete [] vncsigma2_;
+      delete [] di_cm_;
     }
   );
 
