@@ -57,4 +57,5 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage)
 
   return TaskStatus::complete;
 }
+
 } // namespace radiation

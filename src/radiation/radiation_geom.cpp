@@ -21,11 +21,31 @@
   
 namespace radiation {
 
+KOKKOS_INLINE_FUNCTION
+void DeviceUnitFluxDir(int ic1, int ic2, int nlvl,
+                       DualArray4D<Real> ah_norm,
+                       DualArray2D<Real> ap_norm,
+                       Real *dtheta, Real *dphi);
+KOKKOS_INLINE_FUNCTION
+void DeviceGetGridCartPosition(int lm, int nlvl,
+                               DualArray4D<Real> ah_norm,
+                               DualArray2D<Real> ap_norm,
+                               Real *x, Real *y, Real *z);
+KOKKOS_INLINE_FUNCTION
+void DeviceGetGridCartPositionMid(int lm, int nb, int nlvl,
+                                  DualArray4D<Real> ah_norm,
+                                  DualArray2D<Real> ap_norm,
+                                  Real *x, Real *y, Real *z);
+KOKKOS_INLINE_FUNCTION
+void DeviceGreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
+                            Real *apar, Real *psi0);
+
 //----------------------------------------------------------------------------------------
 //! \fn  void Radiation::InitMesh()
 //! \brief Initialize angular mesh
 
-void Radiation::InitAngularMesh() {
+void Radiation::InitAngularMesh()
+{
   int nlev = nlevels;
   Real sin_ang = 2.0/sqrt(5.0);
   Real cos_ang = 1.0/sqrt(5.0);
@@ -254,9 +274,7 @@ void Radiation::InitAngularMesh() {
       nh_f_.h_view(lm,nb,2) = ym;
       nh_f_.h_view(lm,nb,3) = zm;
     }
-    
-    // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
-    if (nn==5) {
+        if (nn==5) {
       nh_f_.h_view(lm,5,0) = std::numeric_limits<Real>::quiet_NaN();
       nh_f_.h_view(lm,5,1) = std::numeric_limits<Real>::quiet_NaN();
       nh_f_.h_view(lm,5,2) = std::numeric_limits<Real>::quiet_NaN();
@@ -277,7 +295,8 @@ void Radiation::InitAngularMesh() {
 //! \fn  void Radiation::InitCoordinateFrame()
 //! \brief Initialize frame related quantities.
 
-void Radiation::InitCoordinateFrame() {
+void Radiation::InitCoordinateFrame()
+{
   auto &indcs = pmy_pack->coord.coord_data.mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -286,6 +305,9 @@ void Radiation::InitCoordinateFrame() {
   int &is = indcs.is;
   int &js = indcs.js;
   int &ks = indcs.ks;
+
+  int nangles_ = nangles;
+  int nlev_ = nlevels;
 
   int &nmb = pmy_pack->nmb_thispack;
   auto coord = pmy_pack->coord.coord_data;
@@ -317,7 +339,7 @@ void Radiation::InitCoordinateFrame() {
       ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
                     e, e_cov, omega);
 
-      for (int lm=0; lm<nangles; ++lm) {
+      for (int lm=0; lm<nangles_; ++lm) {
         Real n0 = 0.0;
         Real n1 = 0.0;
         Real n2 = 0.0;
@@ -373,14 +395,14 @@ void Radiation::InitCoordinateFrame() {
       ComputeTetrad(x1f, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
                     e, e_cov, omega);
 
-      for (int lm=0; lm<nangles; ++lm) {
+      for (int lm=0; lm<nangles_; ++lm) {
         Real n1 = 0.0;
         Real n_0 = 0.0;
         for (int d = 0; d < 4; ++d) {
-          n1 += e[d][1] * nh_c_.d_view(lm,d);
-          n_0 += e_cov[d][0] * nh_c_.d_view(lm,d);
+          n1 += e[d][1]*nh_c_.d_view(lm,d);
+          n_0 += e_cov[d][0]*nh_c_.d_view(lm,d);
         }
-        n1_n_0_(m,lm,k,j,i) = n1 * n_0;
+        n1_n_0_(m,lm,k,j,i) = n1*n_0;
       }
     }
   );
@@ -410,14 +432,14 @@ void Radiation::InitCoordinateFrame() {
       ComputeTetrad(x1v, x2f, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
                     e, e_cov, omega);
 
-      for (int lm=0; lm<nangles; ++lm) {
+      for (int lm=0; lm<nangles_; ++lm) {
         Real n2 = 0.0;
         Real n_0 = 0.0;
         for (int d = 0; d < 4; ++d) {
-          n2 += e[d][2] * nh_c_.d_view(lm,d);
-          n_0 += e_cov[d][0] * nh_c_.d_view(lm,d);
+          n2 += e[d][2]*nh_c_.d_view(lm,d);
+          n_0 += e_cov[d][0]*nh_c_.d_view(lm,d);
         }
-        n2_n_0_(m,lm,k,j,i) = n2 * n_0;
+        n2_n_0_(m,lm,k,j,i) = n2*n_0;
       }
     }
   );
@@ -448,14 +470,14 @@ void Radiation::InitCoordinateFrame() {
       ComputeTetrad(x1v, x2v, x3f, coord.snake, coord.bh_mass, coord.bh_spin,
                     e, e_cov, omega);
 
-      for (int lm=0; lm<nangles; ++lm) {
+      for (int lm=0; lm<nangles_; ++lm) {
         Real n3 = 0.0;
         Real n_0 = 0.0;
         for (int d = 0; d < 4; ++d) {
-          n3 += e[d][3] * nh_c_.d_view(lm,d);
-          n_0 += e_cov[d][0] * nh_c_.d_view(lm,d);
+          n3 += e[d][3]*nh_c_.d_view(lm,d);
+          n_0 += e_cov[d][0]*nh_c_.d_view(lm,d);
         }
-        n3_n_0_(m,lm,k,j,i) = n3 * n_0;
+        n3_n_0_(m,lm,k,j,i) = n3*n_0;
       }
     }
   );
@@ -464,6 +486,8 @@ void Radiation::InitCoordinateFrame() {
   auto num_neighbors_ = num_neighbors;
   auto ind_neighbors_ = ind_neighbors;
   auto na_n_0_ = na_n_0;
+  auto amesh_normals_ = amesh_normals;
+  auto ameshp_normals_ = ameshp_normals;
 
   par_for("rad_na_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
@@ -487,45 +511,43 @@ void Radiation::InitCoordinateFrame() {
       ComputeTetrad(x1v, x2v, x3v, coord.snake, coord.bh_mass, coord.bh_spin,
                     e, e_cov, omega);
 
-      for (int lm=0; lm<nangles; ++lm) {
+      for (int lm=0; lm<nangles_; ++lm) {
         for (int nb=0; nb<num_neighbors_.d_view(lm); ++nb) {
             Real zeta_f = acos(nh_f_.d_view(lm,nb,3));
             Real psi_f  = atan2(nh_f_.d_view(lm,nb,2), nh_f_.d_view(lm,nb,1));
-        
+
             Real na1 = 0.0;
             Real na2 = 0.0;
             for (int n = 0; n < 4; ++n) {
               for (int p = 0; p < 4; ++p) {
                 na1 += (1.0/sin(zeta_f)*nh_f_.d_view(lm,nb,n)*nh_f_.d_view(lm,nb,p)
-                        * (nh_f_.d_view(lm,nb,0) * omega[3][n][p]
-                        -  nh_f_.d_view(lm,nb,3) * omega[0][n][p]));
+                        * (nh_f_.d_view(lm,nb,0)*omega[3][n][p]
+                        -  nh_f_.d_view(lm,nb,3)*omega[0][n][p]));
                 na2 += (1.0/SQR(sin(zeta_f))*nh_f_.d_view(lm,nb,n)*nh_f_.d_view(lm,nb,p)
-                        * (nh_f_.d_view(lm,nb,2) * omega[1][n][p]
-                        -  nh_f_.d_view(lm,nb,1) * omega[n][p][2]));
+                        * (nh_f_.d_view(lm,nb,2)*omega[1][n][p]
+                        -  nh_f_.d_view(lm,nb,1)*omega[n][p][2]));
               }
             }
-            
+
             Real unit_zeta, unit_psi;
-            UnitFluxDir(lm,ind_neighbors_.d_view(lm,nb),&unit_zeta,&unit_psi);
-            
+            DeviceUnitFluxDir(lm,ind_neighbors_.d_view(lm,nb),nlev_,
+                              amesh_normals_,ameshp_normals_,&unit_zeta,&unit_psi);
+
             Real na = na1*unit_zeta + na2*unit_psi;
-          
             Real n_0 = 0.0;
             for (int n = 0; n < 4; ++n) {
-              n_0 += e_cov[n][0] * nh_f_.d_view(lm,nb,n);
+              n_0 += e_cov[n][0]*nh_f_.d_view(lm,nb,n);
             }
-            na_n_0_(m,lm,k,j,i,nb) = na * n_0;
-
+            na_n_0_(m,lm,k,j,i,nb) = na*n_0;
         }
       }
-
     }
   );
-  
+
   // Calculate norm_to_tet
   auto norm_to_tet_ = norm_to_tet;
 
-  par_for("rad_norm_to_tet", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, n1,
+  par_for("rad_norm_to_tet", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i)
     {
       Real &x1min = coord.mb_size.d_view(m).x1min;
@@ -586,7 +608,8 @@ void Radiation::InitCoordinateFrame() {
 
 // TODO(@gnwong, @pdmullen) implement new function that returns num neighbors using
 // if statements instead of also computing the neighbors too
-int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
+int Radiation::GetNeighbors(int lm, int neighbors[6])
+const {
   int num_neighbors;
   int nlev = nlevels;
   auto amesh_indices_ = amesh_indices;
@@ -594,13 +617,13 @@ int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
   // handle north pole 
   if (lm==10*nlev*nlev) {
     for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = amesh_indices_.d_view(bl,1,1);
+      neighbors[bl] = amesh_indices_.h_view(bl,1,1);
     }
     neighbors[5] = not_a_patch;
     num_neighbors = 5;
   } else if (lm == 10*nlev*nlev + 1) {  // handle south pole
     for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = amesh_indices_.d_view(bl,nlev,2*nlev);
+      neighbors[bl] = amesh_indices_.h_view(bl,nlev,2*nlev);
     }
     neighbors[5] = not_a_patch;
     num_neighbors = 5;
@@ -608,28 +631,26 @@ int Radiation::GetNeighbors(int lm, int neighbors[6]) const {
     int ibl0 =  lm / (2*nlev*nlev);
     int ibl1 = (lm % (2*nlev*nlev)) / (2*nlev);
     int ibl2 = (lm % (2*nlev*nlev)) % (2*nlev);
-    neighbors[0] = amesh_indices_.d_view(ibl0, ibl1+1, ibl2+2);
-    neighbors[1] = amesh_indices_.d_view(ibl0, ibl1+2, ibl2+1);
-    neighbors[2] = amesh_indices_.d_view(ibl0, ibl1+2, ibl2);
-    neighbors[3] = amesh_indices_.d_view(ibl0, ibl1+1, ibl2);
-    neighbors[4] = amesh_indices_.d_view(ibl0, ibl1  , ibl2+1);
+    neighbors[0] = amesh_indices_.h_view(ibl0, ibl1+1, ibl2+2);
+    neighbors[1] = amesh_indices_.h_view(ibl0, ibl1+2, ibl2+1);
+    neighbors[2] = amesh_indices_.h_view(ibl0, ibl1+2, ibl2);
+    neighbors[3] = amesh_indices_.h_view(ibl0, ibl1+1, ibl2);
+    neighbors[4] = amesh_indices_.h_view(ibl0, ibl1  , ibl2+1);
 
     // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
     if (lm % (2*nlev*nlev) == nlev-1 || lm % (2*nlev*nlev) == 2*nlev-1) {
       neighbors[5] = not_a_patch;
       num_neighbors = 5;
     } else {
-      neighbors[5] = amesh_indices_.d_view(ibl0, ibl1, ibl2+2);
+      neighbors[5] = amesh_indices_.h_view(ibl0, ibl1, ibl2+2);
       num_neighbors = 6;
     }
-    
   }
-
   return num_neighbors;
 }
 
-Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
-  // TODO(@gnwong, @pdmullen) how safe? assert n >= 0 && n < numverts?
+Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6])
+const {
   int nvec[6];
   int nnum = GetNeighbors(lm, nvec);
   Real x0, y0, z0;
@@ -656,8 +677,6 @@ Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
     weight += 2.0*atan(numerator/denominator);
     length[nb] = acos(scalprod_12);
   }
-  
-  // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
   if (nnum == 5) {
     length[5] = std::numeric_limits<Real>::quiet_NaN();
   }
@@ -665,8 +684,8 @@ Real Radiation::ComputeWeightAndDualEdges(int lm, Real length[6]) const {
   return weight;
 }
 
-void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z) const {
-  // TODO(@gnwong, @pdmullen) should we assert n >= 0 and n < numverties? how safe are we?
+void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z)
+const {
   auto nlevels_ = nlevels;
   auto amesh_normals_ = amesh_normals;
   auto ameshp_normals_ = ameshp_normals;
@@ -674,18 +693,18 @@ void Radiation::GetGridCartPosition(int lm, Real *x, Real *y, Real *z) const {
   int ibl1 = (lm % (2*nlevels_*nlevels_)) / (2*nlevels_);
   int ibl2 = (lm % (2*nlevels_*nlevels_)) % (2*nlevels_);
   if (ibl0 == 5) {
-    *x = ameshp_normals_.d_view(ibl2, 0);  // TODO(@gnwong, @pdmullen) okay as [dh]_view?
-    *y = ameshp_normals_.d_view(ibl2, 1);
-    *z = ameshp_normals_.d_view(ibl2, 2);
+    *x = ameshp_normals_.h_view(ibl2, 0);
+    *y = ameshp_normals_.h_view(ibl2, 1);
+    *z = ameshp_normals_.h_view(ibl2, 2);
   } else {
-    *x = amesh_normals_.d_view(ibl0,ibl1+1,ibl2+1,0);
-    *y = amesh_normals_.d_view(ibl0,ibl1+1,ibl2+1,1);
-    *z = amesh_normals_.d_view(ibl0,ibl1+1,ibl2+1,2);
+    *x = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,0);
+    *y = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,1);
+    *z = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,2);
   }
 }
 
-void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z) const {
-  // TODO(@gnwong, @pdmullen) should we assert?  (n good, nb good, (n,nb) are neighbors)
+void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z)
+const {
   Real x1, y1, z1;
   Real x2, y2, z2;
   GetGridCartPosition(lm,&x1,&y1,&z1);
@@ -699,72 +718,8 @@ void Radiation::GetGridCartPositionMid(int lm, int nb, Real *x, Real *y, Real *z
   *z = zm/norm;
 }
 
-void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
-                                       Real y1, Real y2, Real y3,
-                                       Real z1, Real z2, Real z3,
-                                       Real *x, Real *y, Real *z) const {
-  Real a = sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
-  Real b = sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
-  Real c = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
-  Real denom = 1.0/((a+c+b)*(a+c-b)*(a+b-c)*(b+c-a));
-  Real x_c = (x1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+x2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
-              + x3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
-  Real y_c = (y1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+y2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
-              + y3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
-  Real z_c = (z1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+z2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
-              + z3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
-  Real norm_c = sqrt(SQR(x_c)+SQR(y_c)+SQR(z_c));
-  *x = x_c/norm_c;
-  *y = y_c/norm_c;
-  *z = z_c/norm_c;
-}
-
-
-void Radiation::GetGridPositionPolar(int ic, Real * theta, Real * phi)
+void Radiation::OptimalAngles(Real ang[2])
 const {
-  // TODO(@gnwong, @pdmullen) rewrite?
-  // assert(ic >= 0 && ic < NumVertices());
-  Real x_, y_, z_;
-  GetGridCartPosition(ic,&x_,&y_,&z_);
-  *theta = acos(z_);
-  *phi   = atan2(y_,x_);
-}
-
-void Radiation::GreatCircleParam(Real zeta1, Real zeta2,
-                                 Real psi1, Real psi2,
-                                 Real *apar, Real *psi0)
-const {
-  Real atilde = (sin(psi2)/tan(zeta1)-sin(psi1)/tan(zeta2))/sin(psi2-psi1);
-  Real btilde = (cos(psi2)/tan(zeta1)-cos(psi1)/tan(zeta2))/sin(psi1-psi2);
-  *psi0 = atan2(btilde, atilde);
-  *apar = sqrt(atilde*atilde+btilde*btilde);
-}
-
-void Radiation::UnitFluxDir(int ic1, int ic2, Real * dtheta, Real * dphi) const {
-  Real zeta1, psi1;
-  GetGridPositionPolar(ic1,&zeta1,&psi1);
-  Real xm, ym, zm;
-  GetGridCartPositionMid(ic1,ic2,&xm,&ym,&zm);
-  Real zetam = acos(zm);
-  Real psim  = atan2(ym,xm);
-  if (fabs(psim-psi1) < 1.0e-10 ||
-      fabs(fabs(zm)-1) < 1.0e-10 ||
-      fabs(fabs(cos(zeta1))-1) < 1.0e-10) {
-    *dtheta = copysign(1.0,zetam-zeta1);
-    *dphi = 0.0;
-  } else {
-    Real a_par, p_par;
-    GreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
-    Real zeta_deriv = (a_par*sin(psim-p_par)
-                       / (1.0+a_par*a_par*cos(psim-p_par)*cos(psim-p_par)));
-    Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetam)*sin(zetam));
-    Real signfactor = copysign(1.0,psim-psi1)*copysign(1.0,M_PI-fabs(psim-psi1));
-    *dtheta = signfactor * zeta_deriv * denom;
-    *dphi   = signfactor * denom;
-  }
-}
-
-void Radiation::OptimalAngles(Real ang[2]) const {
   int nzeta = 200;
   int npsi = 200;
   Real maxangle = ArcLength(0,1);
@@ -804,10 +759,10 @@ void Radiation::OptimalAngles(Real ang[2]) const {
       }
     }
   }
-  
 }
 
-void Radiation::RotateGrid(Real zeta, Real psi) {
+void Radiation::RotateGrid(Real zeta, Real psi)
+{
   Real kx = -sin(psi);
   Real ky = cos(psi);
   Real vx, vy, vz;
@@ -863,8 +818,8 @@ void Radiation::RotateGrid(Real zeta, Real psi) {
   }
 }
 
-void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6]) const {
-  // TODO(@gnwong, @pdmullen) could assert here
+void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6])
+const {
   Real x0, y0, z0;
   GetGridCartPosition(lm, &x0,&y0,&z0);
   int nvec[6];
@@ -890,21 +845,123 @@ void Radiation::ComputeXiEta(int lm, Real xi[6], Real eta[6]) const {
     eta[nb] = c_len*sin(a_angle);
     a_angle += acos(cos_a);
   }
-  
-  // TODO(@gnwong, @pdmullen) is it still necessary to use quiet NaN's here?
   if (nn==5) {
     xi[5] = std::numeric_limits<Real>::quiet_NaN();
     eta[5] = std::numeric_limits<Real>::quiet_NaN();
   }
 }
 
-
-Real Radiation::ArcLength(int ic1, int ic2) const {
+Real Radiation::ArcLength(int ic1, int ic2)
+const {
   Real x1, y1, z1;
   GetGridCartPosition(ic1,&x1,&y1,&z1);
   Real x2, y2, z2;
   GetGridCartPosition(ic2,&x2,&y2,&z2);
   return acos(x1*x2+y1*y2+z1*z2);
+}
+
+void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
+                                       Real y1, Real y2, Real y3,
+                                       Real z1, Real z2, Real z3,
+                                       Real *x, Real *y, Real *z)
+const {
+  Real a = sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
+  Real b = sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
+  Real c = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
+  Real denom = 1.0/((a+c+b)*(a+c-b)*(a+b-c)*(b+c-a));
+  Real x_c = (x1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+x2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + x3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real y_c = (y1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+y2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + y3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real z_c = (z1*SQR(a)*(SQR(b)+SQR(c)-SQR(a))+z2*SQR(b)*(SQR(c)+SQR(a)-SQR(b))
+              + z3*SQR(c)*(SQR(a)+SQR(b)-SQR(c)))*denom;
+  Real norm_c = sqrt(SQR(x_c)+SQR(y_c)+SQR(z_c));
+  *x = x_c/norm_c;
+  *y = y_c/norm_c;
+  *z = z_c/norm_c;
+}
+
+KOKKOS_INLINE_FUNCTION
+void DeviceUnitFluxDir(int ic1, int ic2, int nlvl,
+                       DualArray4D<Real> ah_norm,
+                       DualArray2D<Real> ap_norm,
+                       Real *dtheta, Real *dphi)
+{
+  Real x, y, z;
+  DeviceGetGridCartPosition(ic1,nlvl,ah_norm,ap_norm,&x,&y,&z);
+  Real zeta1 = acos(z);
+  Real psi1 = atan2(y,x);
+
+  Real xm, ym, zm;
+  DeviceGetGridCartPositionMid(ic1,ic2,nlvl,ah_norm,ap_norm,&xm,&ym,&zm);
+  Real zetam = acos(zm);
+  Real psim = atan2(ym,xm);
+
+  if (fabs(psim-psi1) < 1.0e-10 ||
+      fabs(fabs(zm)-1) < 1.0e-10 ||
+      fabs(fabs(cos(zeta1))-1) < 1.0e-10) {
+    *dtheta = copysign(1.0,zetam-zeta1);
+    *dphi = 0.0;
+  } else {
+    Real a_par, p_par;
+    DeviceGreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
+    Real zeta_deriv = (a_par*sin(psim-p_par)
+                       / (1.0+a_par*a_par*cos(psim-p_par)*cos(psim-p_par)));
+    Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetam)*sin(zetam));
+    Real signfactor = copysign(1.0,psim-psi1)*copysign(1.0,M_PI-fabs(psim-psi1));
+    *dtheta = signfactor*zeta_deriv*denom;
+    *dphi   = signfactor*denom;
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+void DeviceGetGridCartPosition(int lm, int nlvl,
+                               DualArray4D<Real> ah_norm,
+                               DualArray2D<Real> ap_norm,
+                               Real *x, Real *y, Real *z)
+{
+  int ibl0 =  lm / (2*nlvl*nlvl);
+  int ibl1 = (lm % (2*nlvl*nlvl)) / (2*nlvl);
+  int ibl2 = (lm % (2*nlvl*nlvl)) % (2*nlvl);
+  if (ibl0 == 5) {
+    *x = ap_norm.d_view(ibl2, 0);
+    *y = ap_norm.d_view(ibl2, 1);
+    *z = ap_norm.d_view(ibl2, 2);
+  } else {
+    *x = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,0);
+    *y = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,1);
+    *z = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,2);
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+void DeviceGetGridCartPositionMid(int lm, int nb, int nlvl,
+                                  DualArray4D<Real> ah_norm,
+                                  DualArray2D<Real> ap_norm,
+                                  Real *x, Real *y, Real *z)
+{
+  Real x1, y1, z1;
+  Real x2, y2, z2;
+  DeviceGetGridCartPosition(lm,nlvl,ah_norm,ap_norm,&x1,&y1,&z1);
+  DeviceGetGridCartPosition(nb,nlvl,ah_norm,ap_norm,&x2,&y2,&z2);
+  Real xm = 0.5*(x1+x2);
+  Real ym = 0.5*(y1+y2);
+  Real zm = 0.5*(z1+z2);
+  Real norm = sqrt(SQR(xm)+SQR(ym)+SQR(zm));
+  *x = xm/norm;
+  *y = ym/norm;
+  *z = zm/norm;
+}
+
+
+KOKKOS_INLINE_FUNCTION
+void DeviceGreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
+                            Real *apar, Real *psi0)
+{
+  Real atilde = (sin(psi2)/tan(zeta1)-sin(psi1)/tan(zeta2))/sin(psi2-psi1);
+  Real btilde = (cos(psi2)/tan(zeta1)-cos(psi1)/tan(zeta2))/sin(psi1-psi2);
+  *psi0 = atan2(btilde, atilde);
+  *apar = sqrt(atilde*atilde+btilde*btilde);
 }
 
 } // namespace radiation

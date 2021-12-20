@@ -6,7 +6,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file hydro.hpp
-//  \brief definitions for Hydro class
+//  \brief definitions for Radiation class
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -18,6 +18,50 @@ class EquationOfState;
 class Coordinates;
 class SourceTerms;
 class Driver;
+
+
+KOKKOS_INLINE_FUNCTION
+int DeviceGetNeighbors(int lm, int nlvl,
+                       DualArray3D<Real> a_indcs,
+                       int neighbors[6])
+{
+  int num_neighbors;
+
+  // handle north pole
+  if (lm==10*nlvl*nlvl) {
+    for (int bl = 0; bl < 5; ++bl) {
+      neighbors[bl] = a_indcs.d_view(bl,1,1);
+    }
+    neighbors[5] = -1;
+    num_neighbors = 5;
+  } else if (lm == 10*nlvl*nlvl + 1) {  // handle south pole
+    for (int bl = 0; bl < 5; ++bl) {
+      neighbors[bl] = a_indcs.d_view(bl,nlvl,2*nlvl);
+    }
+    neighbors[5] = -1;
+    num_neighbors = 5;
+  } else {
+    int ibl0 =  lm / (2*nlvl*nlvl);
+    int ibl1 = (lm % (2*nlvl*nlvl)) / (2*nlvl);
+    int ibl2 = (lm % (2*nlvl*nlvl)) % (2*nlvl);
+    neighbors[0] = a_indcs.d_view(ibl0, ibl1+1, ibl2+2);
+    neighbors[1] = a_indcs.d_view(ibl0, ibl1+2, ibl2+1);
+    neighbors[2] = a_indcs.d_view(ibl0, ibl1+2, ibl2);
+    neighbors[3] = a_indcs.d_view(ibl0, ibl1+1, ibl2);
+    neighbors[4] = a_indcs.d_view(ibl0, ibl1  , ibl2+1);
+
+    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
+    if (lm % (2*nlvl*nlvl) == nlvl-1 || lm % (2*nlvl*nlvl) == 2*nlvl-1) {
+      neighbors[5] = -1;
+      num_neighbors = 5;
+    } else {
+      neighbors[5] = a_indcs.d_view(ibl0, ibl1, ibl2+2);
+      num_neighbors = 6;
+    }
+  }
+  return num_neighbors;
+}
+
 
 //----------------------------------------------------------------------------------------
 //! \struct RadiationTaskIDs
@@ -143,24 +187,22 @@ public:
 
   // Helper geometry functions for geodesic mesh. Implemented in radiation_geom.cpp
   int GetNeighbors(int lm, int neighbors[6]) const;
-  double ComputeWeightAndDualEdges(int lm, double length[6]) const;
-  void GetGridCartPosition(int n, double *x, double *y, double *z) const;
-  void GetGridCartPositionMid(int n, int nb, double *x, double *y, double *z) const;
+  Real ComputeWeightAndDualEdges(int lm, Real length[6]) const;
+  void GetGridCartPosition(int n, Real *x, Real *y, Real *z) const;
+  void GetGridCartPositionMid(int n, int nb, Real *x, Real *y, Real *z) const;
 
-  void CircumcenterNormalized(double x1, double x2, double x3,
-                              double y1, double y2, double y3,
-                              double z1, double z2, double z3,
-                              double *x, double *y, double *z) const;
+  void CircumcenterNormalized(Real x1, Real x2, Real x3,
+                              Real y1, Real y2, Real y3,
+                              Real z1, Real z2, Real z3,
+                              Real *x, Real *y, Real *z) const;
  
-  void GetGridPositionPolar(int ic, double *theta, double *phi) const;
-  void GreatCircleParam(double zeta1, double zeta2, double psi1, double psi2, double *apar, double *psi0) const;
-  void UnitFluxDir(int ic1, int ic2, double *dtheta, double *dphi) const;
-  void OptimalAngles(double ang[2]) const;
-  void RotateGrid(double zeta, double psi);
+  void GetGridPositionPolar(int ic, Real *theta, Real *phi) const;
+  void OptimalAngles(Real ang[2]) const;
+  void RotateGrid(Real zeta, Real psi);
 
   // TODO inline this
-  double ArcLength(int ic1, int ic2) const;
-  void ComputeXiEta(int lm, double xi[6], double eta[6]) const;
+  Real ArcLength(int ic1, int ic2) const;
+  void ComputeXiEta(int lm, Real xi[6], Real eta[6]) const;
 
   // Moments functions
   void SetMoments(DvceArray5D<Real> &prim);

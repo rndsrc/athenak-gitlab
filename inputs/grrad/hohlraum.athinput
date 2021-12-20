@@ -37,8 +37,7 @@ a = 0.0  # black hole spin a (0 <= a/M < 1)
 rmin = 0.0 # excision radius
 
 <radiation>
-nzeta     = 127      # number of polar angles in direction space
-npsi      = 128      # number of azimuthal angles in direction space
+nlevel = 2
 reconstruct = plm    # reconstruction method
 
 <problem>
