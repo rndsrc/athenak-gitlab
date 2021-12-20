@@ -6,7 +6,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file hydro.hpp
-//  \brief definitions for Hydro class
+//  \brief definitions for Radiation class
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -18,6 +18,50 @@ class EquationOfState;
 class Coordinates;
 class SourceTerms;
 class Driver;
+
+
+KOKKOS_INLINE_FUNCTION
+int DeviceGetNeighbors(int lm, int nlvl,
+                       DualArray3D<Real> a_indcs,
+                       int neighbors[6])
+{
+  int num_neighbors;
+
+  // handle north pole
+  if (lm==10*nlvl*nlvl) {
+    for (int bl = 0; bl < 5; ++bl) {
+      neighbors[bl] = a_indcs.d_view(bl,1,1);
+    }
+    neighbors[5] = -1;
+    num_neighbors = 5;
+  } else if (lm == 10*nlvl*nlvl + 1) {  // handle south pole
+    for (int bl = 0; bl < 5; ++bl) {
+      neighbors[bl] = a_indcs.d_view(bl,nlvl,2*nlvl);
+    }
+    neighbors[5] = -1;
+    num_neighbors = 5;
+  } else {
+    int ibl0 =  lm / (2*nlvl*nlvl);
+    int ibl1 = (lm % (2*nlvl*nlvl)) / (2*nlvl);
+    int ibl2 = (lm % (2*nlvl*nlvl)) % (2*nlvl);
+    neighbors[0] = a_indcs.d_view(ibl0, ibl1+1, ibl2+2);
+    neighbors[1] = a_indcs.d_view(ibl0, ibl1+2, ibl2+1);
+    neighbors[2] = a_indcs.d_view(ibl0, ibl1+2, ibl2);
+    neighbors[3] = a_indcs.d_view(ibl0, ibl1+1, ibl2);
+    neighbors[4] = a_indcs.d_view(ibl0, ibl1  , ibl2+1);
+
+    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
+    if (lm % (2*nlvl*nlvl) == nlvl-1 || lm % (2*nlvl*nlvl) == 2*nlvl-1) {
+      neighbors[5] = -1;
+      num_neighbors = 5;
+    } else {
+      neighbors[5] = a_indcs.d_view(ibl0, ibl1, ibl2+2);
+      num_neighbors = 6;
+    }
+  }
+  return num_neighbors;
+}
+
 
 //----------------------------------------------------------------------------------------
 //! \struct RadiationTaskIDs
@@ -153,9 +197,6 @@ public:
                               Real *x, Real *y, Real *z) const;
  
   void GetGridPositionPolar(int ic, Real *theta, Real *phi) const;
-  void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
-                        Real *apar, Real *psi0) const;
-  void UnitFluxDir(int ic1, int ic2, Real *dtheta, Real *dphi) const;
   void OptimalAngles(Real ang[2]) const;
   void RotateGrid(Real zeta, Real psi);
 

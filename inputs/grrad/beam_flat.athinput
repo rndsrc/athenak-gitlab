@@ -42,8 +42,7 @@ a = 0.0  # black hole mass M, controls magnitude of sinusoidal perturb in snake 
 snake = true  # use snake coordinates
 
 <radiation>
-nzeta     = 5        # number of polar angles in direction space
-npsi      = 256      # number of azimuthal angles in direction space
+nlevel = 2
 reconstruct = plm    # reconstruction method
 beam_source = true   # apply beam source term
 pos_1  = 0.0         # x-coordinate of beam origin

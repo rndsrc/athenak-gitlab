@@ -169,6 +169,8 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
   auto flxa_ = iaflx;
   auto eta_mn_ = eta_mn;
   auto xi_mn_ = xi_mn;
+  auto amesh_indices_ = amesh_indices;
+  auto nlev_ = nlevels;
 
   par_for("rflux_a",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int lm, int k, int j, int i)
@@ -177,7 +179,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage)
       Real s_mapr_av = 1.0e16;
       Real s_mapr_xi, s_mapr_eta;
       int neighbors[6];
-      int num_neighbors = GetNeighbors(lm, neighbors);
+      int num_neighbors = DeviceGetNeighbors(lm, nlev_, amesh_indices_, neighbors);
       for (int nb=0; nb<num_neighbors; ++nb) {
         int nb_1 = nb;
         int nb_2 = (nb+1)%num_neighbors;
