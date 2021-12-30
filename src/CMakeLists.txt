@@ -19,6 +19,7 @@ add_executable(
 
         coordinates/coordinates.cpp
 
+        diffusion/conduction.cpp
         diffusion/resistivity.cpp
         diffusion/viscosity.cpp
 
