@@ -21,6 +21,7 @@ add_executable(
 
         diffusion/resistivity.cpp
         diffusion/viscosity.cpp
+        diffusion/conduction.cpp
 
         driver/driver.cpp
 
@@ -86,6 +87,7 @@ add_executable(
 
         utils/change_rundir.cpp
         utils/show_config.cpp
+        utils/units.cpp
 )
 
 # custom problem generator to be included in compile
