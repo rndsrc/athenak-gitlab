@@ -12,6 +12,7 @@
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
+#include "hydro/hydro.hpp"
 #include "eos/eos.hpp"
 #include "conduction.hpp"
 
@@ -21,6 +22,20 @@
 Conduction::Conduction(std::string block, MeshBlockPack *pp, ParameterInput *pin)
   : pmy_pack(pp)
 {
+  // Check for hydro and ideal gas
+  if (pmy_pack->phydro == nullptr) {
+    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
+              << "Thermal conduction only works for hydro" << std::endl;
+    std::exit(EXIT_FAILURE);
+  } else {
+    const bool &is_ideal = pmy_pack->phydro->peos->eos_data.is_ideal;
+    if (is_ideal == false){
+      std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
+                << "Thermal conduction only works for ideal gas" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+
   // Read thermal conductivity of isotropic thermal conduction
   kappa = pin->GetReal(block,"conductivity");
   
@@ -68,7 +83,6 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto size = pmy_pack->pmb->mb_size;
   const bool &use_e = eos.use_e;
-  const bool &is_ideal = eos.is_ideal;
   Real gm1 = eos.gamma-1.0;
 
   //--------------------------------------------------------------------------------------
@@ -90,13 +104,10 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
           hflx1(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) - 
                      w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)) / size.d_view(m).dx1;
                      
-        }
-        else {
+        } else {
           hflx1(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j,i-1)) / size.d_view(m).dx1;
         }
-        if (is_ideal) {
-          flx1(m,IEN,k,j,i) -= kappa * hflx1(i);
-        }
+        flx1(m,IEN,k,j,i) -= kappa * hflx1(i);
       });
     }
   );
@@ -121,9 +132,7 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
         } else {
           hflx2(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j-1,i)) / size.d_view(m).dx2;
         }
-        if (is_ideal) {
-          flx2(m,IEN,k,j,i) -= kappa * hflx2(i);
-        }
+        flx2(m,IEN,k,j,i) -= kappa * hflx2(i);
       });
     }
   );
@@ -148,9 +157,7 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
         } else {
           hflx3(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k-1,j,i)) / size.d_view(m).dx3;
         }
-        if (is_ideal) {
-          flx3(m,IEN,k,j,i) -= kappa * hflx3(i);
-        }
+        flx3(m,IEN,k,j,i) -= kappa * hflx3(i);
       });
     }
   );
