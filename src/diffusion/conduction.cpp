@@ -13,6 +13,7 @@
 #include "parameter_input.hpp"
 #include "mesh/mesh.hpp"
 #include "hydro/hydro.hpp"
+#include "mhd/mhd.hpp"
 #include "eos/eos.hpp"
 #include "conduction.hpp"
 
@@ -22,14 +23,18 @@
 Conduction::Conduction(std::string block, MeshBlockPack *pp, ParameterInput *pin)
   : pmy_pack(pp)
 {
-  // Check for hydro and ideal gas
-  if (pmy_pack->phydro == nullptr) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Thermal conduction only works for hydro" << std::endl;
-    std::exit(EXIT_FAILURE);
-  } else {
+  // Check that EOS is ideal
+  if (pmy_pack->phydro != nullptr) {
     const bool &is_ideal = pmy_pack->phydro->peos->eos_data.is_ideal;
-    if (is_ideal == false){
+    if (is_ideal == false) {
+      std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
+                << "Thermal conduction only works for ideal gas" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+  if (pmy_pack->pmhd != nullptr) {
+    const bool &is_ideal = pmy_pack->pmhd->peos->eos_data.is_ideal;
+    if (is_ideal == false) {
       std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
                 << "Thermal conduction only works for ideal gas" << std::endl;
       std::exit(EXIT_FAILURE);

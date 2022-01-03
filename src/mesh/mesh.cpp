@@ -526,6 +526,10 @@ void Mesh::NewTimeStep(const Real tlim)
     if (pmb_pack->pmhd->presist != nullptr) {
       dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->presist->dtnew) );
     }
+    // thermal conduction timestep
+    if (pmb_pack->pmhd->pcond != nullptr) {
+      dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->pcond->dtnew) );
+    }
   }
 
 #if MPI_PARALLEL_ENABLED
