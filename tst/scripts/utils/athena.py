@@ -24,9 +24,9 @@ def make(arguments):
         make_command = ['make', '-j8']
         try:
             t0 = timer()
-            logger.debug('Executing: ' + ' '.join(cmake_command))
+            logger.debug('Executing: '+' '.join(cmake_command))
             subprocess.check_call(cmake_command, stdout=out_log)
-            logger.debug('Executing: ' + ' '.join(make_command))
+            logger.debug('Executing: '+' '.join(make_command))
             subprocess.check_call(make_command, stdout=out_log)
             logger.debug('Build took {0:.3g} seconds.'.format(timer() - t0))
         except subprocess.CalledProcessError as err:
@@ -50,7 +50,7 @@ def run(input_filename, arguments):
         run_command = ['./athena', '-i', input_filename_full]
         try:
             cmd = run_command + arguments
-            logging.getLogger('athena.run').debug('Executing: '.join(cmd))
+            logging.getLogger('athena.run').debug('Executing: '+' '.join(cmd))
             subprocess.check_call(cmd, stdout=out_log)
         except subprocess.CalledProcessError as err:
             raise AthenaError('Return code {0} from command \'{1}\''
@@ -73,7 +73,7 @@ def mpirun(nproc, input_filename, arguments):
                        input_filename_full]
         try:
             cmd = run_command + arguments
-            logging.getLogger('athena.run').debug('Executing: '.join(cmd))
+            logging.getLogger('athena.run').debug('Executing: '+' '.join(cmd))
             subprocess.check_call(cmd, stdout=out_log)
         except subprocess.CalledProcessError as err:
             raise AthenaError('Return code {0} from command \'{1}\''
