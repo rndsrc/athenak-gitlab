@@ -1,3 +1,6 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 before_script:
   - module load python3 rh/devtoolset/7 cuda cudatoolkit
 
