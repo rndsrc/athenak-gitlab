@@ -43,7 +43,6 @@ def main(**kwargs):
                                   iter_modules(path=['scripts/'
                                                      + directory],
                                                prefix=directory + '.')]
-                print(dir_test_names)
                 test_names.extend(dir_test_names)
     else:  # run selected tests
         for test in tests:
