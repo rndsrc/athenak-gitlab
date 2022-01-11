@@ -11,7 +11,7 @@ from .log_pipe import LogPipe
 athena_rel_path = '../'
 
 
-# Function for compiling Athena++
+# Function for compiling AthenaK
 def make(arguments):
     logger = logging.getLogger('athena.make')
     out_log = LogPipe('athena.make', logging.INFO)
@@ -38,7 +38,7 @@ def make(arguments):
         os.chdir(current_dir)
 
 
-# Function for running Athena++
+# Function for running AthenaK
 def run(input_filename, arguments):
     out_log = LogPipe('athena.run', logging.INFO)
     current_dir = os.getcwd()
@@ -60,7 +60,7 @@ def run(input_filename, arguments):
         os.chdir(current_dir)
 
 
-# Function for running Athena++ with MPI
+# Function for running AthenaK with MPI
 def mpirun(nproc, input_filename, arguments):
     out_log = LogPipe('athena.run', logging.INFO)
     current_dir = os.getcwd()

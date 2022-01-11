@@ -8,7 +8,6 @@
 # Notes:
 #   - Requires Python 3+.
 #   - This file should not be modified when adding new scripts.
-#   - To add a new script, create a new .py file in scripts/tests/.
 
 # Modules
 import argparse
@@ -25,9 +24,10 @@ from timeit import default_timer as timer
 import sys
 sys.dont_write_bytecode = True
 
-# Athena++ modules
+# AthenaK modules
 import scripts.utils.athena as athena  # noqa
 
+# AthenaK logger
 logger = logging.getLogger('athena')
 
 
@@ -36,15 +36,14 @@ def main(**kwargs):
     # Make list of tests to run
     tests = kwargs.pop('tests')
     test_names = []
-
-    # Identify tests
     if len(tests) == 0:  # run all tests
-        for _, directory, ispkg in iter_modules(path=['scripts/tests']):
-            if ispkg:
+        for _, directory, ispkg in iter_modules(path=['scripts']):
+            if ispkg and directory != 'utils':
                 dir_test_names = [name for _, name, _ in
-                                  iter_modules(path=['scripts/tests/'
+                                  iter_modules(path=['scripts/'
                                                      + directory],
                                                prefix=directory + '.')]
+                print(dir_test_names)
                 test_names.extend(dir_test_names)
     else:  # run selected tests
         for test in tests:
@@ -54,7 +53,7 @@ def main(**kwargs):
                 test_names.append(test.replace('/', '.'))
             else:  # test suite specified
                 dir_test_names = [name for _, name, _ in
-                                  iter_modules(path=['scripts/tests/'
+                                  iter_modules(path=['scripts/'
                                                      + test],
                                                prefix=test + '.')]
                 test_names.extend(dir_test_names)
@@ -72,7 +71,7 @@ def main(**kwargs):
         deps_installed = True
         for name in test_names:
             try:
-                name_full = 'scripts.tests.' + name
+                name_full = 'scripts.' + name
                 module = __import__(name_full, globals(), locals(),
                                     fromlist=['run', 'analyze'])
             except ImportError as e:
@@ -100,7 +99,7 @@ def main(**kwargs):
         for name in test_names:
             t0 = timer()
             try:
-                name_full = 'scripts.tests.' + name
+                name_full = 'scripts.' + name
                 module = __import__(name_full, globals(), locals(),
                                     fromlist=['run', 'analyze'])
                 reload(module)
@@ -186,12 +185,12 @@ def log_init(args):
                                      ':%(name)s: %(message)s')
         f_handler.setFormatter(f_format)
         logger.addHandler(f_handler)
-    logger.debug('Starting Athena++ regression tests')
+    logger.debug('Starting AthenaK regression tests')
 
 
 # Execute main function
 if __name__ == '__main__':
-    help_msg = ('names of tests to run, relative to scripts/tests/')
+    help_msg = ('names of tests to run, relative to scripts/')
     parser = argparse.ArgumentParser()
     parser.add_argument('tests',
                         type=str,
