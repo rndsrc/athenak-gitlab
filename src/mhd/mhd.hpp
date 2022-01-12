@@ -18,6 +18,7 @@ class EquationOfState;
 class Coordinates;
 class Viscosity;
 class Resistivity;
+class Conduction;
 class SourceTerms;
 class Driver;
 
@@ -94,9 +95,10 @@ public:
   BoundaryValuesFC *pbval_b;
   MHDBoundaryFnPtr MHDBoundaryFunc[6];
 
-  // Object(s) for extra physics (viscosity, resistivity, srcterms)
+  // Object(s) for extra physics (viscosity, resistivity, thermal conduction, srcterms)
   Viscosity *pvisc = nullptr;
   Resistivity *presist = nullptr;
+  Conduction *pcond = nullptr;
   SourceTerms *psrc = nullptr;
 
   // following only used for time-evolving flow
@@ -135,25 +137,6 @@ public:
   // CalculateFluxes function templated over Riemann Solvers
   template <MHD_RSolver T>
   TaskStatus CalcFluxes(Driver *d, int stage);
-
-  // functions to set physical BCs for MHD conserved variables, applied to single MB
-  // specified by argument 'm'. 
-  void EnrollBoundaryFunction(BoundaryFace dir, MHDBoundaryFnPtr my_bcfunc);
-  void CheckUserBoundaries();
-  void ReflectInnerX1(int m);
-  void ReflectOuterX1(int m);
-  void ReflectInnerX2(int m);
-  void ReflectOuterX2(int m);
-  void ReflectInnerX3(int m);
-  void ReflectOuterX3(int m);
-  void OutflowInnerX1(int m);
-  void OutflowOuterX1(int m);
-  void OutflowInnerX2(int m);
-  void OutflowOuterX2(int m);
-  void OutflowInnerX3(int m);
-  void OutflowOuterX3(int m);
-  void ShearInnerX1(int m);
-  void ShearOuterX1(int m);
 
 private:
   MeshBlockPack* pmy_pack;   // ptr to MeshBlockPack containing this MHD
