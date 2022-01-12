@@ -24,8 +24,7 @@
 //! \fn ProblemGenerator::UserProblem_()
 //! \brief Problem Generator for spherical blast problem
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real rout = pin->GetReal("problem", "radius");
   Real rin  = rout - pin->GetOrAddReal("problem", "ramp", 0.0);
   Real pa   = pin->GetOrAddReal("problem", "pamb", 1.0);
@@ -42,12 +41,10 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // setup uniform ambient medium with spherical over-pressured region in Hydro
   if (pmbp->phydro != nullptr) {
-
     auto &eos = pmbp->phydro->peos->eos_data;
     auto &w0 = pmbp->phydro->w0;
-    par_for("pgen_cloud1", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m,int k, int j, int i)
-      {
+    par_for("pgen_cloud1",DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
+      KOKKOS_LAMBDA(int m,int k,int j,int i) {
         Real &x1min = size.d_view(m).x1min;
         Real &x1max = size.d_view(m).x1max;
         int nx1 = indcs.nx1;
@@ -99,7 +96,6 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     // Convert primitives to conserved
     auto &u0 = pmbp->phydro->u0;
     pmbp->phydro->peos->PrimToCons(w0, u0);
-
   }
 
   return;

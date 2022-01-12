@@ -48,8 +48,7 @@
 //! \fn void ProblemGenerator::UserProblem()
 //  \brief Problem Generator for the Rayleigh-Taylor instability test
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->pmesh->one_d) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "rti problem generator only works in 2D/3D" << std::endl;
@@ -79,14 +78,13 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     EOS_Data &eos = pmbp->phydro->peos->eos_data;
     Real gm1 = eos.gamma - 1.0;
     Real p0 = 1.0/eos.gamma;
-   
+
     // 2D PROBLEM
 
     if (pmbp->pmesh->two_d) {
       auto u0 = pmbp->phydro->u0;
       par_for("rt2d", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-        KOKKOS_LAMBDA(int m, int k, int j, int i)
-        {
+        KOKKOS_LAMBDA(int m, int k, int j, int i) {
           Real &x1min = size.d_view(m).x1min;
           Real &x1max = size.d_view(m).x1max;
           int nx1 = indcs.nx1;
@@ -103,7 +101,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
           if (iprob == 1) {
             u0(m,IM2,k,j,i) = (1.0 + cos(kx*x1v))*(1.0 + cos(ky*x2v))/4.0;
           } else {
-            u0(m,IM2,k,j,i) = (Ran2((int64_t*)iseed) - 0.5)*(1.0 + cos(ky*x2v));
+            u0(m,IM2,k,j,i) = ((Ran2((int64_t*)iseed)-0.5) *  // NOLINT
+                               (1.0 + cos(ky*x2v)));
           }
 
           u0(m,IDN,k,j,i) = den;
@@ -119,8 +118,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     } else {
       auto u0 = pmbp->phydro->u0;
       par_for("rt2d", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-        KOKKOS_LAMBDA(int m, int k, int j, int i)
-        {
+        KOKKOS_LAMBDA(int m, int k, int j, int i) {
           Real &x1min = size.d_view(m).x1min;
           Real &x1max = size.d_view(m).x1max;
           int nx1 = indcs.nx1;
@@ -142,7 +140,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
           if (iprob == 1) {
             u0(m,IM3,k,j,i) = (1.0+cos(kx*x1v))*(1.0+cos(ky*x2v))*(1.0+cos(kz*x3v))/8.0;
           } else {
-            u0(m,IM3,k,j,i) = amp*(Ran2((int64_t*)iseed) - 0.5)*(1.0 + cos(kz*x3v));
+            u0(m,IM3,k,j,i) = (amp*(Ran2((int64_t*)iseed)-0.5) *  // NOLINT
+                               (1.0 + cos(kz*x3v)));
           }
 
           u0(m,IDN,k,j,i) = den;
@@ -153,7 +152,6 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
         }
       );
     }
-
   } // end of Hydro initialization
 
   return;

@@ -24,8 +24,7 @@
 //! \fn
 //  \brief Problem Generator for KHI tests
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   // read problem parameters from input file
   int iprob  = pin->GetReal("problem","iprob");
   Real amp   = pin->GetReal("problem","amp");
@@ -59,8 +58,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // initialize primitive variables
   par_for("pgen_kh1", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
       int nx1 = indcs.nx1;
@@ -77,7 +75,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
       // Lorentz factor (needed to initializve 4-velocity in SR)
       Real u00 = 1.0;
       bool is_relativistic = false;
-      if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic){
+      if (pmbp->phydro->is_special_relativistic ||
+          pmbp->phydro->is_general_relativistic) {
         is_relativistic = true;
       }
 

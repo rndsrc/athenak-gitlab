@@ -14,8 +14,6 @@
 //! - ifield = 1 - Bz=B0 sin(x1) field with zero-net-flux [default]
 //! - ifield = 2 - uniform Bz
 
-#include <Kokkos_Random.hpp>
-
 // C++ headers
 #include <cmath>      // sqrt()
 #include <iostream>   // cout, endl
@@ -34,12 +32,13 @@
 #include "srcterms/srcterms.hpp"
 #include "pgen.hpp"
 
+#include <Kokkos_Random.hpp>
+
 //----------------------------------------------------------------------------------------
 //! \fn ProblemGenerator::_()
 //  \brief
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->pmesh->three_d) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "mri2d problem generator only works in 2D (nx3=1)" << std::endl;
@@ -81,15 +80,14 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
                 << "Shearing box source terms not enabled for mri2d problem" << std::endl;
       exit(EXIT_FAILURE);
     }
-    // Initialize magnetic field first, so entire arrays are initialized before adding 
+    // Initialize magnetic field first, so entire arrays are initialized before adding
     // magnetic energy to conserved variables in next loop.  For 2D shearing box
     // B1=Bx, B2=Bz, B3=By
     // ifield = 1 - Bz=B0 sin(kx*xav1) field with zero-net-flux [default]
     // ifield = 2 - uniform Bz
     auto b0 = pmbp->pmhd->b0;
     par_for("mri2d-b", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real &x1min = size.d_view(m).x1min;
         Real &x1max = size.d_view(m).x1max;
         int nx1 = indcs.nx1;
@@ -136,8 +134,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     Real gm1 = eos.gamma - 1.0;
     auto u0 = pmbp->phydro->u0;
     par_for("mri2d-u", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         u0(m,IDN,k,j,i) = d0;
         u0(m,IM1,k,j,i) = d0*amp;
         u0(m,IM2,k,j,i) = 0.0;
@@ -158,8 +155,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
     auto u0 = pmbp->pmhd->u0;
     Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
     par_for("mri2d-u", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real rd = d0;
         Real rp = p0;
         auto rand_gen = rand_pool64.get_state();  // get random number state this thread

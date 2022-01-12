@@ -27,8 +27,7 @@
 //! \fn ProblemGenerator::UserProblem()
 //  \brief Shu-Osher test problem generator
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->phydro == nullptr) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "Shu-Osher test can only be run in Hydro, but no <hydro> block "
@@ -53,8 +52,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   auto &u0 = pmbp->phydro->u0;
 
   par_for("pgen_shock1", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m,int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m,int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
       int nx1 = indcs.nx1;

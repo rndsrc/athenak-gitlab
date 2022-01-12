@@ -106,7 +106,6 @@ class Task {
 //  bool lb_time_;   // flag to include this task in timing for automatic load balancing
   bool complete_ = false;
   std::function<TaskStatus(Driver*, int)> func_;  // ptr to Task function
-
 };
 
 //----------------------------------------------------------------------------------------
@@ -149,8 +148,8 @@ class TaskList {
       if ( tasks_completed_.CheckDependencies(dep) && !(task.IsComplete()) ) {
         TaskStatus status = task(d,s);  // calls Task function using overloaded operator()
         if (status == TaskStatus::complete) {
-          task.SetComplete();              // set bool flag in task 
-          MarkTaskComplete(task.GetID());  // add TaskID to tasks_completed_ 
+          task.SetComplete();              // set bool flag in task
+          MarkTaskComplete(task.GetID());  // add TaskID to tasks_completed_
         }
       }
     }

@@ -5,7 +5,7 @@
 //========================================================================================
 //! \file mesh_refinement.cpp
 //! \brief File containing various Mesh functions associated with SMR/AMR, including
-//! restriction and load_balancing.  Note prolongation is part of BVals classes. 
+//! restriction and load_balancing.  Note prolongation is part of BVals classes.
 
 #include <iostream>
 
@@ -22,10 +22,9 @@
 //! \fn void Mesh::RestrictCC
 //  \brief Restricts cell-centered variables to coarse mesh
 
-void Mesh::RestrictCC(DvceArray5D<Real> u, DvceArray5D<Real> cu)
-{
-  int nmb  = u.extent_int(0);  // TODO: 1st index from L of input array must be NMB
-  int nvar = u.extent_int(1);  // TODO: 2nd index from L of input array must be NVAR
+void Mesh::RestrictCC(DvceArray5D<Real> u, DvceArray5D<Real> cu) {
+  int nmb  = u.extent_int(0);  // TODO(@user): 1st index from L of in array must be NMB
+  int nvar = u.extent_int(1);  // TODO(@user): 2nd index from L of in array must be NVAR
 
   auto &cis = mb_indcs.cis;
   auto &cie = mb_indcs.cie;
@@ -37,18 +36,15 @@ void Mesh::RestrictCC(DvceArray5D<Real> u, DvceArray5D<Real> cu)
   // restrict in 1D
   if (one_d) {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, 0, nvar-1, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int n, const int i)
-      {
+      KOKKOS_LAMBDA(const int m, const int n, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         cu(m,n,cks,cjs,i) = 0.5*(u(m,n,cks,cjs,finei) + u(m,n,cks,cjs,finei+1));
       }
     );
-
   // restrict in 2D
   } else if (two_d) {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, 0, nvar-1, cjs, cje, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int n, const int j, const int i)
-      {
+      KOKKOS_LAMBDA(const int m, const int n, const int j, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         int finej = 2*j - cjs;  // correct when cjs=js
         cu(m,n,cks,j,i) = 0.25*(u(m,n,cks,finej  ,finei) + u(m,n,cks,finej  ,finei+1)
@@ -59,8 +55,7 @@ void Mesh::RestrictCC(DvceArray5D<Real> u, DvceArray5D<Real> cu)
   // restrict in 3D
   } else {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, 0, nvar-1, cks, cke, cjs, cje, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int n, const int k, const int j, const int i)
-      {
+      KOKKOS_LAMBDA(const int m, const int n, const int k, const int j, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         int finej = 2*j - cjs;  // correct when cjs=js
         int finek = 2*k - cks;  // correct when cks=ks
@@ -79,22 +74,20 @@ void Mesh::RestrictCC(DvceArray5D<Real> u, DvceArray5D<Real> cu)
 //! \fn void Mesh::RestrictFC
 //  \brief Restricts face-centered variables to coarse mesh
 
-void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
-{ 
-  int nmb  = b.x1f.extent_int(0);  // TODO: 1st index from L of input array must be NMB
-  
+void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb) {
+  int nmb  = b.x1f.extent_int(0);  // TODO(@user): 1st idx from L of in array must be NMB
+
   auto &cis = mb_indcs.cis;
   auto &cie = mb_indcs.cie;
   auto &cjs = mb_indcs.cjs;
   auto &cje = mb_indcs.cje;
   auto &cks = mb_indcs.cks;
   auto &cke = mb_indcs.cke;
-  
+
   // restrict in 1D
   if (one_d) {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int i)
-      { 
+      KOKKOS_LAMBDA(const int m, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         // restrict B1
         cb.x1f(m,cks,cjs,i) = b.x1f(m,cks,cjs,finei);
@@ -111,12 +104,11 @@ void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
         cb.x3f(m,cks+1,cjs,i) = b3coarse;
       }
     );
-  
+
   // restrict in 2D
   } else if (two_d) {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, cjs, cje, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int j, const int i)
-      { 
+      KOKKOS_LAMBDA(const int m, const int j, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         int finej = 2*j - cjs;  // correct when cjs=js
         // restrict B1
@@ -128,7 +120,7 @@ void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
         // restrict B2
         cb.x2f(m,cks,j,i) = 0.5*(b.x2f(m,cks,finej,finei) + b.x2f(m,cks,finej,finei+1));
         if (j==cje) {
-          cb.x2f(m,cks,j+1,i) = 
+          cb.x2f(m,cks,j+1,i) =
             0.5*(b.x2f(m,cks,finej+2,finei) + b.x2f(m,cks,finej+2,finei+1));
         }
         // restrict B3
@@ -138,12 +130,11 @@ void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
         cb.x3f(m,cks+1,j,i) = b3coarse;
       }
     );
-  
+
   // restrict in 3D
   } else {
     par_for("restrict3D",DevExeSpace(),0, nmb-1, cks, cke, cjs, cje, cis, cie,
-      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i)
-      { 
+      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
         int finei = 2*i - cis;  // correct when cis=is
         int finej = 2*j - cjs;  // correct when cjs=js
         int finek = 2*k - cks;  // correct when cks=ks
@@ -157,11 +148,11 @@ void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
                 + b.x1f(m,finek+1,finej,finei+2) + b.x1f(m,finek+1,finej+1,finei+2));
         }
         // restrict B2
-        cb.x2f(m,k,j,i) = 
+        cb.x2f(m,k,j,i) =
           0.25*(b.x2f(m,finek  ,finej,finei) + b.x2f(m,finek  ,finej,finei+1)
               + b.x2f(m,finek+1,finej,finei) + b.x2f(m,finek+1,finej,finei+1));
         if (j==cje) {
-          cb.x2f(m,k,j+1,i) = 
+          cb.x2f(m,k,j+1,i) =
             0.25*(b.x2f(m,finek  ,finej+2,finei) + b.x2f(m,finek  ,finej+2,finei+1)
                 + b.x2f(m,finek+1,finej+2,finei) + b.x2f(m,finek+1,finej+2,finei+1));
         }
@@ -186,11 +177,10 @@ void Mesh::RestrictFC(DvceFaceFld4D<Real> b, DvceFaceFld4D<Real> cb)
 // input: clist = cost of each MB (array of length nmbtotal)
 //        nb = number of MeshBlocks
 // output: rlist = rank to which each MB is assigned (array of length nmbtotal)
-//         slist = 
-//         nlist = 
+//         slist =
+//         nlist =
 
-void Mesh::LoadBalance(float *clist, int *rlist, int *slist, int *nlist, int nb)
-{
+void Mesh::LoadBalance(float *clist, int *rlist, int *slist, int *nlist, int nb) {
   float min_cost = std::numeric_limits<float>::max();
   float max_cost = 0.0, totalcost = 0.0;
 
@@ -248,8 +238,7 @@ void Mesh::LoadBalance(float *clist, int *rlist, int *slist, int *nlist, int nb)
 // \!fn void Mesh::ResetLoadBalanceCounters()
 // \brief reset counters and flags for load balancing
 
-void Mesh::ResetLoadBalanceCounters()
-{
+void Mesh::ResetLoadBalanceCounters() {
   if (lb_automatic_) {
     for (int m=0; m<pmb_pack->nmb_thispack; ++m) {
       costlist[pmb_pack->pmb->mb_gid.h_view(m)] = std::numeric_limits<float>::min();

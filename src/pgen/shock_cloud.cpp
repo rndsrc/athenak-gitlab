@@ -29,8 +29,7 @@
 //! \fn ProblemGenerator::_()
 //! \brief Problem Generator for the shock-cloud interaction problem
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real gm = pmbp->phydro->peos->eos_data.gamma;
   Real gm1 = gm - 1.0;
 
@@ -69,11 +68,9 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
-
     auto &u0 = pmbp->phydro->u0;
     par_for("pgen_cloud1", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m,int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m,int k, int j, int i) {
         Real &x1min = size.d_view(m).x1min;
         Real &x1max = size.d_view(m).x1max;
         int nx1 = indcs.nx1;

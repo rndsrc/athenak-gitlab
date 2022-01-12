@@ -15,23 +15,21 @@
 //----------------------------------------------------------------------------------------
 // ctor: also calls EOS base class constructor
 
-IsothermalHydro::IsothermalHydro(MeshBlockPack *pp, ParameterInput *pin)
-  : EquationOfState(pp, pin)
-{
-    eos_data.is_ideal = false;
-    eos_data.iso_cs = pin->GetReal("hydro","iso_sound_speed");
-    eos_data.gamma = 0.0;
-    eos_data.use_e = false;
-    eos_data.use_t = false;
+IsothermalHydro::IsothermalHydro(MeshBlockPack *pp, ParameterInput *pin) :
+  EquationOfState(pp, pin) {
+  eos_data.is_ideal = false;
+  eos_data.iso_cs = pin->GetReal("hydro","iso_sound_speed");
+  eos_data.gamma = 0.0;
+  eos_data.use_e = false;
+  eos_data.use_t = false;
 }
 
 //----------------------------------------------------------------------------------------
 // \!fn void ConsToPrim()
 // \brief Converts conserved into primitive variables.  Operates over entire MeshBlock,
-//  including ghost cells.  
+//  including ghost cells.
 
-void IsothermalHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim)
-{
+void IsothermalHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -44,8 +42,7 @@ void IsothermalHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &pri
   Real &dfloor_ = eos_data.density_floor;
 
   par_for("isohyd_con2prim", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real& u_d  = cons(m,IDN,k,j,i);
       const Real& u_m1 = cons(m,IM1,k,j,i);
       const Real& u_m2 = cons(m,IM2,k,j,i);
@@ -79,8 +76,7 @@ void IsothermalHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &pri
 // \!fn void PrimToCons()
 // \brief Converts primitive into conserved variables. Operates over only active cells.
 
-void IsothermalHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons)
-{
+void IsothermalHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &ie = indcs.ie;
   int &js = indcs.js; int &je = indcs.je;
@@ -90,8 +86,7 @@ void IsothermalHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real
   int &nmb = pmy_pack->nmb_thispack;
 
   par_for("isohyd_prim2con", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real& u_d  = cons(m,IDN,k,j,i);
       Real& u_m1 = cons(m,IM1,k,j,i);
       Real& u_m2 = cons(m,IM2,k,j,i);

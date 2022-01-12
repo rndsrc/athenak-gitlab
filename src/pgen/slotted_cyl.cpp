@@ -61,8 +61,7 @@ Real SlottedCylinderProfile(Real x1, Real x2) {
 //! \fn void MeshBlock::UserProblem(ParameterInput *pin)
 //  \brief Sets initial conditions for linear wave tests
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->phydro == nullptr) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "Slotted cylinder test can only be run in Hydro, but no <hydro> block "
@@ -90,12 +89,11 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin)
   int &ks = indcs.ks; int &ke = indcs.ke;
   int &nscalars = pmbp->phydro->nscalars;
   int &nhydro = pmbp->phydro->nhydro;
-  auto &u0 = pmbp->phydro->u0; 
+  auto &u0 = pmbp->phydro->u0;
 
   // Set initial conditions
   par_for("pgen_slot_cyl", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
       int nx1 = indcs.nx1;

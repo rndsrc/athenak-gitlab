@@ -18,10 +18,9 @@
 
 //----------------------------------------------------------------------------------------
 // ctor: also calls EOS base class constructor
-    
-IdealGRMHD::IdealGRMHD(MeshBlockPack *pp, ParameterInput *pin)
-  : EquationOfState(pp, pin)
-{      
+
+IdealGRMHD::IdealGRMHD(MeshBlockPack *pp,
+                       ParameterInput *pin) : EquationOfState(pp, pin) {
   eos_data.is_ideal = true;
   eos_data.gamma = pin->GetReal("mhd","gamma");
   eos_data.iso_cs = 0.0;
@@ -46,7 +45,7 @@ IdealGRMHD::IdealGRMHD(MeshBlockPack *pp, ParameterInput *pin)
               << "Both use_e and use_t set to true" << std::endl;
     std::exit(EXIT_FAILURE);
   }
-}  
+}
 
 //----------------------------------------------------------------------------------------
 //! \fn Real Equation49()
@@ -55,11 +54,10 @@ IdealGRMHD::IdealGRMHD(MeshBlockPack *pp, ParameterInput *pin)
 //! solving Equation44
 
 KOKKOS_INLINE_FUNCTION
-Real Equation49(const Real mu, const Real b2, const Real rpar, const Real r, const Real q)
-{
+Real Equation49(const Real mu, const Real b2,
+                const Real rpar, const Real r, const Real q) {
   Real const x = 1./(1.+mu*b2);                  // (26)
   Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
-
   return mu*sqrt(1.+rbar) - 1.;
 }
 
@@ -70,8 +68,7 @@ Real Equation49(const Real mu, const Real b2, const Real rpar, const Real r, con
 
 KOKKOS_INLINE_FUNCTION
 Real Equation44(const Real mu, const Real b2, const Real rpar, const Real r, const Real q,
-                const Real ud, const Real pfloor, const Real gm1)
-{
+                const Real ud, const Real pfloor, const Real gm1) {
   Real const x = 1./(1.+mu*b2);                  // (26)
   Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
   Real qbar = q - 0.5*b2 - 0.5*(mu*mu*(b2*rbar- rpar*rpar)); // (31)
@@ -83,7 +80,7 @@ Real Equation44(const Real mu, const Real b2, const Real rpar, const Real r, con
   Real eps = w*(qbar - mu*rbar)+  z2/(w+1.);
 
   //NOTE: The following generalizes to ANY equation of state
-  eps = fmax(pfloor/(wd*gm1), eps);                          // 
+  eps = fmax(pfloor/(wd*gm1), eps);                          //
   Real const h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps));   // (43)
 
   return mu - 1./(h/w + rbar*mu); // (45)
@@ -95,9 +92,7 @@ Real Equation44(const Real mu, const Real b2, const Real rpar, const Real r, con
 //! Operates over entire MeshBlock, including ghost cells.
 
 void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
-         const DvceFaceFld4D<Real> &b, DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc)
-{
-
+         const DvceFaceFld4D<Real> &b, DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -133,8 +128,7 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
   Real const rr_max = 1.0 - 1.0e-12;
 
   par_for("grmhd_con2prim", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real& u_d  = cons(m, IDN,k,j,i);
       Real& u_m1 = cons(m, IM1,k,j,i);
       Real& u_m2 = cons(m, IM2,k,j,i);
@@ -150,7 +144,7 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
       Real& w_bx = bcc(m,IBX,k,j,i);
       Real& w_by = bcc(m,IBY,k,j,i);
       Real& w_bz = bcc(m,IBZ,k,j,i);
-      w_bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));  
+      w_bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
       w_by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
       w_bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
 
@@ -172,12 +166,12 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
 
       Real rad = sqrt(SQR(x1v) + SQR(x2v) + SQR(x3v));
       bool floor_hit = false;
+
       // Only execute cons2prim if outside excised region
       if (rad > rmin) {
-
         // We are evolving T^t_t, but the SR C2P algorithm is only consistent with
         // alpha^2 T^{tt}.  Therefore compute T^{tt} = g^0\mu T^t_\mu
-        // We are also evolving (E-D) as conserved variable, so must convert to E 
+        // We are also evolving (E-D) as conserved variable, so must convert to E
         Real ue_tmp = gi_[I00]*(u_e+u_d) + gi_[I01]*u_m1 + gi_[I02]*u_m2 + gi_[I03]*u_m3;
 
         // This is only true if sqrt{-g}=1!
@@ -209,7 +203,7 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
           floor_hit = true;
         }
 
-        // Recast all variables 
+        // Recast all variables
         // Need to raise indices on u_m1, which transforms using the spatial 3-metric.
         // This is slightly more involved
         //
@@ -229,16 +223,15 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
                     (gi_[I23] - gi_[I02]*gi_[I03]/gi_[I00])*um2_tmp +
                     (gi_[I33] - gi_[I03]*gi_[I03]/gi_[I00])*um3_tmp);  // (C26)
 
-
-	// Recast all variables (eq 22-24)
-	// Variables q and r defined in anonymous namspace: global this file
+        // Recast all variables (eq 22-24)
+        // Variables q and r defined in anonymous namspace: global this file
         Real q = ue_tmp/ud_tmp;
         Real r = sqrt(um1_tmp*m1u + um2_tmp*m2u + um3_tmp*m3u)/ud_tmp;
 
-	Real sqrtd = sqrt(u_d);
-	Real bx = w_bx/sqrtd;
-	Real by = w_by/sqrtd;
-	Real bz = w_bz/sqrtd;
+        Real sqrtd = sqrt(u_d);
+        Real bx = w_bx/sqrtd;
+        Real by = w_by/sqrtd;
+        Real bz = w_bz/sqrtd;
 
         // Need to treat the magnetic fields. Also they lack an alpha
         // This is only true if sqrt{-g}=1!
@@ -246,133 +239,125 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
         by *= alpha;
         bz *= alpha;
 
+        Real b2 =     g_[I11] * bx * bx + g_[I22] * by * by + g_[I33] * bz * bz
+                +2.*( g_[I12] * bx * by + g_[I13] * bx * bz + g_[I23] * by * bz);
+        Real rpar = (bx*um1_tmp +  by*um2_tmp +  bz*um3_tmp)/u_d;
 
-	Real b2 =     g_[I11] * bx * bx + g_[I22] * by * by + g_[I33] * bz * bz
-	        +2.*( g_[I12] * bx * by + g_[I13] * bx * bz + g_[I23] * by * bz);
+        // Need to find initial bracket. Requires separate solve
+        Real zm=0.;
+        Real zp=1.; // This is the lowest specific enthalpy admitted by the EOS
 
-	Real rpar = (bx*um1_tmp +  by*um2_tmp +  bz*um3_tmp)/u_d;
+        // Evaluate master function (eq 49) at bracket values
+        Real fm = Equation49(zm, b2, rpar, r, q);
+        Real fp = Equation49(zp, b2, rpar, r, q);
 
+        // For simplicity on the GPU, find roots using the false position method
+        int iterations = max_iterations;
+        // If bracket within tolerances, don't bother doing any iterations
+        if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
+          iterations = -1;
+        }
+        Real z = 0.5*(zm + zp);
 
-	// Need to find initial bracket. Requires separate solve
+        for (int ii=0; ii < iterations; ++ii) {
+          z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
+          Real f = Equation49(z, b2, rpar, r, q);
 
-	Real zm=0.;
-	Real zp=1.; // This is the lowest specific enthalpy admitted by the EOS
+          // Quit if convergence reached
+          // NOTE: both z and f are of order unity
+          if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )) {
+            break;
+          }
 
-	// Evaluate master function (eq 49) at bracket values
-	Real fm = Equation49(zm, b2, rpar, r, q);
-	Real fp = Equation49(zp, b2, rpar, r, q);
-	
-	
-	// For simplicity on the GPU, find roots using the false position method
-	int iterations = max_iterations;
-	// If bracket within tolerances, don't bother doing any iterations
-	if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
-	  iterations = -1;
-	}
-	Real z = 0.5*(zm + zp);
+          // assign zm-->zp if root bracketed by [z,zp]
+          if (f * fp < 0.0) {
+            zm = zp;
+            fm = fp;
+            zp = z;
+            fp = f;
+          } else { // assign zp-->z if root bracketed by [zm,z]
+            fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
+            zp = z;
+            fp = f;
+          }
+        }
 
-	for (int ii=0; ii < iterations; ++ii) {
-	  z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
-	  Real f = Equation49(z, b2, rpar, r, q);
+        zm= 0.;
+        zp= z;
 
-	  // Quit if convergence reached
-	  // NOTE: both z and f are of order unity
-	  if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
-	      break;
-	  }
+        // Evaluate master function (eq 44) at bracket values
+        fm = Equation44(zm, b2, rpar, r, q, u_d, pfloor_, gm1);
+        fp = Equation44(zp, b2, rpar, r, q, u_d, pfloor_, gm1);
 
-	  // assign zm-->zp if root bracketed by [z,zp]
-	  if (f * fp < 0.0) {
-	     zm = zp;
-	     fm = fp;
-	     zp = z;
-	     fp = f;
+        // For simplicity on the GPU, find roots using the false position method
+        iterations = max_iterations;
+        // If bracket within tolerances, don't bother doing any iterations
+        if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
+          iterations = -1;
+        }
+        z = 0.5*(zm + zp);
 
-	  // assign zp-->z if root bracketed by [zm,z]
-	  } else {
-	     fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
-	     zp = z;
-	     fp = f;
-	  }
-	}
+        for (int ii=0; ii < iterations; ++ii) {
+          z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
+          Real f = Equation44(z, b2, rpar, r, q, u_d, pfloor_, gm1);
 
+          // Quit if convergence reached
+          // NOTE: both z and f are of order unity
+          if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )) {
+            break;
+          }
 
-	zm= 0.;
-	zp= z;
+          // assign zm-->zp if root bracketed by [z,zp]
+          if (f * fp < 0.0) {
+            zm = zp;
+            fm = fp;
+            zp = z;
+            fp = f;
+          // assign zp-->z if root bracketed by [zm,z]
+          } else {
+            fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
+            zp = z;
+            fp = f;
+          }
+        }
 
-	// Evaluate master function (eq 44) at bracket values
-	fm = Equation44(zm, b2, rpar, r, q, u_d, pfloor_, gm1);
-	fp = Equation44(zp, b2, rpar, r, q, u_d, pfloor_, gm1);
+        Real &mu = z;
 
-	// For simplicity on the GPU, find roots using the false position method
-	iterations = max_iterations;
-	// If bracket within tolerances, don't bother doing any iterations
-	if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
-	  iterations = -1;
-	}
-	z = 0.5*(zm + zp);
+        Real const x = 1./(1.+mu*b2);           // (26)
 
-	for (int ii=0; ii < iterations; ++ii) {
-	  z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
-	  Real f = Equation44(z, b2, rpar, r, q, u_d, pfloor_, gm1);
-
-	  // Quit if convergence reached
-	  // NOTE: both z and f are of order unity
-	  if ((fabs(zm-zp) < tol ) || (fabs(f) < tol )){
-	      break;
-	  }
-
-	  // assign zm-->zp if root bracketed by [z,zp]
-	  if (f * fp < 0.0) {
-	     zm = zp;
-	     fm = fp;
-	     zp = z;
-	     fp = f;
-
-	  // assign zp-->z if root bracketed by [zm,z]
-	  } else {
-	     fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
-	     zp = z;
-	     fp = f;
-	  }
-	}
-
-	Real &mu = z;
-
-	Real const x = 1./(1.+mu*b2);           // (26)
-
-	Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
-	Real qbar = q - 0.5*b2 - 0.5*(mu*mu*(b2*rbar- rpar*rpar)); // (31)
-        //  rbar = sqrt(rbar);
+        Real rbar = (x*x*r*r + mu*x*(1.+x)*rpar*rpar); // (38)
+        Real qbar = q - 0.5*b2 - 0.5*(mu*mu*(b2*rbar- rpar*rpar)); // (31)
+              //  rbar = sqrt(rbar);
 
 
-	Real z2 = (mu*mu*rbar/(fabs(1.- SQR(mu)*rbar))); // (32)
-	Real w = sqrt(1.+z2);
+        Real z2 = (mu*mu*rbar/(fabs(1.- SQR(mu)*rbar))); // (32)
+        Real w = sqrt(1.+z2);
 
-	w_d = u_d/w;                  // (34)
-	Real eps = w*(qbar - mu*rbar)+  z2/(w+1.);
+        w_d = u_d/w;                  // (34)
+        Real eps = w*(qbar - mu*rbar)+  z2/(w+1.);
 
-        //NOTE: The following generalizes to ANY equation of state
-	eps = fmax(pfloor_/(w_d*gm1), eps);                          // 
-	Real const h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps));   // (43)
+        // NOTE(@ermost): The following generalizes to ANY equation of state
+        eps = fmax(pfloor_/(w_d*gm1), eps);                          //
+        Real const h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps));   // (43)
         if (use_e) {
           Real& w_e  = prim(m,IEN,k,j,i);
           w_e = w_d*eps;
         } else {
           Real& w_t  = prim(m,ITM,k,j,i);
-          w_t = gm1*eps;  // TODO:  is this the correct expression?
+          w_t = gm1*eps;  // TODO(@user):  is this the correct expression?
         }
 
-	Real const conv = w/(h*w + b2); // (C26)
-	w_ux = conv * ( m1u/u_d + bx * rpar/(h*w));           // (C26)
-	w_uy = conv * ( m2u/u_d + by * rpar/(h*w));           // (C26)
-	w_uz = conv * ( m3u/u_d + bz * rpar/(h*w));           // (C26)
+        Real const conv = w/(h*w + b2); // (C26)
+        w_ux = conv * ( m1u/u_d + bx * rpar/(h*w));           // (C26)
+        w_uy = conv * ( m2u/u_d + by * rpar/(h*w));           // (C26)
+        w_uz = conv * ( m3u/u_d + bz * rpar/(h*w));           // (C26)
 
-	// convert scalars (if any)
-	for (int n=nmhd; n<(nmhd+nscal); ++n) {
-	  prim(m,n,k,j,i) = cons(m,n,k,j,i)/u_d;
-	}
+        // convert scalars (if any)
+        for (int n=nmhd; n<(nmhd+nscal); ++n) {
+          prim(m,n,k,j,i) = cons(m,n,k,j,i)/u_d;
+        }
       }
+
       // reset conserved variables inside excised regions or if floor is hit
       Real w_p;
       if (use_e) {
@@ -397,7 +382,7 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
             cons(m,n,k,j,i) = prim(m,n,k,j,i)*cons(m,IDN,k,j,i);
          }
       }
-    }                                     
+    }
   );
 
   return;
@@ -407,9 +392,8 @@ void IdealGRMHD::ConsToPrim(DvceArray5D<Real> &cons,
 //! \fn void PrimToCons()
 //! \brief Converts primitive into conserved variables.  Operates only over active cells.
 
-void IdealGRMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc, 
-   			    DvceArray5D<Real> &cons)
-{
+void IdealGRMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc,
+            DvceArray5D<Real> &cons) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is; int ie = indcs.ie;
   int js = indcs.js; int je = indcs.je;
@@ -425,8 +409,7 @@ void IdealGRMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Rea
   bool &use_e = eos_data.use_e;
 
   par_for("grmhd_prim2cons", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       // Extract components of metric
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
@@ -504,7 +487,7 @@ void IdealGRMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Rea
       Real& u_t0_1 = cons(m,IM1,k,j,i);
       Real& u_t0_2 = cons(m,IM2,k,j,i);
       Real& u_t0_3 = cons(m,IM3,k,j,i);
-      
+
       // Set conserved quantities
       Real wtot = w_d + gamma_prime * w_p + b_sq;
       Real ptot = w_p + 0.5 * b_sq;

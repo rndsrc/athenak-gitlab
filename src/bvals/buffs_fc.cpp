@@ -25,9 +25,8 @@
 //! relative to center of MeshBlock (0,0,0).  The arguments f1/2 are the coordinates
 //! of subblocks within faces/edges (only relevant with SMR/AMR)
 
-void BoundaryValuesFC::InitSendIndices(
-     BoundaryBuffer &buf, int ox1, int ox2, int ox3, int f1, int f2)
-{
+void BoundaryValuesFC::InitSendIndices(BoundaryBuffer &buf,
+                                       int ox1, int ox2, int ox3, int f1, int f2) {
   auto &mb_indcs  = pmy_pack->pmesh->mb_indcs;
   int ng  = mb_indcs.ng;
   int ng1 = ng - 1;
@@ -103,7 +102,7 @@ void BoundaryValuesFC::InitSendIndices(
   // Formulae taken from LoadBoundaryBufferToCoarser() in src/bvals/fc/bvals_fc.cpp
   // Identical to send indices for same level replacing is,ie,.. with cis,cie,...
   {auto &icoar = buf.icoar;   // indices of buffer for neighbor coarser level
-  if (ox1 == 0) { 
+  if (ox1 == 0) {
     icoar[0].bis = mb_indcs.cis,          icoar[0].bie = mb_indcs.cie + 1;
     icoar[1].bis = mb_indcs.cis,          icoar[1].bie = mb_indcs.cie;
     icoar[2].bis = mb_indcs.cis,          icoar[2].bie = mb_indcs.cie;
@@ -116,7 +115,7 @@ void BoundaryValuesFC::InitSendIndices(
     icoar[1].bis = mb_indcs.cis,          icoar[1].bie = mb_indcs.cis + ng1;
     icoar[2].bis = mb_indcs.cis,          icoar[2].bie = mb_indcs.cis + ng1;
   }
-  if (ox2 == 0) { 
+  if (ox2 == 0) {
     icoar[0].bjs = mb_indcs.cjs,          icoar[0].bje = mb_indcs.cje;
     icoar[1].bjs = mb_indcs.cjs,          icoar[1].bje = mb_indcs.cje + 1;
     icoar[2].bjs = mb_indcs.cjs,          icoar[2].bje = mb_indcs.cje;
@@ -137,7 +136,7 @@ void BoundaryValuesFC::InitSendIndices(
     icoar[0].bks = mb_indcs.cke - ng1,    icoar[0].bke = mb_indcs.cke;
     icoar[1].bks = mb_indcs.cke - ng1,    icoar[1].bke = mb_indcs.cke;
     icoar[2].bks = mb_indcs.cke - ng1,    icoar[2].bke = mb_indcs.cke;
-  } else {              
+  } else {
     icoar[0].bks = mb_indcs.cks,          icoar[0].bke = mb_indcs.cks + ng1;
     icoar[1].bks = mb_indcs.cks,          icoar[1].bke = mb_indcs.cks + ng1;
     icoar[2].bks = mb_indcs.cks + 1,      icoar[2].bke = mb_indcs.cks + ng;
@@ -332,9 +331,8 @@ void BoundaryValuesFC::InitSendIndices(
 //! relative to center of MeshBlock (0,0,0).  The arguments f1/2 are the coordinates
 //! of subblocks within faces/edges (only relevant with SMR/AMR)
 
-void BoundaryValuesFC::InitRecvIndices(
-     BoundaryBuffer &buf, int ox1, int ox2, int ox3, int f1, int f2)
-{ 
+void BoundaryValuesFC::InitRecvIndices(BoundaryBuffer &buf,
+                                       int ox1, int ox2, int ox3, int f1, int f2) {
   auto &mb_indcs  = pmy_pack->pmesh->mb_indcs;
   int ng = mb_indcs.ng;
 
@@ -828,5 +826,4 @@ void BoundaryValuesFC::InitRecvIndices(
                (iflux[i].bke - iflux[i].bks + 1);
     buf.iflux_ndat = std::max(buf.iflux_ndat, ndat);
   }}
-
 }

@@ -4,7 +4,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file coordinates.cpp
-//! \brief 
+//! \brief
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
@@ -16,10 +16,8 @@
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures describing MeshBlocks
 
-Coordinates::Coordinates(MeshBlockPack *ppack)
-  : pmy_pack(ppack)
-{
-
+Coordinates::Coordinates(MeshBlockPack *ppack) :
+  pmy_pack(ppack) {
 }
 
 //----------------------------------------------------------------------------------------
@@ -27,8 +25,7 @@ Coordinates::Coordinates(MeshBlockPack *ppack)
 // Read properties of metric from input file for GR.  This function called from Hydro
 // and MHD constructors, but only when GR is specified
 
-void Coordinates::InitMetric(ParameterInput *pin)
-{
+void Coordinates::InitMetric(ParameterInput *pin) {
   coord_data.is_minkowski = pin->GetOrAddBoolean("coord","minkowski",false);
   coord_data.bh_mass = pin->GetReal("coord","m");
   coord_data.bh_spin = pin->GetReal("coord","a");
@@ -40,8 +37,7 @@ void Coordinates::InitMetric(ParameterInput *pin)
 // Coordinate (geometric) source term function for GR hydrodynamics
 
 void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim, const EOS_Data &eos,
-                                const Real dt, DvceArray5D<Real> &cons)
-{
+                                const Real dt, DvceArray5D<Real> &cons) {
   // capture variables for kernel
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is; int ie = indcs.ie;
@@ -55,8 +51,7 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim, const EOS_Data &e
 
   int nmb1 = pmy_pack->nmb_thispack - 1;
   par_for("coord_src", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i)
-    {
+    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
       // Extract components of metric
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
@@ -166,20 +161,19 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim, const EOS_Data &e
 
   return;
 }
-  
+
 //----------------------------------------------------------------------------------------
 //! \fn
 // Coordinate (geometric) source term function for GR MHD
 //
-// TODO: Most of this function just copies the Hydro version.  Only difference is the
-// inclusion of the magnetic field in computing the stress-energy tensor.  There must be
-// a smarter way to generalize these two functions and avoid duplicated code.
+// TODO(@user): Most of this function just copies the Hydro version.  Only difference is
+// the inclusion of the magnetic field in computing the stress-energy tensor.  There must
+// be a smarter way to generalize these two functions and avoid duplicated code.
 // Functions distinguished only by argument list.
 
 void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim,
                                 const DvceArray5D<Real> &bcc, const EOS_Data &eos,
-                                const Real dt, DvceArray5D<Real> &cons)
-{
+                                const Real dt, DvceArray5D<Real> &cons) {
   // capture variables for kernel
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is; int ie = indcs.ie;
@@ -193,8 +187,7 @@ void Coordinates::AddCoordTerms(const DvceArray5D<Real> &prim,
 
   int nmb1 = pmy_pack->nmb_thispack - 1;
   par_for("coord_src", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i)
-    {
+    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
       // Extract components of metric
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;

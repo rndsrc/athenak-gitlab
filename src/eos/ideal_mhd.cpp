@@ -15,9 +15,8 @@
 //----------------------------------------------------------------------------------------
 // ctor: also calls EOS base class constructor
 
-IdealMHD::IdealMHD(MeshBlockPack *pp, ParameterInput *pin)
-  : EquationOfState(pp, pin)
-{
+IdealMHD::IdealMHD(MeshBlockPack *pp, ParameterInput *pin) :
+  EquationOfState(pp, pin) {
   eos_data.is_ideal = true;
   eos_data.gamma = pin->GetReal("mhd","gamma");
   eos_data.iso_cs = 0.0;
@@ -47,13 +46,12 @@ IdealMHD::IdealMHD(MeshBlockPack *pp, ParameterInput *pin)
 //----------------------------------------------------------------------------------------
 // \!fn void ConsToPrim()
 // \brief Converts conserved into primitive variables.  Operates over entire MeshBlock,
-//  including ghost cells.  
+//  including ghost cells.
 // Note that the primitive variables contain the cell-centered magnetic fields, so that
 // W contains (nmhd+3+nscalars) elements, while U contains (nmhd+nscalars)
 
 void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
-                              DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc)
-{
+                              DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -71,8 +69,7 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
   bool &use_e = eos_data.use_e;
 
   par_for("mhd_con2prim", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real& u_d  = cons(m,IDN,k,j,i);
       Real& u_e  = cons(m,IEN,k,j,i);
       const Real& u_m1 = cons(m,IVX,k,j,i);
@@ -97,7 +94,7 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
       Real& w_bx = bcc(m,IBX,k,j,i);
       Real& w_by = bcc(m,IBY,k,j,i);
       Real& w_bz = bcc(m,IBZ,k,j,i);
-      w_bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));  
+      w_bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
       w_by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
       w_bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
 
@@ -137,8 +134,7 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
 //  Does not change cell- or face-centered magnetic fields.
 
 void IdealMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc,
-                              DvceArray5D<Real> &cons)
-{
+                              DvceArray5D<Real> &cons) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &ie = indcs.ie;
   int &js = indcs.js; int &je = indcs.je;
@@ -148,16 +144,15 @@ void IdealMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real>
   int &nmb = pmy_pack->nmb_thispack;
   Real igm1 = 1.0/(eos_data.gamma - 1.0);
   bool &use_e = eos_data.use_e;
-  
+
   par_for("mhd_prim2con", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    { 
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real& u_d  = cons(m,IDN,k,j,i);
       Real& u_e  = cons(m,IEN,k,j,i);
       Real& u_m1 = cons(m,IVX,k,j,i);
       Real& u_m2 = cons(m,IVY,k,j,i);
       Real& u_m3 = cons(m,IVZ,k,j,i);
-      
+
       const Real& w_d  = prim(m,IDN,k,j,i);
       const Real& w_vx = prim(m,IVX,k,j,i);
       const Real& w_vy = prim(m,IVY,k,j,i);
@@ -185,7 +180,7 @@ void IdealMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real>
       for (int n=nmhd; n<(nmhd+nscal); ++n) {
         cons(m,n,k,j,i) = prim(m,n,k,j,i)*w_d;
       }
-    } 
+    }
   );
 
   return;
