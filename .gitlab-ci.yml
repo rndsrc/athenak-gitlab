@@ -21,7 +21,7 @@ lint_python-job:
     - cd $CI_PROJECT_DIR
     - python3 -m pip install --user flake8
     - echo "Running flake8..."
-    - python3 -m flake8 2> $CI_PROJECT_DIR/tst/lint_python_log.txt
+    - python3 -m flake8 2>&1 | tee $CI_PROJECT_DIR/tst/lint_python_log.txt
   artifacts:
     when: always
     expire_in: 3 days
@@ -38,7 +38,7 @@ lint_c++-job:
   script:
     - cd $CI_PROJECT_DIR/tst/scripts/style
     - echo "Running Google C++ linter..."
-    - bash check_athena_cpp_style.sh 2> $CI_PROJECT_DIR/tst/lint_c++_log.txt
+    - bash check_athena_cpp_style.sh 2>&1 | tee $CI_PROJECT_DIR/tst/lint_c++_log.txt
   artifacts:
     when: always
     expire_in: 3 days
