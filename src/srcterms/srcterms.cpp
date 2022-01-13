@@ -83,12 +83,11 @@ void SourceTerms::AddConstantAccel(DvceArray5D<Real> &u0, const DvceArray5D<Real
   int &dir = const_accel_dir;
 
   par_for("const_acc", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-      Real src = bdt*g*w0(m,IDN,k,j,i);
-      u0(m,dir,k,j,i) += src;
-      if ((u0.extent_int(1) - 1) == IEN) { u0(m,IEN,k,j,i) += src*w0(m,dir,k,j,i); }
-    }
-  );
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+    Real src = bdt*g*w0(m,IDN,k,j,i);
+    u0(m,dir,k,j,i) += src;
+    if ((u0.extent_int(1) - 1) == IEN) { u0(m,IEN,k,j,i) += src*w0(m,dir,k,j,i); }
+  });
   return;
 }
 
@@ -112,15 +111,14 @@ void SourceTerms::AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> 
   Real qo  = qshear*omega0;
 
   par_for("sbox", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-      Real &den = w0(m,IDN,k,j,i);
-      Real mom1 = den*w0(m,IVX,k,j,i);
-      Real mom3 = den*w0(m,IVZ,k,j,i);
-      u0(m,IM1,k,j,i) += 2.0*bdt*(omega0_*mom3);
-      u0(m,IM3,k,j,i) += (qshear_ - 2.0)*bdt*omega0_*mom1;
-      if ((u0.extent_int(1) - 1) == IEN) { u0(m,IEN,k,j,i) += qo*bdt*(mom1*mom3/den); }
-    }
-  );
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+    Real &den = w0(m,IDN,k,j,i);
+    Real mom1 = den*w0(m,IVX,k,j,i);
+    Real mom3 = den*w0(m,IVZ,k,j,i);
+    u0(m,IM1,k,j,i) += 2.0*bdt*(omega0_*mom3);
+    u0(m,IM3,k,j,i) += (qshear_ - 2.0)*bdt*omega0_*mom1;
+    if ((u0.extent_int(1) - 1) == IEN) { u0(m,IEN,k,j,i) += qo*bdt*(mom1*mom3/den); }
+  });
 }
 
 //----------------------------------------------------------------------------------------
@@ -143,17 +141,16 @@ void SourceTerms::AddShearingBox(DvceArray5D<Real> &u0, const DvceArray5D<Real> 
   Real qo  = qshear*omega0;
 
   par_for("sbox", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-    KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-      Real &den = w0(m,IDN,k,j,i);
-      Real mom1 = den*w0(m,IVX,k,j,i);
-      Real mom3 = den*w0(m,IVZ,k,j,i);
-      u0(m,IM1,k,j,i) += 2.0*bdt*(omega0_*mom3);
-      u0(m,IM3,k,j,i) += (qshear_ - 2.0)*bdt*omega0_*mom1;
-      if ((u0.extent_int(1) - 1) == IEN) {
-        u0(m,IEN,k,j,i) -= qo*bdt*(bcc0(m,IBX,k,j,i)*bcc0(m,IBZ,k,j,i) - mom1*mom3/den);
-      }
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+    Real &den = w0(m,IDN,k,j,i);
+    Real mom1 = den*w0(m,IVX,k,j,i);
+    Real mom3 = den*w0(m,IVZ,k,j,i);
+    u0(m,IM1,k,j,i) += 2.0*bdt*(omega0_*mom3);
+    u0(m,IM3,k,j,i) += (qshear_ - 2.0)*bdt*omega0_*mom1;
+    if ((u0.extent_int(1) - 1) == IEN) {
+      u0(m,IEN,k,j,i) -= qo*bdt*(bcc0(m,IBX,k,j,i)*bcc0(m,IBZ,k,j,i) - mom1*mom3/den);
     }
-  );
+  });
 
   return;
 }
@@ -188,22 +185,21 @@ void SourceTerms::AddSBoxEField(const DvceFaceFld4D<Real> &b0,
     auto b1 = b0.x1f;
     auto b2 = b0.x2f;
     par_for_outer("acc0", DevExeSpace(), scr_size, scr_level, 0, nmb1, js, je+1,
-      KOKKOS_LAMBDA(TeamMember_t member, const int m, const int j) {
-        par_for_inner(member, is, ie+1, [&](const int i) {
-          Real &x1min = size.d_view(m).x1min;
-          Real &x1max = size.d_view(m).x1max;
-          int nx1 = indcs.nx1;
-          Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int j) {
+      par_for_inner(member, is, ie+1, [&](const int i) {
+        Real &x1min = size.d_view(m).x1min;
+        Real &x1max = size.d_view(m).x1max;
+        int nx1 = indcs.nx1;
+        Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
 
-          e1(m,ks,  j,i) -= qomega*x1v*b2(m,ks,j,i);
-          e1(m,ke+1,j,i) -= qomega*x1v*b2(m,ks,j,i);
+        e1(m,ks,  j,i) -= qomega*x1v*b2(m,ks,j,i);
+        e1(m,ke+1,j,i) -= qomega*x1v*b2(m,ks,j,i);
 
-          Real x1f = LeftEdgeX(i-is, nx1, x1min, x1max);
-          e2(m,ks  ,j,i) += qomega*x1f*b1(m,ks,j,i);
-          e2(m,ke+1,j,i) += qomega*x1f*b1(m,ks,j,i);
-        });
-      }
-    );
+        Real x1f = LeftEdgeX(i-is, nx1, x1min, x1max);
+        e2(m,ks  ,j,i) += qomega*x1f*b1(m,ks,j,i);
+        e2(m,ke+1,j,i) += qomega*x1f*b1(m,ks,j,i);
+      });
+    });
   }
   // TODO(@user): add 3D shearing box
 

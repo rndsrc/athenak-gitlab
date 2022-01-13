@@ -133,28 +133,27 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
   // Initialize primitive values (HYDRO ONLY)
   par_for("pgen_bondi", DevExeSpace(), 0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
-    KOKKOS_LAMBDA(int m, int k, int j, int i) {
-      Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
-      Real &x1min = size.d_view(m).x1min;
-      Real &x1max = size.d_view(m).x1max;
-      Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real rho, pgas, uu1, uu2, uu3, g_[NMETRIC], gi_[NMETRIC];
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-      Real &x2min = size.d_view(m).x2min;
-      Real &x2max = size.d_view(m).x2max;
-      Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
 
-      Real &x3min = size.d_view(m).x3min;
-      Real &x3max = size.d_view(m).x3max;
-      Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-      ComputePrimitiveSingle(x1v,x2v,x3v,coord,g_,gi_,bondi_,rho,pgas,uu1,uu2,uu3);
-      w0_(m,IDN,k,j,i) = rho;
-      w0_(m,IEN,k,j,i) = pgas/gm1;
-      w0_(m,IM1,k,j,i) = uu1;
-      w0_(m,IM2,k,j,i) = uu2;
-      w0_(m,IM3,k,j,i) = uu3;
-    }
-  );
+    ComputePrimitiveSingle(x1v,x2v,x3v,coord,g_,gi_,bondi_,rho,pgas,uu1,uu2,uu3);
+    w0_(m,IDN,k,j,i) = rho;
+    w0_(m,IEN,k,j,i) = pgas/gm1;
+    w0_(m,IM1,k,j,i) = uu1;
+    w0_(m,IM2,k,j,i) = uu2;
+    w0_(m,IM3,k,j,i) = uu3;
+  });
 
   // Convert primitives to conserved
   auto &u0_ = pmbp->phydro->u0;
@@ -205,36 +204,35 @@ void BondiErrors(MeshBlockPack *pmbp, ParameterInput *pin) {
     array_sum::GlobalSum sum_this_mb;
     Kokkos::parallel_reduce("Bondi-err-Sums",
                             Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
-        // compute n,k,j,i indices of thread
-        int m = (idx)/nkji;
-        int k = (idx - m*nkji)/nji;
-        int j = (idx - m*nkji - k*nji)/nx1;
-        int i = (idx - m*nkji - k*nji - j*nx1) + is;
-        k += ks;
-        j += js;
+    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
+      // compute n,k,j,i indices of thread
+      int m = (idx)/nkji;
+      int k = (idx - m*nkji)/nji;
+      int j = (idx - m*nkji - k*nji)/nx1;
+      int i = (idx - m*nkji - k*nji - j*nx1) + is;
+      k += ks;
+      j += js;
 
-        Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
+      Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
 
-        // Hydro conserved variables:
-        array_sum::GlobalSum evars;
-        evars.the_array[IDN] = vol*fabs(u0_(m,IDN,k,j,i) - u1_(m,IDN,k,j,i));
-        evars.the_array[IM1] = vol*fabs(u0_(m,IM1,k,j,i) - u1_(m,IM1,k,j,i));
-        evars.the_array[IM2] = vol*fabs(u0_(m,IM2,k,j,i) - u1_(m,IM2,k,j,i));
-        evars.the_array[IM3] = vol*fabs(u0_(m,IM3,k,j,i) - u1_(m,IM3,k,j,i));
-        if (eos.is_ideal) {
-          evars.the_array[IEN] = vol*fabs(u0_(m,IEN,k,j,i) - u1_(m,IEN,k,j,i));
-        }
+      // Hydro conserved variables:
+      array_sum::GlobalSum evars;
+      evars.the_array[IDN] = vol*fabs(u0_(m,IDN,k,j,i) - u1_(m,IDN,k,j,i));
+      evars.the_array[IM1] = vol*fabs(u0_(m,IM1,k,j,i) - u1_(m,IM1,k,j,i));
+      evars.the_array[IM2] = vol*fabs(u0_(m,IM2,k,j,i) - u1_(m,IM2,k,j,i));
+      evars.the_array[IM3] = vol*fabs(u0_(m,IM3,k,j,i) - u1_(m,IM3,k,j,i));
+      if (eos.is_ideal) {
+        evars.the_array[IEN] = vol*fabs(u0_(m,IEN,k,j,i) - u1_(m,IEN,k,j,i));
+      }
 
-        // fill rest of the_array with zeros, if narray < NREDUCTION_VARIABLES
-        for (int n=nvars; n<NREDUCTION_VARIABLES; ++n) {
-          evars.the_array[n] = 0.0;
-        }
+      // fill rest of the_array with zeros, if narray < NREDUCTION_VARIABLES
+      for (int n=nvars; n<NREDUCTION_VARIABLES; ++n) {
+        evars.the_array[n] = 0.0;
+      }
 
-        // sum into parallel reduce
-        mb_sum += evars;
-      }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-    );
+      // sum into parallel reduce
+      mb_sum += evars;
+    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb));
 
     // store data into l1_err array
     for (int n=0; n<nvars; ++n) {

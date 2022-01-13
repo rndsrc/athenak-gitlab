@@ -99,21 +99,20 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
   auto flx1 = flx.x1f;
 
   par_for_outer("conduct1", DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je,
-    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-      ScrArray1D<Real> hflx1(member.team_scratch(scr_level), ncells1);
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
+    ScrArray1D<Real> hflx1(member.team_scratch(scr_level), ncells1);
 
-      // Add heat fluxes into fluxes of conserved variables: energy
-      par_for_inner(member, is, ie+1, [&](const int i) {
-        if (use_e) {
-          hflx1(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                     w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)) / size.d_view(m).dx1;
-        } else {
-          hflx1(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j,i-1)) / size.d_view(m).dx1;
-        }
-        flx1(m,IEN,k,j,i) -= kappa * hflx1(i);
-      });
-    }
-  );
+    // Add heat fluxes into fluxes of conserved variables: energy
+    par_for_inner(member, is, ie+1, [&](const int i) {
+      if (use_e) {
+        hflx1(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
+                   w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)) / size.d_view(m).dx1;
+      } else {
+        hflx1(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j,i-1)) / size.d_view(m).dx1;
+      }
+      flx1(m,IEN,k,j,i) -= kappa * hflx1(i);
+    });
+  });
   if (pmy_pack->pmesh->one_d) {return;}
 
   //--------------------------------------------------------------------------------------
@@ -122,21 +121,20 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
   auto flx2 = flx.x2f;
 
   par_for_outer("conduct2",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je+1,
-    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-      ScrArray1D<Real> hflx2(member.team_scratch(scr_level), ncells1);
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
+    ScrArray1D<Real> hflx2(member.team_scratch(scr_level), ncells1);
 
-      // Add heat fluxes into fluxes of conserved variables: energy
-      par_for_inner(member, is, ie, [&](const int i) {
-        if (use_e) {
-          hflx2(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                     w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)) / size.d_view(m).dx2;
-        } else {
-          hflx2(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j-1,i)) / size.d_view(m).dx2;
-        }
-        flx2(m,IEN,k,j,i) -= kappa * hflx2(i);
-      });
-    }
-  );
+    // Add heat fluxes into fluxes of conserved variables: energy
+    par_for_inner(member, is, ie, [&](const int i) {
+      if (use_e) {
+        hflx2(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
+                   w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)) / size.d_view(m).dx2;
+      } else {
+        hflx2(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j-1,i)) / size.d_view(m).dx2;
+      }
+      flx2(m,IEN,k,j,i) -= kappa * hflx2(i);
+    });
+  });
   if (pmy_pack->pmesh->two_d) {return;}
 
   //--------------------------------------------------------------------------------------
@@ -145,21 +143,20 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const Real kappa
   auto flx3 = flx.x3f;
 
   par_for_outer("conduct3",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke+1, js, je,
-    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-      ScrArray1D<Real> hflx3(member.team_scratch(scr_level), ncells1);
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
+    ScrArray1D<Real> hflx3(member.team_scratch(scr_level), ncells1);
 
-      // Add heat fluxes into fluxes of conserved variables: energy
-      par_for_inner(member, is, ie, [&](const int i) {
-        if (use_e) {
-          hflx3(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                     w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)) / size.d_view(m).dx3;
-        } else {
-          hflx3(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k-1,j,i)) / size.d_view(m).dx3;
-        }
-        flx3(m,IEN,k,j,i) -= kappa * hflx3(i);
-      });
-    }
-  );
+    // Add heat fluxes into fluxes of conserved variables: energy
+    par_for_inner(member, is, ie, [&](const int i) {
+      if (use_e) {
+        hflx3(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
+                   w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)) / size.d_view(m).dx3;
+      } else {
+        hflx3(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k-1,j,i)) / size.d_view(m).dx3;
+      }
+      flx3(m,IEN,k,j,i) -= kappa * hflx3(i);
+    });
+  });
 
   return;
 }

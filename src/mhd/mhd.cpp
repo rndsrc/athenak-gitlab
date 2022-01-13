@@ -242,10 +242,10 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
         rsolver_method = MHD_RSolver::hlle;
       // HLLD solver
       } else if (rsolver.compare("hlld") == 0) {
-          rsolver_method = MHD_RSolver::hlld;
+        rsolver_method = MHD_RSolver::hlld;
       // Roe solver
-//      } else if (rsolver.compare("roe") == 0) {
-//        rsolver_method = MHD_RSolver::roe;
+      // } else if (rsolver.compare("roe") == 0) {
+      //   rsolver_method = MHD_RSolver::roe;
       } else {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                   << std::endl << "<mhd>/rsolver = '" << rsolver << "' not implemented"

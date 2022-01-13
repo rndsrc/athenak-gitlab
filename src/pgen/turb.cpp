@@ -45,16 +45,15 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
     // Set initial conditions
     par_for("pgen_turb", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i) {
-        u0(m,IDN,k,j,i) = 1.0;
-        u0(m,IM1,k,j,i) = 0.0;
-        u0(m,IM2,k,j,i) = 0.0;
-        u0(m,IM3,k,j,i) = 0.0;
-        if (eos.is_ideal) {
-          u0(m,IEN,k,j,i) = p0/gm1;
-        }
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      u0(m,IDN,k,j,i) = 1.0;
+      u0(m,IM1,k,j,i) = 0.0;
+      u0(m,IM2,k,j,i) = 0.0;
+      u0(m,IM3,k,j,i) = 0.0;
+      if (eos.is_ideal) {
+        u0(m,IEN,k,j,i) = p0/gm1;
       }
-    );
+    });
   }
 
   // Initialize MHD variables ---------------------------------
@@ -68,25 +67,24 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
     // Set initial conditions
     par_for("pgen_turb", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i) {
-        u0(m,IDN,k,j,i) = 1.0;
-        u0(m,IM1,k,j,i) = 0.0;
-        u0(m,IM2,k,j,i) = 0.0;
-        u0(m,IM3,k,j,i) = 0.0;
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      u0(m,IDN,k,j,i) = 1.0;
+      u0(m,IM1,k,j,i) = 0.0;
+      u0(m,IM2,k,j,i) = 0.0;
+      u0(m,IM3,k,j,i) = 0.0;
 
-        // initialize B
-        b0.x1f(m,k,j,i) = B0;
-        b0.x2f(m,k,j,i) = 0.0;
-        b0.x3f(m,k,j,i) = 0.0;
-        if (i==ie) {b0.x1f(m,k,j,i+1) = B0;}
-        if (j==je) {b0.x2f(m,k,j+1,i) = 0.0;}
-        if (k==ke) {b0.x3f(m,k+1,j,i) = 0.0;}
+      // initialize B
+      b0.x1f(m,k,j,i) = B0;
+      b0.x2f(m,k,j,i) = 0.0;
+      b0.x3f(m,k,j,i) = 0.0;
+      if (i==ie) {b0.x1f(m,k,j,i+1) = B0;}
+      if (j==je) {b0.x2f(m,k,j+1,i) = 0.0;}
+      if (k==ke) {b0.x3f(m,k+1,j,i) = 0.0;}
 
-        if (eos.is_ideal) {
-          u0(m,IEN,k,j,i) = p0/gm1 + 0.5; // 0.5 comes from B^2/2
-        }
+      if (eos.is_ideal) {
+        u0(m,IEN,k,j,i) = p0/gm1 + 0.5; // 0.5 comes from B^2/2
       }
-    );
+    });
   }
 
   // Initialize ion-neutral variables -------------------------
@@ -104,25 +102,24 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
     // Set initial conditions
     par_for("pgen_turb_mhd", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i) {
-        u0(m,IDN,k,j,i) = d_i;
-        u0(m,IM1,k,j,i) = 0.0;
-        u0(m,IM2,k,j,i) = 0.0;
-        u0(m,IM3,k,j,i) = 0.0;
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      u0(m,IDN,k,j,i) = d_i;
+      u0(m,IM1,k,j,i) = 0.0;
+      u0(m,IM2,k,j,i) = 0.0;
+      u0(m,IM3,k,j,i) = 0.0;
 
-        // initialize B
-        b0.x1f(m,k,j,i) = B0;
-        b0.x2f(m,k,j,i) = 0.0;
-        b0.x3f(m,k,j,i) = 0.0;
-        if (i==ie) {b0.x1f(m,k,j,i+1) = B0;}
-        if (j==je) {b0.x2f(m,k,j+1,i) = 0.0;}
-        if (k==ke) {b0.x3f(m,k+1,j,i) = 0.0;}
+      // initialize B
+      b0.x1f(m,k,j,i) = B0;
+      b0.x2f(m,k,j,i) = 0.0;
+      b0.x3f(m,k,j,i) = 0.0;
+      if (i==ie) {b0.x1f(m,k,j,i+1) = B0;}
+      if (j==je) {b0.x2f(m,k,j+1,i) = 0.0;}
+      if (k==ke) {b0.x3f(m,k+1,j,i) = 0.0;}
 
-        if (eos.is_ideal) {
-          u0(m,IEN,k,j,i) = p0/gm1 + 0.5; // 0.5 comes from B^2/2
-        }
+      if (eos.is_ideal) {
+        u0(m,IEN,k,j,i) = p0/gm1 + 0.5; // 0.5 comes from B^2/2
       }
-    );
+    });
     // Hydro
     auto &u0_ = pmbp->phydro->u0;
     EOS_Data &eos_ = pmbp->phydro->peos->eos_data;
@@ -131,16 +128,15 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
     // Set initial conditions
     par_for("pgen_turb_hydro", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i) {
-        u0_(m,IDN,k,j,i) = d_n; // TODO(@user): replace with neutral density
-        u0_(m,IM1,k,j,i) = 0.0;
-        u0_(m,IM2,k,j,i) = 0.0;
-        u0_(m,IM3,k,j,i) = 0.0;
-        if (eos_.is_ideal) {
-          u0_(m,IEN,k,j,i) = p0_/gm1_;
-        }
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      u0_(m,IDN,k,j,i) = d_n; // TODO(@user): replace with neutral density
+      u0_(m,IM1,k,j,i) = 0.0;
+      u0_(m,IM2,k,j,i) = 0.0;
+      u0_(m,IM3,k,j,i) = 0.0;
+      if (eos_.is_ideal) {
+        u0_(m,IEN,k,j,i) = p0_/gm1_;
       }
-    );
+    });
   }
 
   return;

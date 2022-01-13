@@ -53,7 +53,7 @@ void RestartOutput::LoadOutputData(Mesh *pm) {
     Kokkos::realloc(outdata, nmb, nvar, nout3, nout2, nout1);
 
     // Now copy data Hydro conserved variables to host, using device mirror
-//    DvceArray5D<Real>::HostMirror hst_data = Kokkos::create_mirror(u0_);
+    // DvceArray5D<Real>::HostMirror hst_data = Kokkos::create_mirror(u0_);
     Kokkos::deep_copy(outdata,phydro->u0);
   }
 }

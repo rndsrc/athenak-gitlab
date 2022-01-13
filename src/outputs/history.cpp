@@ -94,41 +94,40 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm) {
   const int nji  = nx2*nx1;
   array_sum::GlobalSum sum_this_mb;
   Kokkos::parallel_reduce("HistSums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
-      // compute n,k,j,i indices of thread
-      int m = (idx)/nkji;
-      int k = (idx - m*nkji)/nji;
-      int j = (idx - m*nkji - k*nji)/nx1;
-      int i = (idx - m*nkji - k*nji - j*nx1) + is;
-      k += ks;
-      j += js;
+  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
+    // compute n,k,j,i indices of thread
+    int m = (idx)/nkji;
+    int k = (idx - m*nkji)/nji;
+    int j = (idx - m*nkji - k*nji)/nx1;
+    int i = (idx - m*nkji - k*nji - j*nx1) + is;
+    k += ks;
+    j += js;
 
-      Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
+    Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
 
-      // Hydro conserved variables:
-      array_sum::GlobalSum hvars;
-      hvars.the_array[IDN] = vol*u0_(m,IDN,k,j,i);
-      hvars.the_array[IM1] = vol*u0_(m,IM1,k,j,i);
-      hvars.the_array[IM2] = vol*u0_(m,IM2,k,j,i);
-      hvars.the_array[IM3] = vol*u0_(m,IM3,k,j,i);
-      if (eos_data.is_ideal) {
-        hvars.the_array[IEN] = vol*u0_(m,IEN,k,j,i);
-      }
+    // Hydro conserved variables:
+    array_sum::GlobalSum hvars;
+    hvars.the_array[IDN] = vol*u0_(m,IDN,k,j,i);
+    hvars.the_array[IM1] = vol*u0_(m,IM1,k,j,i);
+    hvars.the_array[IM2] = vol*u0_(m,IM2,k,j,i);
+    hvars.the_array[IM3] = vol*u0_(m,IM3,k,j,i);
+    if (eos_data.is_ideal) {
+      hvars.the_array[IEN] = vol*u0_(m,IEN,k,j,i);
+    }
 
-      // Hydro KE
-      hvars.the_array[nhydro_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
-      hvars.the_array[nhydro_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
-      hvars.the_array[nhydro_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
+    // Hydro KE
+    hvars.the_array[nhydro_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nhydro_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nhydro_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
 
-      // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
-      for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
-        hvars.the_array[n] = 0.0;
-      }
+    // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
+    for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
+      hvars.the_array[n] = 0.0;
+    }
 
-      // sum into parallel reduce
-      mb_sum += hvars;
-    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-  );
+    // sum into parallel reduce
+    mb_sum += hvars;
+  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb));
 
   // store data into hdata array
   for (int n=0; n<pdata->nhist; ++n) {
@@ -185,46 +184,45 @@ void HistoryOutput::LoadMHDHistoryData(HistoryData *pdata, Mesh *pm) {
   const int nji  = nx2*nx1;
   array_sum::GlobalSum sum_this_mb;
   Kokkos::parallel_reduce("HistSums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-    KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
-      // compute n,k,j,i indices of thread
-      int m = (idx)/nkji;
-      int k = (idx - m*nkji)/nji;
-      int j = (idx - m*nkji - k*nji)/nx1;
-      int i = (idx - m*nkji - k*nji - j*nx1) + is;
-      k += ks;
-      j += js;
+  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
+    // compute n,k,j,i indices of thread
+    int m = (idx)/nkji;
+    int k = (idx - m*nkji)/nji;
+    int j = (idx - m*nkji - k*nji)/nx1;
+    int i = (idx - m*nkji - k*nji - j*nx1) + is;
+    k += ks;
+    j += js;
 
-      Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
+    Real vol = size.d_view(m).dx1*size.d_view(m).dx2*size.d_view(m).dx3;
 
-      // MHD conserved variables:
-      array_sum::GlobalSum hvars;
-      hvars.the_array[IDN] = vol*u0_(m,IDN,k,j,i);
-      hvars.the_array[IM1] = vol*u0_(m,IM1,k,j,i);
-      hvars.the_array[IM2] = vol*u0_(m,IM2,k,j,i);
-      hvars.the_array[IM3] = vol*u0_(m,IM3,k,j,i);
-      if (eos_data.is_ideal) {
-        hvars.the_array[IEN] = vol*u0_(m,IEN,k,j,i);
-      }
+    // MHD conserved variables:
+    array_sum::GlobalSum hvars;
+    hvars.the_array[IDN] = vol*u0_(m,IDN,k,j,i);
+    hvars.the_array[IM1] = vol*u0_(m,IM1,k,j,i);
+    hvars.the_array[IM2] = vol*u0_(m,IM2,k,j,i);
+    hvars.the_array[IM3] = vol*u0_(m,IM3,k,j,i);
+    if (eos_data.is_ideal) {
+      hvars.the_array[IEN] = vol*u0_(m,IEN,k,j,i);
+    }
 
-      // MHD KE
-      hvars.the_array[nmhd_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
-      hvars.the_array[nmhd_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
-      hvars.the_array[nmhd_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
+    // MHD KE
+    hvars.the_array[nmhd_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nmhd_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nmhd_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
 
-      // MHD ME
-      hvars.the_array[nmhd_+3] = vol*0.25*(SQR(bx1f(m,k,j,i+1)) + SQR(bx1f(m,k,j,i)));
-      hvars.the_array[nmhd_+4] = vol*0.25*(SQR(bx2f(m,k,j+1,i)) + SQR(bx2f(m,k,j,i)));
-      hvars.the_array[nmhd_+5] = vol*0.25*(SQR(bx3f(m,k+1,j,i)) + SQR(bx3f(m,k,j,i)));
+    // MHD ME
+    hvars.the_array[nmhd_+3] = vol*0.25*(SQR(bx1f(m,k,j,i+1)) + SQR(bx1f(m,k,j,i)));
+    hvars.the_array[nmhd_+4] = vol*0.25*(SQR(bx2f(m,k,j+1,i)) + SQR(bx2f(m,k,j,i)));
+    hvars.the_array[nmhd_+5] = vol*0.25*(SQR(bx3f(m,k+1,j,i)) + SQR(bx3f(m,k,j,i)));
 
-      // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
-      for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
-        hvars.the_array[n] = 0.0;
-      }
+    // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
+    for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
+      hvars.the_array[n] = 0.0;
+    }
 
-      // sum into parallel reduce
-      mb_sum += hvars;
-    }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
-  );
+    // sum into parallel reduce
+    mb_sum += hvars;
+  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb));
 
   // store data into hdata array
   for (int n=0; n<pdata->nhist; ++n) {

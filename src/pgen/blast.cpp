@@ -44,54 +44,53 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
     auto &eos = pmbp->phydro->peos->eos_data;
     auto &w0 = pmbp->phydro->w0;
     par_for("pgen_cloud1",DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m,int k,int j,int i) {
-        Real &x1min = size.d_view(m).x1min;
-        Real &x1max = size.d_view(m).x1max;
-        int nx1 = indcs.nx1;
-        Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+    KOKKOS_LAMBDA(int m,int k,int j,int i) {
+      Real &x1min = size.d_view(m).x1min;
+      Real &x1max = size.d_view(m).x1max;
+      int nx1 = indcs.nx1;
+      Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
 
-        Real &x2min = size.d_view(m).x2min;
-        Real &x2max = size.d_view(m).x2max;
-        int nx2 = indcs.nx2;
-        Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
+      Real &x2min = size.d_view(m).x2min;
+      Real &x2max = size.d_view(m).x2max;
+      int nx2 = indcs.nx2;
+      Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
 
-        Real &x3min = size.d_view(m).x3min;
-        Real &x3max = size.d_view(m).x3max;
-        int nx3 = indcs.nx3;
-        Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
+      Real &x3min = size.d_view(m).x3min;
+      Real &x3max = size.d_view(m).x3max;
+      int nx3 = indcs.nx3;
+      Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-        Real rad = std::sqrt(SQR(x1v) + SQR(x2v) + SQR(x3v));
+      Real rad = std::sqrt(SQR(x1v) + SQR(x2v) + SQR(x3v));
 
-        Real den = da;
-        Real pres = pa;
-        if (rad < rout) {
-          if (rad < rin) {
-            den = drat*da;
-            pres = prat*pa;
-          } else {   // add smooth ramp in density
-            Real f = (rad-rin) / (rout-rin);
-            Real log_den = (1.0-f) * log(drat*da) + f * log(da);
-            den = exp(log_den);
-            Real log_pres = (1.0-f) * log(prat*pa) + f * log(pa);
-            pres = exp(log_pres);
-          }
+      Real den = da;
+      Real pres = pa;
+      if (rad < rout) {
+        if (rad < rin) {
+          den = drat*da;
+          pres = prat*pa;
+        } else {   // add smooth ramp in density
+          Real f = (rad-rin) / (rout-rin);
+          Real log_den = (1.0-f) * log(drat*da) + f * log(da);
+          den = exp(log_den);
+          Real log_pres = (1.0-f) * log(prat*pa) + f * log(pa);
+          pres = exp(log_pres);
         }
-
-        // set either internal energy density or temparature as primitive
-        Real prim,
-        if (eos.use_e) {
-          prim = pres/(eos.gamma - 1.0);
-        } else {
-          prim = pres/((eos.gamma - 1.0)*den);
-        }
-
-        w0(m,IDN,k,j,i) = den;
-        w0(m,IVX,k,j,i) = 0.0;
-        w0(m,IVY,k,j,i) = 0.0;
-        w0(m,IVZ,k,j,i) = 0.0;
-        w0(m,IEN,k,j,i) = prim;
       }
-    );
+
+      // set either internal energy density or temparature as primitive
+      Real prim,
+      if (eos.use_e) {
+        prim = pres/(eos.gamma - 1.0);
+      } else {
+        prim = pres/((eos.gamma - 1.0)*den);
+      }
+
+      w0(m,IDN,k,j,i) = den;
+      w0(m,IVX,k,j,i) = 0.0;
+      w0(m,IVY,k,j,i) = 0.0;
+      w0(m,IVZ,k,j,i) = 0.0;
+      w0(m,IEN,k,j,i) = prim;
+    });
 
     // Convert primitives to conserved
     auto &u0 = pmbp->phydro->u0;
