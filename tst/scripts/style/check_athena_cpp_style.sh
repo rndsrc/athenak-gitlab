@@ -22,19 +22,16 @@ curl https://raw.githubusercontent.com/cpplint/cpplint/develop/cpplint.py \
 
 # Apply Google C++ Style Linter to all source code files at once:
 echo "Starting Google C++ Style cpplint.py test"
-set -e
 # Use "python3 -u" to prevent buffering of sys.stdout,stderr.write()
 # calls in cpplint.py and mix-up in Jenkins logs,
 find ../../../src -type f \( -name "*.cpp" -o -name "*.hpp" \) \
--print | xargs python3 -u ./cpplint.py --counting=detailed
-set +e
+-print | xargs python3 -u cpplint.py --counting=detailed
+if [ $? -ne 0 ]; then echo "ERROR: C++ style errors found"; rm -f cpplint.py; exit 1; fi
+rm -f cpplint.py
 echo "End of Google C++ Style cpplint.py test"
 
-# Remove the cpplint.py linter
-rm -f cpplint.py
-
 # Begin custom AthenaK style rules and checks:
-echo "Starting std::sqrt(), std::cbrt(), \t test"
+echo "Starting \t, closing brace, and #pragma test"
 while read -r file
 do
     echo "Checking $file...."
@@ -52,11 +49,8 @@ do
     grep -nrEi '^\s+#pragma' "$file"
     if [ $? -ne 1 ]; then echo "ERROR: Left justify any #pragma statements"; exit 1; fi
 
-    # To lint each src/ file separately, use:
-    # ./cpplint.py --counting=detailed "$file"
 done < <(find ../../../src -type f \( -name "*.cpp" -o -name "*.hpp" \) -print)
-
-echo "End of std::sqrt(), std::cbrt(), \t test"
+echo "End of \t, closing brace, and #pragma test"
 
 # Search src/ C++ source code for trailing whitespace errors
 # (Google C++ Style Linter does not check for this,
@@ -73,8 +67,7 @@ echo "End of trailing whitespace test"
 # executable permissions bit, and ignores the user read/write and all "group" and "other",
 # setting file modes to 100644 or 100755 (exec)
 echo "Checking for correct file permissions in src/"
-
 git ls-tree -r --full-tree HEAD src/ | awk '{print substr($1,4,5), $4}' | grep -v "644"
 if [ $? -ne 1 ]; then echo "ERROR: Found C++ file(s) in src/ \
-with executable permission"; \exit 1; fi
+with executable permission"; exit 1; fi
 echo "End of file permissions test"
