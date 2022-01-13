@@ -15,6 +15,11 @@
 #
 # LOG:      Updated by @pdmullen on 1/12/2022 for use in AthenaK
 
+# Obtain Google C++ Style Linter:
+echo "Obtaining Google C++ Style cpplint.py test"
+curl https://raw.githubusercontent.com/cpplint/cpplint/develop/cpplint.py \
+--output cpplint.py --silent
+
 # Apply Google C++ Style Linter to all source code files at once:
 echo "Starting Google C++ Style cpplint.py test"
 set -e
@@ -70,3 +75,6 @@ git ls-tree -r --full-tree HEAD src/ | awk '{print substr($1,4,5), $4}' | grep -
 if [ $? -ne 1 ]; then echo "ERROR: Found C++ file(s) in src/ \
 with executable permission"; \exit 1; fi
 echo "End of file permissions test"
+
+# Remove the cpplint.py linter
+rm -f cpplint.py
