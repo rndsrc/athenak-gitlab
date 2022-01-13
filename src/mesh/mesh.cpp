@@ -390,57 +390,58 @@ void Mesh::WriteMeshStructure() {
   }
 
   for (int i=root_level; i<=max_level; i++) {
-  for (int j=0; j<nmb_total; j++) {
-    if (lloclist[j].level == i) {
-      MeshBlock block(this->pmb_pack, j, 1);
-      std::int32_t &lx1 = lloclist[j].lx1;
-      std::int32_t &lx2 = lloclist[j].lx2;
-      std::int32_t &lx3 = lloclist[j].lx3;
-      std::fprintf(fp,"#MeshBlock %d on rank=%d with cost=%g\n", j, ranklist[j],
-                   costlist[j]);
-      std::fprintf(
-          fp,"#  Logical level %d, location = (%" PRId32 " %" PRId32 " %" PRId32")\n",
-          lloclist[j].level, lx1, lx2, lx3);
-      if (two_d) { // 2D
-        Real &x1min = block.mb_size.h_view(0).x1min;
-        Real &x1max = block.mb_size.h_view(0).x1max;
-        Real &x2min = block.mb_size.h_view(0).x2min;
-        Real &x2max = block.mb_size.h_view(0).x2max;
-        std::fprintf(fp,"%g %g\n", x1min, x2min);
-        std::fprintf(fp,"%g %g\n", x1max, x2min);
-        std::fprintf(fp,"%g %g\n", x1max, x2max);
-        std::fprintf(fp,"%g %g\n", x1min, x2max);
-        std::fprintf(fp,"%g %g\n", x1min, x2min);
-        std::fprintf(fp,"\n\n");
-      }
-      if (three_d) { // 3D
-        Real &x1min = block.mb_size.h_view(0).x1min;
-        Real &x1max = block.mb_size.h_view(0).x1max;
-        Real &x2min = block.mb_size.h_view(0).x2min;
-        Real &x2max = block.mb_size.h_view(0).x2max;
-        Real &x3min = block.mb_size.h_view(0).x3min;
-        Real &x3max = block.mb_size.h_view(0).x3max;
-        std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3min);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3max);
-        std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
-        std::fprintf(fp, "\n\n");
+    for (int j=0; j<nmb_total; j++) {
+      if (lloclist[j].level == i) {
+        MeshBlock block(this->pmb_pack, j, 1);
+        std::int32_t &lx1 = lloclist[j].lx1;
+        std::int32_t &lx2 = lloclist[j].lx2;
+        std::int32_t &lx3 = lloclist[j].lx3;
+        std::fprintf(fp,"#MeshBlock %d on rank=%d with cost=%g\n", j, ranklist[j],
+                     costlist[j]);
+        std::fprintf(
+            fp,"#  Logical level %d, location = (%" PRId32 " %" PRId32 " %" PRId32")\n",
+            lloclist[j].level, lx1, lx2, lx3);
+        if (two_d) { // 2D
+          Real &x1min = block.mb_size.h_view(0).x1min;
+          Real &x1max = block.mb_size.h_view(0).x1max;
+          Real &x2min = block.mb_size.h_view(0).x2min;
+          Real &x2max = block.mb_size.h_view(0).x2max;
+          std::fprintf(fp,"%g %g\n", x1min, x2min);
+          std::fprintf(fp,"%g %g\n", x1max, x2min);
+          std::fprintf(fp,"%g %g\n", x1max, x2max);
+          std::fprintf(fp,"%g %g\n", x1min, x2max);
+          std::fprintf(fp,"%g %g\n", x1min, x2min);
+          std::fprintf(fp,"\n\n");
+        }
+        if (three_d) { // 3D
+          Real &x1min = block.mb_size.h_view(0).x1min;
+          Real &x1max = block.mb_size.h_view(0).x1max;
+          Real &x2min = block.mb_size.h_view(0).x2min;
+          Real &x2max = block.mb_size.h_view(0).x2max;
+          Real &x3min = block.mb_size.h_view(0).x3min;
+          Real &x3max = block.mb_size.h_view(0).x3max;
+          std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2min, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1max, x2max, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3min);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2max, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3max);
+          std::fprintf(fp,"%g %g %g\n", x1min, x2min, x3min);
+          std::fprintf(fp, "\n\n");
+        }
       }
     }
-  }}
+  }
   std::fclose(fp);
   std::cout << "See the 'mesh_structure.dat' file for MeshBlock data" << std::endl;
   std::cout << "Use 'plot_mesh.py' script to visualize data" << std::endl << std::endl;

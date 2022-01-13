@@ -68,7 +68,8 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "<hydro>/eos = '" << eqn_of_state << "' not implemented" << std::endl;
     std::exit(EXIT_FAILURE);
-  }}
+  }
+  }
 
   // (3) Initialize scalars, diffusion, source terms
   nscalars = pin->GetOrAddInteger("hydro","nscalars",0);
@@ -149,7 +150,8 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
                 << std::endl << "<hydro> recon = '" << xorder << "' not implemented"
                 << std::endl;
       std::exit(EXIT_FAILURE);
-    }}
+    }
+    }
 
     // select Riemann solver (no default).  Test for compatibility of options
     {std::string rsolver = pin->GetString("hydro","rsolver");
@@ -225,7 +227,8 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
                   << std::endl;
         std::exit(EXIT_FAILURE);
       }
-    }}
+    }
+    }
 
     // allocate second registers, fluxes
     int ncells1 = indcs.nx1 + 2*(indcs.ng);

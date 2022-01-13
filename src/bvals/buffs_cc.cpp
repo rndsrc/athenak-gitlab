@@ -371,7 +371,8 @@ void BoundaryValuesCC::InitRecvIndices(BoundaryBuffer &buf,
     iprol.bks = mb_indcs.cke + 1;      iprol.bke = mb_indcs.cke + cn;
   } else {
     iprol.bks = mb_indcs.cks - cn;     iprol.bke = mb_indcs.cks - 1;
-  }}
+  }
+  }
 
   // set indices for receives for flux-correction.  Similar to send, except data loaded
   // into appropriate sub-block of coarse buffer (similar to receive from FINER level)

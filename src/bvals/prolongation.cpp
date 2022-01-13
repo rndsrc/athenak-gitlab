@@ -344,7 +344,7 @@ void BoundaryValuesFC::ProlongFC(DvceFaceFld4D<Real> &b, DvceFaceFld4D<Real> &cb
         });
       }
     });
-  }
+    }
 
   //------ 3D PROBLEM: -----
   } else {
@@ -554,7 +554,8 @@ void BoundaryValuesFC::ProlongFC(DvceFaceFld4D<Real> &b, DvceFaceFld4D<Real> &cb
         });
       }
     });
-  }}
+    }
+  }
 
   return;
 }

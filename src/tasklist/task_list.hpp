@@ -133,7 +133,7 @@ class TaskList {
   TaskID GetIDLastTask() {return task_list_.back().GetID();}
   // output diagnostics (useful for debugging)
   void PrintIDs() { for (auto &it : task_list_) {it.GetID().PrintID();} }
-  void PrintDependencies() {for (auto &it : task_list_) {it.GetDependency().PrintID();}}
+  void PrintDependencies() { for (auto &it : task_list_) {it.GetDependency().PrintID();} }
 
   //
   void Reset() {

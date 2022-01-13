@@ -85,7 +85,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "<mhd> eos = '" << eqn_of_state << "' not implemented" << std::endl;
     std::exit(EXIT_FAILURE);
-  }}
+  }
+  }
 
   // (3) Initialize scalars, diffusion, source terms
   nscalars = pin->GetOrAddInteger("mhd","nscalars",0);
@@ -186,7 +187,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
                 << std::endl << "<mhd>/recon = '" << xorder << "' not implemented"
                 << std::endl;
       std::exit(EXIT_FAILURE);
-    }}
+    }
+    }
 
     // select Riemann solver (no default).  Test for compatibility of options
     {std::string rsolver = pin->GetString("mhd","rsolver");
@@ -252,7 +254,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
                   << std::endl;
         std::exit(EXIT_FAILURE);
       }
-    }}
+    }
+    }
 
     // allocate second registers
     int ncells1 = indcs.nx1 + 2*(indcs.ng);

@@ -158,7 +158,8 @@ void BoundaryValuesFC::InitSendIndices(BoundaryBuffer &buf,
     int ndat = (icoar[i].bie - icoar[i].bis + 1)*(icoar[i].bje - icoar[i].bjs + 1)*
                (icoar[i].bke - icoar[i].bks + 1);
     buf.icoar_ndat = std::max(buf.icoar_ndat, ndat);
-  }}
+  }
+  }
 
   // set indices for sends to neighbors on FINER level (matches recv from COARSER)
   // Formulae taken from LoadBoundaryBufferToFiner() src/bvals/fc/bvals_fc.cpp
@@ -268,7 +269,8 @@ void BoundaryValuesFC::InitSendIndices(BoundaryBuffer &buf,
     int ndat = (ifine[i].bie - ifine[i].bis + 1)*(ifine[i].bje - ifine[i].bjs + 1)*
                (ifine[i].bke - ifine[i].bks + 1);
     buf.ifine_ndat = std::max(buf.ifine_ndat, ndat);
-  }}
+  }
+  }
 
   // set indices for sends for FLUX CORRECTION (sends always to COARSER level)
   {auto &iflux = buf.iflux;    // indices of buffer for flux correction
@@ -315,7 +317,8 @@ void BoundaryValuesFC::InitSendIndices(BoundaryBuffer &buf,
     int ndat = (iflux[i].bie - iflux[i].bis + 1)*(iflux[i].bje - iflux[i].bjs + 1)*
                (iflux[i].bke - iflux[i].bks + 1);
     buf.iflux_ndat = std::max(buf.iflux_ndat, ndat);
-  }}
+  }
+  }
 
   return;
 }
@@ -503,7 +506,8 @@ void BoundaryValuesFC::InitRecvIndices(BoundaryBuffer &buf,
     int ndat = (icoar[i].bie - icoar[i].bis + 1)*(icoar[i].bje - icoar[i].bjs + 1)*
                (icoar[i].bke - icoar[i].bks + 1);
     buf.icoar_ndat = std::max(buf.icoar_ndat, ndat);
-  }}
+  }
+  }
 
   // set indices for receives from neighbors on FINER level (matches send to COARSER)
   // Formulae taken from SetBoundaryFromFiner() in src/bvals/cc/bvals_cc.cpp
@@ -619,7 +623,8 @@ void BoundaryValuesFC::InitRecvIndices(BoundaryBuffer &buf,
     int ndat = (ifine[i].bie - ifine[i].bis + 1)*(ifine[i].bje - ifine[i].bjs + 1)*
                (ifine[i].bke - ifine[i].bks + 1);
     buf.ifine_ndat = std::max(buf.ifine_ndat, ndat);
-  }}
+  }
+  }
 
   // set indices for PROLONGATION in coarse cell buffers. Indices refer to coarse cells.
   // Formulae taken from ProlongateBoundaries() in src/bvals/bvals_refine.cpp
@@ -722,7 +727,8 @@ void BoundaryValuesFC::InitRecvIndices(BoundaryBuffer &buf,
     iprol[0].bks = mb_indcs.cks - cn;         iprol[0].bke = mb_indcs.cks - 1;
     iprol[1].bks = mb_indcs.cks - cn;         iprol[1].bke = mb_indcs.cks - 1;
     iprol[2].bks = mb_indcs.cks - cn;         iprol[2].bke = mb_indcs.cks - 1;
-  }}
+  }
+  }
 
   // set indices for receives for flux-correction.  Similar to send, except data loaded
   // into appropriate sub-block of coarse buffer (similar to receive from FINER level)
@@ -825,5 +831,6 @@ void BoundaryValuesFC::InitRecvIndices(BoundaryBuffer &buf,
     int ndat = (iflux[i].bie - iflux[i].bis + 1)*(iflux[i].bje - iflux[i].bjs + 1)*
                (iflux[i].bke - iflux[i].bks + 1);
     buf.iflux_ndat = std::max(buf.iflux_ndat, ndat);
-  }}
+  }
+  }
 }

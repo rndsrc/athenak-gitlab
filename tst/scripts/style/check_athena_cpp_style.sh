@@ -41,13 +41,12 @@ do
     if [ $? -ne 1 ]; then echo "ERROR: Use single closing brace '}}' per line"; exit 1; fi
 
     # GNU Grep Extended Regex (ERE) syntax:
-    grep -nrEi '^\s+KOKKOS_INLINE_FUNCTION' "$file"
-    if [ $? -ne 1 ]; then echo "ERROR: Left justify any \
-    KOKKOS_INLINE_FUNCTION statements"; exit 1; fi
+    grep -nrEi '^\s+#pragma' "$file"
+    if [ $? -ne 1 ]; then echo "ERROR: Left justify any #pragma statements"; exit 1; fi
 
     # To lint each src/ file separately, use:
     # ./cpplint.py --counting=detailed "$file"
-done < <(find ../../src/ -type f \( -name "*.cpp" -o -name "*.hpp" \) -print)
+done < <(find ../../../src -type f \( -name "*.cpp" -o -name "*.hpp" \) -print)
 
 echo "End of std::sqrt(), std::cbrt(), \t test"
 
