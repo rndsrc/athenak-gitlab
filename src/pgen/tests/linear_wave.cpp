@@ -51,7 +51,8 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin);
 //! \struct LinWaveVariables
 //! \brief container for variables shared with vector potential and error functions
 
-struct LinWaveVariables {
+struct LinWaveVariables
+{
   Real d0, p0, v1_0, b1_0, b2_0, b3_0, dby, dbz, k_par;
   Real cos_a2, cos_a3, sin_a2, sin_a3;
 };
