@@ -28,8 +28,7 @@
 //! \fn ProblemGenerator::ShockTube_()
 //! \brief Problem Generator for the shock tube (Riemann problem) tests
 
-void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
   // parse shock direction: {1,2,3} -> {x1,x2,x3}
   int shk_dir = pin->GetInteger("problem","shock_dir");
   if (shk_dir < 1 || shk_dir > 3) {
@@ -74,7 +73,6 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
-
     // Parse left state read from input file: d,vx,vy,vz,[P]
     HydPrim1D wl,wr;
     wl.d  = pin->GetReal("problem","dl");
@@ -87,7 +85,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
     if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic) {
       u0l = 1.0/sqrt( 1.0 - (SQR(wl.vx) + SQR(wl.vy) + SQR(wl.vz)) );
     }
-  
+
     // Parse right state read from input file: d,vx,vy,vz,[P]
     wr.d  = pin->GetReal("problem","dr");
     wr.vx = pin->GetReal("problem","ur");
@@ -113,8 +111,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
 
     auto &w0 = pmbp->phydro->w0;
     par_for("pgen_shock1", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m,int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m,int k, int j, int i) {
         Real x;
         if (shk_dir == 1) {
           Real &x1min = size.d_view(m).x1min;
@@ -153,12 +150,10 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
     // Convert primitives to conserved
     auto &u0 = pmbp->phydro->u0;
     pmbp->phydro->peos->PrimToCons(w0, u0);
-
   } // End initialization of Hydro variables
 
   // Initialize MHD variables -------------------------------
   if (pmbp->pmhd != nullptr) {
-  
     // Parse left state read from input file: d,vx,vy,vz,[P]
     MHDPrim1D wl,wr;
     wl.d  = pin->GetReal("problem","dl");
@@ -174,7 +169,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
     if (pmbp->pmhd->is_special_relativistic || pmbp->pmhd->is_general_relativistic) {
       u0l = 1.0/sqrt( 1.0 - (SQR(wl.vx) + SQR(wl.vy) + SQR(wl.vz)) );
     }
-    
+
     // Parse right state read from input file: d,vx,vy,vz,[P]
     wr.d  = pin->GetReal("problem","dr");
     wr.vx = pin->GetReal("problem","ur");
@@ -200,13 +195,12 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
       prim_l = wl.p/(wl.d);
       prim_r = wr.p/(wr.d);
     }
-    
+
     auto &w0 = pmbp->pmhd->w0;
     auto &b0 = pmbp->pmhd->b0;
     auto &bcc0 = pmbp->pmhd->bcc0;
     par_for("pgen_shock1", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m,int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m,int k, int j, int i) {
         Real x,bxl,byl,bzl,bxr,byr,bzr;
         if (shk_dir == 1) {
           Real &x1min = size.d_view(m).x1min;
@@ -229,11 +223,11 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
           x = CellCenterX(k-ks, nx3, x3min, x3max);
           bxl = wl.by; byl = wl.bz; bzl = bx_l;
           bxr = wr.by; byr = wr.bz; bzr = bx_r;
-        } 
-          
+        }
+
         // in SR/GR, primitive variables use spatial components of 4-vel u^i = gamma * v^i
         if (x < xshock) {
-          w0(m,IDN,k,j,i) = wl.d; 
+          w0(m,IDN,k,j,i) = wl.d;
           w0(m,ivx,k,j,i) = wl.vx*u0l;
           w0(m,ivy,k,j,i) = wl.vy*u0l;
           w0(m,ivz,k,j,i) = wl.vz*u0l;
@@ -268,7 +262,6 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin)
     // Convert primitives to conserved
     auto &u0 = pmbp->pmhd->u0;
     pmbp->pmhd->peos->PrimToCons(w0, bcc0, u0);
-
   } // End initialization of MHD variables
 
   return;

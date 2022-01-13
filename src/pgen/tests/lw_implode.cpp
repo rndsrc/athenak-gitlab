@@ -21,8 +21,7 @@
 //! \fn void MeshBlock::LWImplode_()
 //  \brief Problem Generator for LW Implosion test
 
-void ProblemGenerator::LWImplode(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::LWImplode(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->phydro == nullptr) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "LW Implosion test can only be run in Hydro, but no <hydro> block "
@@ -51,8 +50,7 @@ void ProblemGenerator::LWImplode(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // Set initial conditions
   par_for("pgen_lw_implode", DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       // to make ICs symmetric, set y0 to be in between cell center and face
       Real y0 = 0.5*(x2max_mesh + x2min_mesh) + 0.25*(size.d_view(m).dx2);
 

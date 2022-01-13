@@ -86,8 +86,8 @@ class TaskID {
 
 class Task {
  public:
-  Task(TaskID id, TaskID dep, std::function<TaskStatus(Driver*, int)> func)
-      : myid_(id), dep_(dep), func_(func) {}
+  Task(TaskID id, TaskID dep, std::function<TaskStatus(Driver*, int)> func) :
+  myid_(id), dep_(dep), func_(func) {}
   // overloaded operator() calls task function
   TaskStatus operator()(Driver *d, int s) {return func_(d,s);}
   TaskID GetID() {return myid_;}
@@ -103,7 +103,7 @@ class Task {
  private:
   TaskID myid_;    // encodes task ID in bitfld_
   TaskID dep_;     // encodes dependencies to other tasks in bitfld_
-//  bool lb_time_;   // flag to include this task in timing for automatic load balancing
+  // bool lb_time_;   // flag to include this task in timing for automatic load balancing
   bool complete_ = false;
   std::function<TaskStatus(Driver*, int)> func_;  // ptr to Task function
 };

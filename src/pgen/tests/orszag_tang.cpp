@@ -11,7 +11,7 @@
 //========================================================================================
 
 // C++ headers
-#include <math.h> 
+#include <math.h>
 #include <iostream>   // endl
 #include <sstream>    // stringstream
 
@@ -39,8 +39,7 @@ Real A3(const Real x1, const Real x2, const Real B0) {
 //  constructed assuming the domain extends over [-0.5x0.5, -0.5x0.5], so that exact
 //  symmetry can be enforced across x=0 and y=0.
 
-void ProblemGenerator::OrszagTang(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::OrszagTang(MeshBlockPack *pmbp, ParameterInput *pin) {
   if (pmbp->pmhd == nullptr) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
               << "Orszag-Tang test can only be run in MHD, but no <mhd> block "
@@ -66,8 +65,7 @@ void ProblemGenerator::OrszagTang(MeshBlockPack *pmbp, ParameterInput *pin)
   auto &size = pmbp->pmb->mb_size;
 
   par_for("pgen_ot1", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
       int nx1 = indcs.nx1;
@@ -111,8 +109,7 @@ void ProblemGenerator::OrszagTang(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // initialize total energy (requires B to be defined across entire grid first)
   par_for("pgen_ot2", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-    KOKKOS_LAMBDA(int m, int k, int j, int i)
-    {
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
       u0(m,IEN,k,j,i) = p0/gm1 + (0.5/u0(m,IDN,k,j,i))*
            (SQR(u0(m,IM1,k,j,i)) + SQR(u0(m,IM2,k,j,i)) + SQR(u0(m,IM3,k,j,i))) +
             0.5*(SQR(0.5*(b0.x1f(m,k,j,i) + b0.x1f(m,k,j,i+1))) +

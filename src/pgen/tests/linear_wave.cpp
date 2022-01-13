@@ -51,8 +51,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin);
 //! \struct LinWaveVariables
 //! \brief container for variables shared with vector potential and error functions
 
-struct LinWaveVariables
-{
+struct LinWaveVariables {
   Real d0, p0, v1_0, b1_0, b2_0, b3_0, dby, dbz, k_par;
   Real cos_a2, cos_a3, sin_a2, sin_a3;
 };
@@ -75,7 +74,7 @@ Real A1(const Real x1, const Real x2, const Real x3, const LinWaveVariables lw) 
 //----------------------------------------------------------------------------------------
 //! \fn Real A2(const Real x1,const Real x2,const Real x3)
 //! \brief A2: 2-component of vector potential
-  
+
 KOKKOS_INLINE_FUNCTION
 Real A2(const Real x1, const Real x2, const Real x3, const LinWaveVariables lw) {
   Real x =  x1*lw.cos_a2*lw.cos_a3 + x2*lw.cos_a2*lw.sin_a3 + x3*lw.sin_a2;
@@ -103,8 +102,7 @@ Real A3(const Real x1, const Real x2, const Real x3, const LinWaveVariables lw) 
 //! \fn void ProblemGenerator::LinearWave_()
 //! \brief Sets initial conditions for linear wave tests
 
-void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin) {
   // set linear wave errors function
   pgen_error_func = LinearWaveErrors;
 
@@ -213,7 +211,7 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
     HydroEigensystem(lwv.d0, lwv.v1_0, 0.0, 0.0, p0, eos, ev, rem);
 
     // set new time limit in ParameterInput (to be read by Driver constructor) based on
-    // wave speed of selected mode.  
+    // wave speed of selected mode.
     // input tlim is interpreted asnumber of wave periods for evolution
     if (set_initial_conditions) {
       Real tlim = pin->GetReal("time", "tlim");
@@ -221,11 +219,10 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
     }
 
     // compute solution in u1 register. For initial conditions, set u1 -> u0.
-    auto &u1 = (set_initial_conditions)? pmbp->phydro->u0 : pmbp->phydro->u1; 
+    auto &u1 = (set_initial_conditions)? pmbp->phydro->u0 : pmbp->phydro->u1;
 
     par_for("pgen_linwave1", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real &x1min = size.d_view(m).x1min;
         Real &x1max = size.d_view(m).x1max;
         int nx1 = indcs.nx1;
@@ -246,7 +243,7 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
         Real mx = lwv.d0*vflow + amp*sn*rem[1][wave_flag];
         Real my = amp*sn*rem[2][wave_flag];
         Real mz = amp*sn*rem[3][wave_flag];
-  
+
         // compute cell-centered conserved variables
         u1(m,IDN,k,j,i)=lwv.d0 + amp*sn*rem[0][wave_flag];
         u1(m,IM1,k,j,i)=mx*lwv.cos_a2*lwv.cos_a3 -my*lwv.sin_a3 -mz*lwv.sin_a2*lwv.cos_a3;
@@ -279,7 +276,7 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
     lwv.dbz = amp*rem[nmhd_+1][wave_flag];
 
     // set new time limit in ParameterInput (to be read by Driver constructor) based on
-    // wave speed of selected mode.  
+    // wave speed of selected mode.
     // input tlim is interpreted asnumber of wave periods for evolution
     if (set_initial_conditions) {
       Real tlim = pin->GetReal("time", "tlim");
@@ -287,12 +284,11 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
     }
 
     // compute solution in u1/b1 registers. For initial conditions, set u1/b1 -> u0/b0.
-    auto &u1 = (set_initial_conditions)? pmbp->pmhd->u0 : pmbp->pmhd->u1; 
+    auto &u1 = (set_initial_conditions)? pmbp->pmhd->u0 : pmbp->pmhd->u1;
     auto &b1 = (set_initial_conditions)? pmbp->pmhd->b0 : pmbp->pmhd->b1;
 
     par_for("pgen_linwave2", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real &x1min = size.d_view(m).x1min;
         Real &x1max = size.d_view(m).x1max;
         int nx1 = indcs.nx1;
@@ -313,7 +309,7 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
         Real mx = lwv.d0*vflow + amp*sn*rem[1][wave_flag];
         Real my = amp*sn*rem[2][wave_flag];
         Real mz = amp*sn*rem[3][wave_flag];
- 
+
         // compute cell-centered conserved variables
         u1(m,IDN,k,j,i)=lwv.d0 + amp*sn*rem[0][wave_flag];
         u1(m,IM1,k,j,i)=mx*lwv.cos_a2*lwv.cos_a3 -my*lwv.sin_a3 -mz*lwv.sin_a2*lwv.cos_a3;
@@ -369,8 +365,7 @@ void ProblemGenerator::LinearWave(MeshBlockPack *pmbp, ParameterInput *pin)
 
 void HydroEigensystem(const Real d, const Real v1, const Real v2, const Real v3,
                       const Real p, const EOS_Data &eos,
-                      Real eigenvalues[5], Real right_eigenmatrix[5][5])
-{
+                      Real eigenvalues[5], Real right_eigenmatrix[5][5]) {
   //--- Ideal Gas Hydrodynamics ---
   if (eos.is_ideal) {
     Real vsq = v1*v1 + v2*v2 + v3*v3;
@@ -453,8 +448,7 @@ void HydroEigensystem(const Real d, const Real v1, const Real v2, const Real v3,
 void MHDEigensystem(const Real d, const Real v1, const Real v2, const Real v3,
                     const Real p, const Real b1, const Real b2, const Real b3,
                     const Real x, const Real y, const EOS_Data &eos,
-                    Real eigenvalues[7], Real right_eigenmatrix[7][7])
-{
+                    Real eigenvalues[7], Real right_eigenmatrix[7][7]) {
   // common factors for both ideal gas and isothermal eigenvectors
   Real btsq = b2*b2 + b3*b3;
   Real bt = std::sqrt(btsq);
@@ -599,10 +593,8 @@ void MHDEigensystem(const Real d, const Real v1, const Real v2, const Real v3,
     right_eigenmatrix[6][4] = right_eigenmatrix[6][2];
     right_eigenmatrix[6][5] = right_eigenmatrix[6][1];
     right_eigenmatrix[6][6] = right_eigenmatrix[6][0];
-
   //--- Isothermal MHD ---
   } else {
-
     Real bt_starsq = btsq*y;
     Real vaxsq = b1*b1/d;
     Real twid_csq = (eos.iso_cs*eos.iso_cs) + x;
@@ -708,8 +700,7 @@ void MHDEigensystem(const Real d, const Real v1, const Real v2, const Real v3,
 //! again to compute initial condictions, and subtracting current solution from ICs, and
 //! outputs errors to file. Problem must be run for an integer number of wave periods.
 
-void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin) {
   // calculate reference solution by calling pgen again.  Solution stored in second
   // register u1/b1 when flag is false.
   set_initial_conditions = false;
@@ -718,7 +709,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
   Real l1_err[8];
   int nvars=0;
 
-  // capture class variables for kernel  
+  // capture class variables for kernel
   auto &indcs = pmbp->pmesh->mb_indcs;
   int &nx1 = indcs.nx1;
   int &nx2 = indcs.nx2;
@@ -741,8 +732,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
     const int nji  = nx2*nx1;
     array_sum::GlobalSum sum_this_mb;
     Kokkos::parallel_reduce("LW-err-Sums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-      {
+      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
         // compute n,k,j,i indices of thread
         int m = (idx)/nkji;
         int k = (idx - m*nkji)/nji;
@@ -762,7 +752,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
         if (eos.is_ideal) {
           evars.the_array[IEN] = vol*fabs(u0_(m,IEN,k,j,i) - u1_(m,IEN,k,j,i));
         }
-  
+
         // fill rest of the_array with zeros, if narray < NREDUCTION_VARIABLES
         for (int n=nvars; n<NREDUCTION_VARIABLES; ++n) {
           evars.the_array[n] = 0.0;
@@ -770,7 +760,6 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
 
         // sum into parallel reduce
         mb_sum += evars;
-
       }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
     );
 
@@ -795,8 +784,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
     const int nji  = nx2*nx1;
     array_sum::GlobalSum sum_this_mb;
     Kokkos::parallel_reduce("LW-err-Sums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum)
-      {
+      KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
         // compute n,k,j,i indices of thread
         int m = (idx)/nkji;
         int k = (idx - m*nkji)/nji;
@@ -821,7 +809,7 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
         Real bcc0 = 0.5*(b0_.x1f(m,k,j,i) + b0_.x1f(m,k,j,i+1));
         Real bcc1 = 0.5*(b1_.x1f(m,k,j,i) + b1_.x1f(m,k,j,i+1));
         evars.the_array[IEN+1] = vol*fabs(bcc0 - bcc1);
- 
+
         bcc0 = 0.5*(b0_.x2f(m,k,j,i) + b0_.x2f(m,k,j+1,i));
         bcc1 = 0.5*(b1_.x2f(m,k,j,i) + b1_.x2f(m,k,j+1,i));
         evars.the_array[IEN+2] = vol*fabs(bcc0 - bcc1);
@@ -837,7 +825,6 @@ void LinearWaveErrors(MeshBlockPack *pmbp, ParameterInput *pin)
 
         // sum into parallel reduce
         mb_sum += evars;
-
       }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb)
     );
 

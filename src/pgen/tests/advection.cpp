@@ -23,13 +23,12 @@
 //! \fn void MeshBlock::Advection_()
 //  \brief Problem Generator for advection problems. By default, initializes profiles
 //  only in passive scalars (and B for MHD).  Can also set profiles in density by setting
-//  input flag advect_dens=true 
+//  input flag advect_dens=true
 //   iprob=1: sine wave
 //   iprob=2: square wave
 //   iprob=2: Gaussian, square, and triangle
 
-void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
-{
+void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin) {
   // Read input parameters
   int flow_dir = pin->GetInteger("problem","flow_dir");
   int iprob = pin->GetInteger("problem","iproblem");
@@ -70,7 +69,6 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
-
     if (pmbp->phydro->peos->eos_data.is_ideal) {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
          << std::endl << "Only isothermal EOS allowed for advection tests" << std::endl;
@@ -81,8 +79,7 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
     auto &u0 = pmbp->phydro->u0;
 
     par_for("hydro_advect", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      {
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real r; // coordinate that will span [0->1]
         if (flow_dir == 1) {
           Real &x1min = size.d_view(m).x1min;
@@ -100,7 +97,7 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
           int nx3 = indcs.nx3;
           r = (CellCenterX(k-ks, nx3, x3min, x3max) - x3mesh)/length;
         }
-  
+
         Real f; // value for advected quantity, depending on problem type
 
         // iprob=1: sine wave
@@ -138,7 +135,7 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
           u0(m,IM1,k,j,i) = 0.0;
           u0(m,IM2,k,j,i) = 0.0;
           u0(m,IM3,k,j,i) = vel;
-        } 
+        }
         // add passive scalars
         for (int n=nhydro; n<(nhydro+nscalars); ++n) {
           u0(m,n,k,j,i) = f;
@@ -158,10 +155,9 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
     int &nscalars = pmbp->pmhd->nscalars;
     auto &u0 = pmbp->pmhd->u0;
     auto &b0 = pmbp->pmhd->b0;
-        
+
     par_for("mhd_advect", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
-      KOKKOS_LAMBDA(int m, int k, int j, int i)
-      { 
+      KOKKOS_LAMBDA(int m, int k, int j, int i) {
         Real r; // coordinate that will span [0->1]
         if (flow_dir == 1) {
           Real &x1min = size.d_view(m).x1min;
@@ -179,15 +175,15 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
           int nx3 = indcs.nx3;
           r = (CellCenterX(k-ks, nx3, x3min, x3max) - x3mesh)/length;
         }
-        
+
         Real f; // value for advected quantity, depending on problem type
 
         // iprob=1: sine wave
-        if (iprob == 1) {               
+        if (iprob == 1) {
           f = 1.0 + amp*sin(2.0*(M_PI)*r);
 
         // iprob=2: square wave in second quarter of domain
-        } else if (iprob == 2) {        
+        } else if (iprob == 2) {
           f = 1.0;
           if (r >= 0.25 && r <= 0.5) { f += amp; }
         } else if (iprob == 3) {
@@ -198,7 +194,7 @@ void ProblemGenerator::Advection(MeshBlockPack *pmbp, ParameterInput *pin)
           if (r >= 0.85 && r <= 0.95) { f += amp*(9.5-10.0*r); }
           if (r >= 0.95) { f += amp*exp((SQR(r-1.2))/-0.005); }
         }
-        
+
         // now compute density  momenta, total energy
         if (advect_dens) {
           u0(m,IDN,k,j,i) = f;
