@@ -54,7 +54,8 @@ echo "End of std::sqrt(), std::cbrt(), \t test"
 # (Google C++ Style Linter does not check for this,
 # but flake8 via pycodestyle warning W291 will check *.py)
 echo "Checking for trailing whitespace in src/"
-find ../../src/ -type f \( -name "*.cpp" -o -name "*.hpp*" \) -exec grep -n -E " +$" {} +
+find ../../../src -type f \( -name "*.cpp" -o -name "*.hpp*" \) \
+-exec grep -n -E " +$" {} +
 if [ $? -ne 1 ]; then echo "ERROR: Found C++ file(s) in src/ \
 with trailing whitespace"; exit 1; fi
 echo "End of trailing whitespace test"
