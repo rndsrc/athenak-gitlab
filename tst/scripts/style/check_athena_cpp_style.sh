@@ -30,6 +30,9 @@ find ../../../src -type f \( -name "*.cpp" -o -name "*.hpp" \) \
 set +e
 echo "End of Google C++ Style cpplint.py test"
 
+# Remove the cpplint.py linter
+rm -f cpplint.py
+
 # Begin custom AthenaK style rules and checks:
 echo "Starting std::sqrt(), std::cbrt(), \t test"
 while read -r file
@@ -75,6 +78,3 @@ git ls-tree -r --full-tree HEAD src/ | awk '{print substr($1,4,5), $4}' | grep -
 if [ $? -ne 1 ]; then echo "ERROR: Found C++ file(s) in src/ \
 with executable permission"; \exit 1; fi
 echo "End of file permissions test"
-
-# Remove the cpplint.py linter
-rm -f cpplint.py
