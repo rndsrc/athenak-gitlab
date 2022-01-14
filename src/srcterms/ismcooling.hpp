@@ -16,7 +16,7 @@
 //! \brief SPEX cooling curve, taken from Table 2 of Schure et al, A&A 508, 751 (2009)
 
 KOKKOS_INLINE_FUNCTION
-Real ISMCoolFn(Real temp){
+Real ISMCoolFn(Real temp) {
   // original data from Shure et al. paper, covers 4.12 < logt < 8.16
   const float lhd[102] = {
       -22.5977, -21.9689, -21.5972, -21.4615, -21.4789, -21.5497, -21.6211, -21.6595,

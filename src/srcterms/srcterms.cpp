@@ -9,8 +9,9 @@
 //  Source terms objects are stored in the respective fluid class, so that Hydro/MHD can
 //  have different source terms
 
-#include <iostream>
 #include <float.h>
+#include <limits>
+#include <iostream>
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -213,7 +214,7 @@ void SourceTerms::AddSBoxEField(const DvceFaceFld4D<Real> &b0,
 // NOTE source terms must all be computed using primitive (w0) and NOT conserved (u0) vars
 
 void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
-                                const EOS_Data &eos_data, const Real bdt){
+                                const EOS_Data &eos_data, const Real bdt) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
@@ -231,10 +232,10 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
   Real heating_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()/n_unit;
 
   par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i){
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // temperature in cgs unit
     Real temp = 1.0;
-    if (use_e){
+    if (use_e) {
       temp = temp_unit*w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
     } else {
       temp = temp_unit*w0(m,ITM,k,j,i);
@@ -254,7 +255,7 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
 //! \brief Compute new time step for ISM cooling.
 
 void SourceTerms::ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0,
-                                        const EOS_Data &eos_data){
+                                        const EOS_Data &eos_data) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, nx1 = indcs.nx1;
   int js = indcs.js, nx2 = indcs.nx2;
@@ -277,7 +278,7 @@ void SourceTerms::ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0,
 
   // find smallest (e/cooling_rate) in each cell
   Kokkos::parallel_reduce("cooling_newdt", Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-  KOKKOS_LAMBDA(const int &idx, Real &min_dt){
+  KOKKOS_LAMBDA(const int &idx, Real &min_dt) {
     // compute m,k,j,i indices of thread and call function
     int m = (idx)/nkji;
     int k = (idx - m*nkji)/nji;
@@ -289,14 +290,14 @@ void SourceTerms::ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0,
     // temperature in cgs unit
     Real temp = 1.0;
     Real eint = 1.0;
-    if (use_e){
+    if (use_e) {
       temp = temp_unit*w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
       eint = w0(m,IEN,k,j,i);
     } else {
       temp = temp_unit*w0(m,ITM,k,j,i);
       eint = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i)/gm1;
     }
-    
+
     Real lambda_cooling = ISMCoolFn(temp)/cooling_unit;
     Real gamma_heating = heating_rate/heating_unit;
 
