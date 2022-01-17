@@ -50,8 +50,8 @@ Real ISMCoolFn(Real temp) {
   int ipps  = static_cast<int>(25.0*logt) - 103;
   ipps = (ipps < 100)? ipps : 100;
   ipps = (ipps > 0 )? ipps : 0;
-  float x0 = 4.12 + 0.04*static_cast<float>(ipps);
-  float dx = logt - x0;
+  Real x0 = 4.12 + 0.04*static_cast<Real>(ipps);
+  Real dx = logt - x0;
   Real logcool = (lhd[ipps+1]*dx - lhd[ipps]*(dx - 0.04))*25.0;
   return pow(10.0,logcool);
 }

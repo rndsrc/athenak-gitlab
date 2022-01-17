@@ -274,7 +274,7 @@ void SourceTerms::ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0,
                       /n_unit/n_unit;
   Real heating_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()/n_unit;
 
-  dtnew_cooling = std::numeric_limits<float>::max();
+  dtnew_cooling = static_cast<Real>std::numeric_limits<float>::max();
 
   // find smallest (e/cooling_rate) in each cell
   Kokkos::parallel_reduce("cooling_newdt", Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
