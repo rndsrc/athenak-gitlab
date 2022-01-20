@@ -18,7 +18,6 @@
 #include "coordinates/cell_locations.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
-#include "eos/eos.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
 #include "diffusion/conduction.hpp"
@@ -534,11 +533,7 @@ void Mesh::NewTimeStep(const Real tlim) {
     }
     // source terms timestep
     if (pmb_pack->phydro->psrc->source_terms_enabled) {
-      if (pmb_pack->phydro->psrc->ism_cooling) {
-        pmb_pack->phydro->psrc->ISMCoolingNewTimeStep(pmb_pack->phydro->w0,
-                                                      pmb_pack->phydro->peos->eos_data);
-        dt = std::min(dt, (cfl_no)*(pmb_pack->phydro->psrc->dtnew_cooling) );
-      }
+      dt = std::min(dt, (cfl_no)*(pmb_pack->phydro->psrc->dtnew) );
     }
   }
   // MHD timestep
@@ -558,11 +553,7 @@ void Mesh::NewTimeStep(const Real tlim) {
     }
     // source terms timestep
     if (pmb_pack->pmhd->psrc->source_terms_enabled) {
-      if (pmb_pack->pmhd->psrc->ism_cooling) {
-        pmb_pack->pmhd->psrc->ISMCoolingNewTimeStep(pmb_pack->pmhd->w0,
-                                                    pmb_pack->pmhd->peos->eos_data);
-        dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->psrc->dtnew_cooling) );
-      }
+      dt = std::min(dt, (cfl_no)*(pmb_pack->pmhd->psrc->dtnew) );
     }
   }
 

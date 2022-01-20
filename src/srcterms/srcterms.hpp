@@ -39,8 +39,8 @@ class SourceTerms {
   bool shearing_box;
   bool ism_cooling;
 
-  // time step for ISM cooling
-  Real dtnew_cooling;
+  // new timestep
+  Real dtnew;
 
   // magnitude and direction of constant accel
   Real const_accel_val;
@@ -60,7 +60,7 @@ class SourceTerms {
   void AddSBoxEField(const DvceFaceFld4D<Real> &b0, DvceEdgeFld4D<Real> &efld);
   void AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                      const EOS_Data &eos, const Real dt);
-  void ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos);
+  void NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos);
 
  private:
   MeshBlockPack* pmy_pack;

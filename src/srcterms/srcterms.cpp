@@ -9,8 +9,6 @@
 //  Source terms objects are stored in the respective fluid class, so that Hydro/MHD can
 //  have different source terms
 
-#include <float.h>
-#include <limits>
 #include <iostream>
 
 #include "athena.hpp"
@@ -247,65 +245,5 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
     u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) *
                         (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating);
   });
-  return;
-}
-
-//----------------------------------------------------------------------------------------
-//! \fn void SourceTerms::ISMCoolingNewTimeStep()
-//! \brief Compute new time step for ISM cooling.
-
-void SourceTerms::ISMCoolingNewTimeStep(const DvceArray5D<Real> &w0,
-                                        const EOS_Data &eos_data) {
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int is = indcs.is, nx1 = indcs.nx1;
-  int js = indcs.js, nx2 = indcs.nx2;
-  int ks = indcs.ks, nx3 = indcs.nx3;
-  const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
-  const int nkji = nx3*nx2*nx1;
-  const int nji  = nx2*nx1;
-  Real use_e = eos_data.use_e;
-  Real gamma = eos_data.gamma;
-  Real gm1 = gamma - 1.0;
-  Real heating_rate = hrate;
-  Real temp_unit = pmy_pack->punit->temperature_cgs();
-  Real n_unit = pmy_pack->punit->density_cgs()/pmy_pack->punit->mu()
-                /pmy_pack->punit->atomic_mass_unit_cgs;
-  Real cooling_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()
-                      /n_unit/n_unit;
-  Real heating_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()/n_unit;
-
-  dtnew_cooling = static_cast<Real>(std::numeric_limits<float>::max());
-
-  // find smallest (e/cooling_rate) in each cell
-  Kokkos::parallel_reduce("cooling_newdt", Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-  KOKKOS_LAMBDA(const int &idx, Real &min_dt) {
-    // compute m,k,j,i indices of thread and call function
-    int m = (idx)/nkji;
-    int k = (idx - m*nkji)/nji;
-    int j = (idx - m*nkji - k*nji)/nx1;
-    int i = (idx - m*nkji - k*nji - j*nx1) + is;
-    k += ks;
-    j += js;
-
-    // temperature in cgs unit
-    Real temp = 1.0;
-    Real eint = 1.0;
-    if (use_e) {
-      temp = temp_unit*w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
-      eint = w0(m,IEN,k,j,i);
-    } else {
-      temp = temp_unit*w0(m,ITM,k,j,i);
-      eint = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i)/gm1;
-    }
-
-    Real lambda_cooling = ISMCoolFn(temp)/cooling_unit;
-    Real gamma_heating = heating_rate/heating_unit;
-
-    // add a tiny number
-    Real cooling_heating = FLT_MIN + fabs(w0(m,IDN,k,j,i) *
-                           (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating));
-
-    min_dt = fmin((eint/cooling_heating), min_dt);
-  }, Kokkos::Min<Real>(dtnew_cooling));
   return;
 }

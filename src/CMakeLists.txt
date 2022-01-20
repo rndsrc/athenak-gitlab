@@ -80,6 +80,7 @@ add_executable(
         pgen/tests/shock_tube.cpp
 
         srcterms/srcterms.cpp
+        srcterms/srcterms_newdt.cpp
         srcterms/turb_driver.cpp
 
         units/units.cpp

@@ -16,6 +16,7 @@
 #include "driver/driver.hpp"
 #include "eos/eos.hpp"
 #include "hydro.hpp"
+#include "srcterms/srcterms.hpp"
 
 namespace hydro {
 
@@ -118,6 +119,11 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
   dtnew = dt1;
   if (pmy_pack->pmesh->multi_d) { dtnew = std::min(dtnew, dt2); }
   if (pmy_pack->pmesh->three_d) { dtnew = std::min(dtnew, dt3); }
+
+  // compute source terms timestep
+  if (psrc->source_terms_enabled) {
+    psrc->NewTimeStep(w0, peos->eos_data);
+  }
 
   return TaskStatus::complete;
 }
