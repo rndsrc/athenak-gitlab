@@ -23,7 +23,7 @@
 
 //----------------------------------------------------------------------------------------
 //! \brief Conduction constructor
-// Note that the coefficient of thermal conduction, kappa, corresponds to conductivity, 
+// Note that the coefficient of thermal conduction, kappa, corresponds to conductivity,
 // not diffusivity. This is different from the coefficient used in Athena++.
 
 Conduction::Conduction(std::string block, MeshBlockPack *pp, ParameterInput *pin) :
