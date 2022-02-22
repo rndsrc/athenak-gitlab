@@ -155,11 +155,11 @@ void Conduction::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_da
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
   auto &w0_ = w0;
-  auto &multi_d=pmy_pack->pmesh->multi_d;
-  auto &three_d=pmy_pack->pmesh->three_d;
+  auto &multi_d = pmy_pack->pmesh->multi_d;
+  auto &three_d = pmy_pack->pmesh->three_d;
   auto &size = pmy_pack->pmb->mb_size;
   Real gm1 = eos_data.gamma-1.0;
-  Real &kappa_ =kappa;
+  Real &kappa_ = kappa;
   Real fac;
   if (pmy_pack->pmesh->three_d) {
     fac = 1.0/6.0;
