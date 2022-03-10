@@ -93,7 +93,16 @@ struct torus_pgen {
 //              Fishbone 1977, ApJ 215 323 (F)
 //   assumes x3 is axisymmetric direction
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
+void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
+  MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
+  if (!pmbp->pcoord->is_general_relativistic) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+              << "GR torus problem can only be run when GR defined in <coord> block"
+              << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+
   // Read problem-specific parameters from input file
   // global parameters
   torus.rho_min = pin->GetReal("problem", "rho_min");
@@ -104,8 +113,6 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   torus.sin_psi = sin(torus.psi);
   torus.cos_psi = cos(torus.psi);
 
-  torus.dfloor=pin->GetOrAddReal("hydro","dfloor",(1024*(FLT_MIN)));
-  torus.pfloor=pin->GetOrAddReal("hydro","pfloor",(1024*(FLT_MIN)));
 
   torus.rho_max = pin->GetReal("problem", "rho_max");
   torus.k_adi = pin->GetReal("problem", "k_adi");
@@ -116,7 +123,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real pert_amp = pin->GetOrAddReal("problem", "pert_amp", 0.0);
 
   // capture variables for kernel
-  auto &indcs = pmbp->pmesh->mb_indcs;
+  auto &indcs = pmy_mesh_->mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
   int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
@@ -131,8 +138,12 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real gm1;
   if (pmbp->phydro != nullptr) {
     torus.gamma_adi = pmbp->phydro->peos->eos_data.gamma;
+    torus.dfloor = pmbp->phydro->peos->eos_data.dfloor;
+    torus.pfloor = pmbp->phydro->peos->eos_data.pfloor;
   } else if (pmbp->pmhd != nullptr) {
     torus.gamma_adi = pmbp->pmhd->peos->eos_data.gamma;
+    torus.dfloor = pmbp->pmhd->peos->eos_data.dfloor;
+    torus.pfloor = pmbp->pmhd->peos->eos_data.pfloor;
   }
   gm1 = torus.gamma_adi - 1.0;
 
@@ -159,7 +170,52 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
     w0_ = pmbp->pmhd->w0;
   }
 
-  // initialize primitive variables ---------------------------------------
+  // initialize primitive variables for restart ---------------------------------------
+
+  if (restart) {
+    auto trs = torus;
+    auto &size = pmbp->pmb->mb_size;
+    Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
+    par_for("pgen_torus0", DevExeSpace(), 0,nmb1,0,(n3-1),0,(n2-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      Real &x1min = size.d_view(m).x1min;
+      Real &x1max = size.d_view(m).x1max;
+      Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+
+      Real &x2min = size.d_view(m).x2min;
+      Real &x2max = size.d_view(m).x2max;
+      Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+
+      Real &x3min = size.d_view(m).x3min;
+      Real &x3max = size.d_view(m).x3max;
+      Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+
+      // Calculate Boyer-Lindquist coordinates of cell
+      Real r, theta, phi;
+      GetBoyerLindquistCoordinates(trs, x1v, x2v, x3v, &r, &theta, &phi);
+
+      // Calculate background primitives
+      Real rho_bg, pgas_bg;
+      if (r > coord.bh_rmin) {
+        rho_bg = trs.rho_min * pow(r, trs.rho_pow);
+        pgas_bg = trs.pgas_min * pow(r, trs.pgas_pow);
+      } else {
+        rho_bg = trs.rho_min * pow(coord.bh_rmin, trs.rho_pow);
+        pgas_bg = trs.pgas_min * pow(coord.bh_rmin, trs.pgas_pow);
+      }
+
+      // Set primitive values on restart, to get solution in excise region
+      w0_(m,IDN,k,j,i) = rho_bg;
+      w0_(m,IEN,k,j,i) = pgas_bg / gm1;
+      w0_(m,IVX,k,j,i) = 0.0;
+      w0_(m,IVY,k,j,i) = 0.0;
+      w0_(m,IVZ,k,j,i) = 0.0;
+    });
+    return;
+  }
+
+
+  // initialize primitive variables for new run ---------------------------------------
 
   auto trs = torus;
   auto &size = pmbp->pmb->mb_size;
@@ -187,7 +243,6 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
     Real cos_phi = cos(phi);
 
     Real sin_vartheta = abs(sin_theta);
-    Real cos_vartheta = cos_theta;
     Real varphi = (sin_theta < 0.0) ? (phi - M_PI) : phi;
     Real sin_varphi = sin(varphi);
     Real cos_varphi = cos(varphi);
@@ -203,8 +258,14 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
     }
 
     // Calculate background primitives
-    Real rho_bg = trs.rho_min * pow(r, trs.rho_pow);
-    Real pgas_bg = trs.pgas_min * pow(r, trs.pgas_pow);
+    Real rho_bg, pgas_bg;
+    if (r > coord.bh_rmin) {
+      rho_bg = trs.rho_min * pow(r, trs.rho_pow);
+      pgas_bg = trs.pgas_min * pow(r, trs.pgas_pow);
+    } else {
+      rho_bg = trs.rho_min * pow(coord.bh_rmin, trs.rho_pow);
+      pgas_bg = trs.pgas_min * pow(coord.bh_rmin, trs.pgas_pow);
+    }
 
     Real rho = rho_bg;
     Real pgas = pgas_bg;
@@ -323,10 +384,10 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
   // Convert primitives to conserved
   if (pmbp->phydro != nullptr) {
-    pmbp->phydro->peos->PrimToCons(w0_, u0_);
+    pmbp->phydro->peos->PrimToCons(w0_, u0_, is, ie, js, je, ks, ke);
   } else if (pmbp->pmhd != nullptr) {
     auto &bcc0_ = pmbp->pmhd->bcc0;
-    pmbp->pmhd->peos->PrimToCons(w0_, bcc0_, u0_);
+    pmbp->pmhd->peos->PrimToCons(w0_, bcc0_, u0_, is, ie, js, je, ks, ke);
   }
 
   return;

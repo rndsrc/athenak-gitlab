@@ -25,44 +25,33 @@ namespace mhd {
 // constructor, initializes data structures and parameters
 
 MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
-  pmy_pack(ppack),
-  u0("cons",1,1,1,1,1),
-  w0("prim",1,1,1,1,1),
-  b0("B_fc",1,1,1,1),
-  bcc0("B_cc",1,1,1,1,1),
-  coarse_u0("ccons",1,1,1,1,1),
-  coarse_b0("cB_fc",1,1,1,1),
-  u1("cons1",1,1,1,1,1),
-  b1("B_fc1",1,1,1,1),
-  uflx("uflx",1,1,1,1,1),
-  efld("efld",1,1,1,1),
-  e3x1("e3x1",1,1,1,1),
-  e2x1("e2x1",1,1,1,1),
-  e1x2("e1x2",1,1,1,1),
-  e3x2("e3x2",1,1,1,1),
-  e2x3("e2x3",1,1,1,1),
-  e1x3("e1x3",1,1,1,1),
-  e1_cc("e1_cc",1,1,1,1),
-  e2_cc("e2_cc",1,1,1,1),
-  e3_cc("e3_cc",1,1,1,1) {
-  // (1) Start by selecting physics for this MHD:
-
-  // Check for relativistic dynamics
-  is_special_relativistic = pin->GetOrAddBoolean("mhd","special_rel",false);
-  is_general_relativistic = pin->GetOrAddBoolean("mhd","general_rel",false);
-  if (is_special_relativistic && is_general_relativistic) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Cannot specify both SR and GR at same time" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-
-  // (2) construct EOS object (no default)
+    pmy_pack(ppack),
+    u0("cons",1,1,1,1,1),
+    w0("prim",1,1,1,1,1),
+    b0("B_fc",1,1,1,1),
+    bcc0("B_cc",1,1,1,1,1),
+    coarse_u0("ccons",1,1,1,1,1),
+    coarse_b0("cB_fc",1,1,1,1),
+    u1("cons1",1,1,1,1,1),
+    b1("B_fc1",1,1,1,1),
+    uflx("uflx",1,1,1,1,1),
+    efld("efld",1,1,1,1),
+    e3x1("e3x1",1,1,1,1),
+    e2x1("e2x1",1,1,1,1),
+    e1x2("e1x2",1,1,1,1),
+    e3x2("e3x2",1,1,1,1),
+    e2x3("e2x3",1,1,1,1),
+    e1x3("e1x3",1,1,1,1),
+    e1_cc("e1_cc",1,1,1,1),
+    e2_cc("e2_cc",1,1,1,1),
+    e3_cc("e3_cc",1,1,1,1) {
+  // (1) construct EOS object (no default)
   {std::string eqn_of_state = pin->GetString("mhd","eos");
   // ideal gas EOS
   if (eqn_of_state.compare("ideal") == 0) {
-    if (is_special_relativistic) {
+    if (pmy_pack->pcoord->is_special_relativistic) {
       peos = new IdealSRMHD(ppack, pin);
-    } else if (is_general_relativistic) {
+    } else if (pmy_pack->pcoord->is_general_relativistic) {
       peos = new IdealGRMHD(ppack, pin);
     } else {
       peos = new IdealMHD(ppack, pin);
@@ -71,7 +60,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
 
   // isothermal EOS
   } else if (eqn_of_state.compare("isothermal") == 0) {
-    if (is_special_relativistic || is_general_relativistic) {
+    if (pmy_pack->pcoord->is_special_relativistic ||
+        pmy_pack->pcoord->is_general_relativistic) {
       std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
                 << "<mhd> eos = isothermal cannot be used with SR/GR" << std::endl;
       std::exit(EXIT_FAILURE);
@@ -88,7 +78,7 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
   }
   }
 
-  // (3) Initialize scalars, diffusion, source terms
+  // (2) Initialize scalars, diffusion, source terms
   nscalars = pin->GetOrAddInteger("mhd","nscalars",0);
 
   // Viscosity (only constructed if needed)
@@ -115,7 +105,7 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
   // Source terms (constructor parses input file to initialize only srcterms needed)
   psrc = new SourceTerms("mhd", ppack, pin);
 
-  // (4) read time-evolution option [already error checked in driver constructor]
+  // (3) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
   std::string evolution_t = pin->GetString("time","evolution");
 
@@ -193,51 +183,47 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
     // select Riemann solver (no default).  Test for compatibility of options
     {std::string rsolver = pin->GetString("mhd","rsolver");
     // Special relativistic solvers
-    if (is_special_relativistic) {
-      if (rsolver.compare("llf") == 0) {
-        rsolver_method = MHD_RSolver::llf_sr;
-      } else if (rsolver.compare("hlle") == 0) {
-        rsolver_method = MHD_RSolver::hlle_sr;
-      // Error for anything else
+    if (pmy_pack->pcoord->is_special_relativistic) {
+      if (evolution_t.compare("dynamic") == 0) {
+        if (rsolver.compare("llf") == 0) {
+          rsolver_method = MHD_RSolver::llf_sr;
+        } else if (rsolver.compare("hlle") == 0) {
+          rsolver_method = MHD_RSolver::hlle_sr;
+        // Error for anything else
+        } else {
+          std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                    << std::endl << "<mhd> rsolver = '" << rsolver << "' not implemented"
+                    << " for SR dynamics" << std::endl;
+          std::exit(EXIT_FAILURE);
+        }
       } else {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                  << std::endl << "<mhd> rsolver = '" << rsolver << "' not implemented"
-                  << " for SR dynamics" << std::endl;
+                  << std::endl << "kinematic dynamics not implemented for SR" <<std::endl;
         std::exit(EXIT_FAILURE);
       }
 
     // General relativistic solvers
-    } else if (is_general_relativistic) {
-      if (rsolver.compare("hlle") == 0) {
-        rsolver_method = MHD_RSolver::hlle_gr;
-      // Error for anything else
+    } else if (pmy_pack->pcoord->is_general_relativistic) {
+      if (evolution_t.compare("dynamic") == 0) {
+        if (rsolver.compare("hlle") == 0) {
+          rsolver_method = MHD_RSolver::hlle_gr;
+        // Error for anything else
+        } else {
+          std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                    << std::endl << "<mhd> rsolver = '" << rsolver << "' not implemented"
+                    << " for GR dynamics" << std::endl;
+          std::exit(EXIT_FAILURE);
+        }
       } else {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                  << std::endl << "<mhd> rsolver = '" << rsolver << "' not implemented"
-                  << " for GR dynamics" << std::endl;
+                  << std::endl << "kinematic dynamics not implemented for GR" <<std::endl;
         std::exit(EXIT_FAILURE);
       }
 
-    // Non-relativistic solvers
-    } else {
-      // Advect solver
-      if (rsolver.compare("advect") == 0) {
-        if (evolution_t.compare("dynamic") == 0) {
-          std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                    << std::endl << "<mhd>/rsolver = '" << rsolver
-                    << "' cannot be used with dynamic problems" << std::endl;
-          std::exit(EXIT_FAILURE);
-        } else {
-          rsolver_method = MHD_RSolver::advect;
-        }
-      // only advect RS can be used with non-dynamic problems; print error otherwise
-      } else  if (evolution_t.compare("dynamic") != 0) {
-        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                  << std::endl << "<mhd>/rsolver = '" << rsolver
-                  << "' cannot be used with non-dynamic problems" << std::endl;
-        std::exit(EXIT_FAILURE);
+    // Non-relativistic dynamic solvers
+    } else if (evolution_t.compare("dynamic") == 0) {
       // LLF solver
-      } else if (rsolver.compare("llf") == 0) {
+      if (rsolver.compare("llf") == 0) {
         rsolver_method = MHD_RSolver::llf;
       // HLLE solver
       } else if (rsolver.compare("hlle") == 0) {
@@ -251,7 +237,19 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
       } else {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                   << std::endl << "<mhd>/rsolver = '" << rsolver << "' not implemented"
-                  << std::endl;
+                  << " for dynamic problems" << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
+
+    // Non-relativistic kinematic solver
+    } else {
+      // Advect solver
+      if (rsolver.compare("advect") == 0) {
+        rsolver_method = MHD_RSolver::advect;
+      } else {
+        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                  << std::endl << "<mhd>/rsolver = '" << rsolver << "' not implemented"
+                  << " for kinematic problems" << std::endl;
         std::exit(EXIT_FAILURE);
       }
     }
@@ -285,9 +283,6 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
     Kokkos::realloc(e2_cc, nmb, ncells3, ncells2, ncells1);
     Kokkos::realloc(e3_cc, nmb, ncells3, ncells2, ncells1);
   }
-
-  // (5) initialize metric (GR only)
-  if (is_general_relativistic) {pmy_pack->pcoord->InitMetric(pin);}
 }
 
 //----------------------------------------------------------------------------------------

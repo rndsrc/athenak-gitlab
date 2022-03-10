@@ -19,32 +19,50 @@
 //----------------------------------------------------------------------------------------
 // ctor: also calls EOS base class constructor
 
-IdealGRHydro::IdealGRHydro(MeshBlockPack *pp,
-                           ParameterInput *pin) : EquationOfState(pp, pin) {
+IdealGRHydro::IdealGRHydro(MeshBlockPack *pp, ParameterInput *pin) :
+    EquationOfState("hydro", pp, pin) {
   eos_data.is_ideal = true;
   eos_data.gamma = pin->GetReal("hydro","gamma");
   eos_data.iso_cs = 0.0;
+  eos_data.use_e = true;  // ideal gas EOS always uses internal energy
+  eos_data.use_t = false;
+}
 
-  // Read flags specifying which variable to use in primitives
-  // if nothing set in input file, use e as default
-  if (!(pin->DoesParameterExist("hydro","use_e")) &&
-      !(pin->DoesParameterExist("hydro","use_t")) ) {
-    eos_data.use_e = true;
-    eos_data.use_t = false;
-  } else {
-    eos_data.use_e = pin->GetOrAddBoolean("hydro","use_e",false);
-    eos_data.use_t = pin->GetOrAddBoolean("hydro","use_t",false);
-  }
-  if (!(eos_data.use_e) && !(eos_data.use_t)) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Both use_e and use_t set to false" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-  if (eos_data.use_e && eos_data.use_t) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Both use_e and use_t set to true" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
+//--------------------------------------------------------------------------------------
+//! \fn void PrimToConsSingle()
+//! \brief Converts single set of primitive into conserved variables.
+
+KOKKOS_INLINE_FUNCTION
+void PrimToConsSingle(const Real g_[], const Real gi_[], const Real &gammap,
+                      const HydPrim1D &w, HydCons1D &u) {
+  const Real
+    &g_00 = g_[I00], &g_01 = g_[I01], &g_02 = g_[I02], &g_03 = g_[I03],
+    &g_10 = g_[I01], &g_11 = g_[I11], &g_12 = g_[I12], &g_13 = g_[I13],
+    &g_20 = g_[I02], &g_21 = g_[I12], &g_22 = g_[I22], &g_23 = g_[I23],
+    &g_30 = g_[I03], &g_31 = g_[I13], &g_32 = g_[I23], &g_33 = g_[I33];
+
+  // Calculate 4-velocity
+  Real alpha = sqrt(-1.0/gi_[I00]);
+  Real tmp = g_[I11]*w.vx*w.vx + 2.0*g_[I12]*w.vx*w.vy + 2.0*g_[I13]*w.vx*w.vz
+           + g_[I22]*w.vy*w.vy + 2.0*g_[I23]*w.vy*w.vz
+           + g_[I33]*w.vz*w.vz;
+  Real gg = sqrt(1.0 + tmp);
+  Real u0 = gg/alpha;
+  Real u1 = w.vx - alpha * gg * gi_[I01];
+  Real u2 = w.vy - alpha * gg * gi_[I02];
+  Real u3 = w.vz - alpha * gg * gi_[I03];
+  Real u_0 = g_00*u0 + g_01*u1 + g_02*u2 + g_03*u3;
+  Real u_1 = g_10*u0 + g_11*u1 + g_12*u2 + g_13*u3;
+  Real u_2 = g_20*u0 + g_21*u1 + g_22*u2 + g_23*u3;
+  Real u_3 = g_30*u0 + g_31*u1 + g_32*u2 + g_33*u3;
+
+  Real wgas_u0 = (w.d + gammap * w.p) * u0;
+  u.d  = w.d * u0;
+  u.e  = wgas_u0 * u_0 + w.p - u.d;  // Evolve E-D as in SR
+  u.mx = wgas_u0 * u_1;
+  u.my = wgas_u0 * u_2;
+  u.mz = wgas_u0 * u_3;
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -68,17 +86,13 @@ Real EquationC22(Real z, Real &u_d, Real q, Real r, Real gm1, Real pfloor) {
 //----------------------------------------------------------------------------------------
 //! \fn void ConsToPrim()
 //! \brief Converts conserved into primitive variables.
-//! Operates over entire MeshBlock, including ghost cells.
+//! Operates over range of cells given in argument list.
 
-void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) {
+void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
+                              const int il, const int iu, const int jl, const int ju,
+                              const int kl, const int ku) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int &ng = indcs.ng;
-  int n1 = indcs.nx1 + 2*ng;
-  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
-  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
-  int &is = indcs.is;
-  int &js = indcs.js;
-  int &ks = indcs.ks;
+  int &is = indcs.is, &js = indcs.js, &ks = indcs.ks;
   auto &size = pmy_pack->pmb->mb_size;
   auto &flat = pmy_pack->pcoord->coord_data.is_minkowski;
   auto &spin = pmy_pack->pcoord->coord_data.bh_spin;
@@ -88,27 +102,41 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
   int &nmb = pmy_pack->nmb_thispack;
   auto eos = eos_data;
   Real gm1 = eos_data.gamma - 1.0;
-  Real &pfloor_ = eos_data.pressure_floor;
-  Real &dfloor_ = eos_data.density_floor;
-  bool &use_e = eos_data.use_e;
+  Real gamma_prime = eos_data.gamma/(eos_data.gamma - 1.0);
+  Real &pfloor_ = eos_data.pfloor;
+  Real &dfloor_ = eos_data.dfloor;
 
   // Parameters
   int const max_iterations = 25;
   Real const tol = 1.0e-12;
   Real const v_sq_max = 1.0 - tol;
 
-  par_for("grhyd_con2prim", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+  const int ni   = (iu - il + 1);
+  const int nji  = (ju - jl + 1)*ni;
+  const int nkji = (ku - kl + 1)*nji;
+  const int nmkji = nmb*nkji;
+
+  int nfloord_=0, nfloore_=0, maxit_=0;
+  Kokkos::parallel_reduce("hyd_c2p",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
+  KOKKOS_LAMBDA(const int &idx, int &sum_d, int &sum_e, int &max_iter) {
+    int m = (idx)/nkji;
+    int k = (idx - m*nkji)/nji;
+    int j = (idx - m*nkji - k*nji)/ni;
+    int i = (idx - m*nkji - k*nji - j*ni) + il;
+    j += jl;
+    k += kl;
+
     Real& u_d  = cons(m,IDN,k,j,i);
     Real& u_e  = cons(m,IEN,k,j,i);
-    Real& u_m1 = cons(m,IM1,k,j,i);
-    Real& u_m2 = cons(m,IM2,k,j,i);
-    Real& u_m3 = cons(m,IM3,k,j,i);
+    const Real& u_m1 = cons(m,IM1,k,j,i);
+    const Real& u_m2 = cons(m,IM2,k,j,i);
+    const Real& u_m3 = cons(m,IM3,k,j,i);
 
     Real& w_d  = prim(m,IDN,k,j,i);
     Real& w_ux = prim(m,IVX,k,j,i);
     Real& w_uy = prim(m,IVY,k,j,i);
     Real& w_uz = prim(m,IVZ,k,j,i);
+    Real& w_e  = prim(m,IEN,k,j,i);
 
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;
@@ -124,45 +152,46 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
 
     Real rad = sqrt(SQR(x1v) + SQR(x2v) + SQR(x3v));
 
-    bool floor_hit = false;
-
     // Extract components of metric
     Real g_[NMETRIC], gi_[NMETRIC];
     ComputeMetricAndInverse(x1v, x2v, x3v, flat, false, spin, g_, gi_);
 
     // Only execute cons2prim if outside excised region
+    bool floor_hit = false;
     if (rad > rmin) {
       // We are evolving T^t_t, but the SR C2P algorithm is only consistent with
       // alpha^2 T^{tt}.J.  Therefore compute T^{tt} = g^0\mu T^t_\mu
       // We are also evolving (E-D) as conserved variable, so must convert to E
-      Real ue_tmp = gi_[I00]*(u_e+u_d) + gi_[I01]*u_m1 + gi_[I02]*u_m2 + gi_[I03]*u_m3;
+      Real ue_sr = gi_[I00]*(u_e+u_d) + gi_[I01]*u_m1 + gi_[I02]*u_m2 + gi_[I03]*u_m3;
 
       // This is only true if sqrt{-g}=1!
-      ue_tmp *= (-1./gi_[I00]);  // Multiply by alpha^2
+      ue_sr *= (-1./gi_[I00]);  // Multiply by alpha^2
 
       // Need to multiply the conserved density by alpha, so that it
       // contains a lorentz factor
       Real alpha = sqrt(-1.0/gi_[I00]);
-      Real ud_tmp = u_d*alpha;
+      Real ud_sr = u_d*alpha;
 
       // Subtract density for consistency with the rest of the algorithm
-      ue_tmp -= ud_tmp;
+      ue_sr -= ud_sr;
 
       // Need to treat the conserved momenta. Also they lack an alpha
       // This is only true if sqrt{-g}=1!
-      Real um1_tmp = u_m1*alpha;
-      Real um2_tmp = u_m2*alpha;
-      Real um3_tmp = u_m3*alpha;
+      Real um1_sr = u_m1*alpha;
+      Real um2_sr = u_m2*alpha;
+      Real um3_sr = u_m3*alpha;
 
       // apply density floor, without changing momentum or energy
-      if (ud_tmp < dfloor_) {
-        ud_tmp = dfloor_;
+      if (ud_sr < dfloor_) {
+        ud_sr = dfloor_;
+        sum_d++;
         floor_hit = true;
       }
 
       // apply energy floor
-      if (ue_tmp < pfloor_/gm1) {
-        ue_tmp = pfloor_/gm1;
+      if (ue_sr < pfloor_/gm1) {
+        ue_sr = pfloor_/gm1;
+        sum_e++;
         floor_hit = true;
       }
 
@@ -174,20 +203,20 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
       //       g^0i = beta^i/alpha^2
       //       g^00 = -1/ alpha^2
       // Hence gamma^ij =  g^ij - g^0i g^0j/g^00
-      Real m1u = ((gi_[I11] - gi_[I01]*gi_[I01]/gi_[I00])*um1_tmp +
-                  (gi_[I12] - gi_[I01]*gi_[I02]/gi_[I00])*um2_tmp +
-                  (gi_[I13] - gi_[I01]*gi_[I03]/gi_[I00])*um3_tmp);  // (C26)
+      Real m1u = ((gi_[I11] - gi_[I01]*gi_[I01]/gi_[I00])*um1_sr +
+                  (gi_[I12] - gi_[I01]*gi_[I02]/gi_[I00])*um2_sr +
+                  (gi_[I13] - gi_[I01]*gi_[I03]/gi_[I00])*um3_sr);  // (C26)
 
-      Real m2u = ((gi_[I12] - gi_[I01]*gi_[I02]/gi_[I00])*um1_tmp +
-                  (gi_[I22] - gi_[I02]*gi_[I02]/gi_[I00])*um2_tmp +
-                  (gi_[I23] - gi_[I02]*gi_[I03]/gi_[I00])*um3_tmp);  // (C26)
+      Real m2u = ((gi_[I12] - gi_[I01]*gi_[I02]/gi_[I00])*um1_sr +
+                  (gi_[I22] - gi_[I02]*gi_[I02]/gi_[I00])*um2_sr +
+                  (gi_[I23] - gi_[I02]*gi_[I03]/gi_[I00])*um3_sr);  // (C26)
 
-      Real m3u = ((gi_[I13] - gi_[I01]*gi_[I03]/gi_[I00])*um1_tmp +
-                  (gi_[I23] - gi_[I02]*gi_[I03]/gi_[I00])*um2_tmp +
-                  (gi_[I33] - gi_[I03]*gi_[I03]/gi_[I00])*um3_tmp);  // (C26)
+      Real m3u = ((gi_[I13] - gi_[I01]*gi_[I03]/gi_[I00])*um1_sr +
+                  (gi_[I23] - gi_[I02]*gi_[I03]/gi_[I00])*um2_sr +
+                  (gi_[I33] - gi_[I03]*gi_[I03]/gi_[I00])*um3_sr);  // (C26)
 
-      Real q = ue_tmp/ud_tmp;
-      Real r = sqrt(um1_tmp*m1u + um2_tmp*m2u + um3_tmp*m3u)/ud_tmp;
+      Real q = ue_sr/ud_sr;
+      Real r = sqrt(um1_sr*m1u + um2_sr*m2u + um3_sr*m3u)/ud_sr;
 
       // Enforce lower velocity bound (eq. C13). This bound combined with a floor on
       // the value of p will guarantee "some" result of the inversion
@@ -198,8 +227,8 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
       auto zp = kk/sqrt(1.0 - kk*kk);
 
       // Evaluate master function (eq C22) at bracket values
-      Real fm = EquationC22(zm, ud_tmp, q, r, gm1, pfloor_);
-      Real fp = EquationC22(zp, ud_tmp, q, r, gm1, pfloor_);
+      Real fm = EquationC22(zm, ud_sr, q, r, gm1, pfloor_);
+      Real fp = EquationC22(zp, ud_sr, q, r, gm1, pfloor_);
 
       // For simplicity on the GPU, find roots using the false position method
       int iterations = max_iterations;
@@ -209,9 +238,10 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
       }
       Real z = 0.5*(zm + zp);
 
-      for (int ii=0; ii < iterations; ++ii) {
+      {int iter;
+      for (iter=0; iter < iterations; ++iter) {
         z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
-        Real f = EquationC22(z, ud_tmp, q, r, gm1, pfloor_);
+        Real f = EquationC22(z, ud_sr, q, r, gm1, pfloor_);
 
         // Quit if convergence reached
         // NOTE: both z and f are of order unity
@@ -230,22 +260,24 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
            fp = f;
         }
       }
+      max_iter = (iter > max_iter)? iter : max_iter;
+      }
 
       // iterations ended, compute primitives from resulting value of z
       Real const w = sqrt(1.0 + z*z);  // (C15)
-      w_d = ud_tmp/w;  // (C15)
+      w_d = ud_sr/w;                   // (C15)
       Real eps = w*q - z*r + (z*z)/(1.0 + w);  // (C16)
-      eps = fmax(pfloor_/w_d/gm1, eps);  // (C18)
-      Real h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps)); // (C1) & (C21)
-      if (use_e) {
-        Real& w_e  = prim(m,IEN,k,j,i);
-        w_e = w_d*eps;
-      } else {
-        Real& w_t  = prim(m,ITM,k,j,i);
-        w_t = gm1*eps;  // TODO(@user):  is this the correct expression?
+      Real epsmin = pfloor_/(w_d*gm1);
+      if (eps <= epsmin) {                     // C18
+        eps = epsmin;
+        sum_e++;
+        floor_hit = true;
       }
 
-      Real const conv = 1.0/(h*ud_tmp); // (C26)
+      Real h = (1.0 + eps) * (1.0 + (gm1*eps)/(1.0+eps)); // (C1) & (C21)
+      w_e = w_d*eps;
+
+      Real const conv = 1.0/(h*ud_sr); // (C26)
       w_ux = conv*m1u;  // (C26)
       w_uy = conv*m2u;  // (C26)
       w_uz = conv*m3u;  // (C26)
@@ -257,42 +289,47 @@ void IdealGRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) 
     }
 
     // reset conserved variables inside excised regions or if floor is hit
-    Real w_p;
-    if (use_e) {
-      const Real& w_e  = prim(m,IEN,k,j,i);
-      w_p = w_e*gm1;
-    } else {
-      const Real& w_t  = prim(m,ITM,k,j,i);
-      w_p = w_t*gm1*w_d;
-    }
     if (rad <= rmin || floor_hit) {
-      Real ud, ue, um1, um2, um3;
-      eos.PrimToConsSingleGRHydro(g_, gi_, w_d, w_p, w_ux, w_uy, w_uz,
-                                  ud, ue, um1, um2, um3);
-      cons(m,IDN,k,j,i) = ud;
-      cons(m,IEN,k,j,i) = ue;
-      cons(m,IM1,k,j,i) = um1;
-      cons(m,IM2,k,j,i) = um2;
-      cons(m,IM3,k,j,i) = um3;
+      HydPrim1D w;
+      w.d  = w_d;
+      w.vx = w_ux;
+      w.vy = w_uy;
+      w.vz = w_uz;
+      w.p = w_e*gm1;
+
+      HydCons1D u;
+      PrimToConsSingle(g_, gi_, gamma_prime, w, u);
+
+      cons(m,IDN,k,j,i) = u.d;
+      cons(m,IEN,k,j,i) = u.e;
+      cons(m,IM1,k,j,i) = u.mx;
+      cons(m,IM2,k,j,i) = u.my;
+      cons(m,IM3,k,j,i) = u.mz;
       // convert scalars (if any)
       for (int n=nhyd; n<(nhyd+nscal); ++n) {
         cons(m,n,k,j,i) = prim(m,n,k,j,i)*cons(m,IDN,k,j,i);
       }
     }
-  });
+  }, Kokkos::Sum<int>(nfloord_), Kokkos::Sum<int>(nfloore_), Kokkos::Max<int>(maxit_));
+
+  // store counters
+  pmy_pack->pmesh->ecounter.neos_dfloor += nfloord_;
+  pmy_pack->pmesh->ecounter.neos_efloor += nfloore_;
+  pmy_pack->pmesh->ecounter.maxit_c2p = maxit_;
 
   return;
 }
 
 //----------------------------------------------------------------------------------------
 //! \fn void PrimToCons()
-//! \brief Converts primitive into conserved variables.  Operates only over active cells.
+//! \brief Converts primitive into conserved variables.  Operates over range of cells
+//! given in argument list.
 
-void IdealGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) {
+void IdealGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons,
+                              const int il, const int iu, const int jl, const int ju,
+                              const int kl, const int ku) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int is = indcs.is; int ie = indcs.ie;
-  int js = indcs.js; int je = indcs.je;
-  int ks = indcs.ks; int ke = indcs.ke;
+  int &is = indcs.is, &js = indcs.js, &ks = indcs.ks;
   auto &size = pmy_pack->pmb->mb_size;
   auto &flat = pmy_pack->pcoord->coord_data.is_minkowski;
   auto &spin = pmy_pack->pcoord->coord_data.bh_spin;
@@ -301,9 +338,8 @@ void IdealGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &
   int &nmb = pmy_pack->nmb_thispack;
   Real gm1 = eos_data.gamma - 1.0;
   Real gamma_prime = eos_data.gamma/(eos_data.gamma - 1.0);
-  bool &use_e = eos_data.use_e;
 
-  par_for("grhyd_prim2cons", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
+  par_for("grhyd_prim2cons", DevExeSpace(), 0, (nmb-1), kl, ku, jl, ju, il, iu,
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     // Extract components of metric
     Real &x1min = size.d_view(m).x1min;
@@ -321,58 +357,27 @@ void IdealGRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &
     Real g_[NMETRIC], gi_[NMETRIC];
     ComputeMetricAndInverse(x1v, x2v, x3v, flat, false, spin, g_, gi_);
 
-    const Real
-      &g_00 = g_[I00], &g_01 = g_[I01], &g_02 = g_[I02], &g_03 = g_[I03],
-      &g_10 = g_[I01], &g_11 = g_[I11], &g_12 = g_[I12], &g_13 = g_[I13],
-      &g_20 = g_[I02], &g_21 = g_[I12], &g_22 = g_[I22], &g_23 = g_[I23],
-      &g_30 = g_[I03], &g_31 = g_[I13], &g_32 = g_[I23], &g_33 = g_[I33];
+    // Load single state of primitive variables
+    HydPrim1D w;
+    w.d  = prim(m,IDN,k,j,i);
+    w.vx = prim(m,IVX,k,j,i);
+    w.vy = prim(m,IVY,k,j,i);
+    w.vz = prim(m,IVZ,k,j,i);
+    w.p = prim(m,IEN,k,j,i)*gm1;
 
-    const Real& w_d  = prim(m,IDN,k,j,i);
-    const Real& w_ux = prim(m,IVX,k,j,i);
-    const Real& w_uy = prim(m,IVY,k,j,i);
-    const Real& w_uz = prim(m,IVZ,k,j,i);
-
-    // Calculate 4-velocity
-    Real alpha = sqrt(-1.0/gi_[I00]);
-    Real tmp = g_[I11]*w_ux*w_ux + 2.0*g_[I12]*w_ux*w_uy + 2.0*g_[I13]*w_ux*w_uz
-             + g_[I22]*w_uy*w_uy + 2.0*g_[I23]*w_uy*w_uz
-             + g_[I33]*w_uz*w_uz;
-    Real gamma = sqrt(1.0 + tmp);
-    Real u0 = gamma/alpha;
-    Real u1 = w_ux - alpha * gamma * gi_[I01];
-    Real u2 = w_uy - alpha * gamma * gi_[I02];
-    Real u3 = w_uz - alpha * gamma * gi_[I03];
-    Real u_0 = g_00*u0 + g_01*u1 + g_02*u2 + g_03*u3;
-    Real u_1 = g_10*u0 + g_11*u1 + g_12*u2 + g_13*u3;
-    Real u_2 = g_20*u0 + g_21*u1 + g_22*u2 + g_23*u3;
-    Real u_3 = g_30*u0 + g_31*u1 + g_32*u2 + g_33*u3;
+    HydCons1D u;
+    PrimToConsSingle(g_, gi_, gamma_prime, w, u);
 
     // Set conserved quantities
-    Real& u_d  = cons(m,IDN,k,j,i);
-    Real& u_e  = cons(m,IEN,k,j,i);
-    Real& u_m1 = cons(m,IM1,k,j,i);
-    Real& u_m2 = cons(m,IM2,k,j,i);
-    Real& u_m3 = cons(m,IM3,k,j,i);
-
-    Real w_p;
-    if (use_e) {
-      const Real& w_e  = prim(m,IEN,k,j,i);
-      w_p = w_e*gm1;
-    } else {
-      const Real& w_t  = prim(m,ITM,k,j,i);
-      w_p = w_t*w_d;
-    }
-
-    Real wgas_u0 = (w_d + gamma_prime * w_p) * u0;
-    u_d  = w_d * u0;
-    u_e  = wgas_u0 * u_0 + w_p - u_d;  // Evolve E-D, as in SR
-    u_m1 = wgas_u0 * u_1;
-    u_m2 = wgas_u0 * u_2;
-    u_m3 = wgas_u0 * u_3;
+    cons(m,IDN,k,j,i) = u.d;
+    cons(m,IEN,k,j,i) = u.e;
+    cons(m,IM1,k,j,i) = u.mx;
+    cons(m,IM2,k,j,i) = u.my;
+    cons(m,IM3,k,j,i) = u.mz;
 
     // convert scalars (if any)
     for (int n=nhyd; n<(nhyd+nscal); ++n) {
-      cons(m,n,k,j,i) = prim(m,n,k,j,i)*u_d;
+      cons(m,n,k,j,i) = prim(m,n,k,j,i)*u.d;
     }
   });
 

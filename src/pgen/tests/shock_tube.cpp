@@ -28,7 +28,8 @@
 //! \fn ProblemGenerator::ShockTube_()
 //! \brief Problem Generator for the shock tube (Riemann problem) tests
 
-void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
+void ProblemGenerator::ShockTube(ParameterInput *pin, const bool restart) {
+  if (restart) return;
   // parse shock direction: {1,2,3} -> {x1,x2,x3}
   int shk_dir = pin->GetInteger("problem","shock_dir");
   if (shk_dir < 1 || shk_dir > 3) {
@@ -65,11 +66,12 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
   }
 
   // capture variables for the kernel
-  auto &indcs = pmbp->pmesh->mb_indcs;
-  auto &size = pmbp->pmb->mb_size;
+  auto &indcs = pmy_mesh_->mb_indcs;
   int &is = indcs.is; int &ie = indcs.ie;
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
+  MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
+  auto &size = pmbp->pmb->mb_size;
 
   // Initialize Hydro variables -------------------------------
   if (pmbp->phydro != nullptr) {
@@ -82,7 +84,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
     wl.p  = pin->GetReal("problem","pl");
     // compute Lorentz factor (needed for SR/GR)
     Real u0l = 1.0;
-    if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic) {
+    if (pmbp->pcoord->is_special_relativistic || pmbp->pcoord->is_general_relativistic) {
       u0l = 1.0/sqrt( 1.0 - (SQR(wl.vx) + SQR(wl.vy) + SQR(wl.vz)) );
     }
 
@@ -94,11 +96,11 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
     wr.p  = pin->GetReal("problem","pr");
     // compute Lorentz factor (needed for SR/GR)
     Real u0r = 1.0;
-    if (pmbp->phydro->is_special_relativistic || pmbp->phydro->is_general_relativistic) {
+    if (pmbp->pcoord->is_special_relativistic || pmbp->pcoord->is_general_relativistic) {
       u0r = 1.0/sqrt( 1.0 - (SQR(wr.vx) + SQR(wr.vy) + SQR(wr.vz)) );
     }
 
-    // set either internal energy density or temparature as primitive
+    // set either internal energy density or temparature as primitive, depending on EOS
     Real prim_l,prim_r;
     auto &eos = pmbp->phydro->peos->eos_data;
     if (eos.use_e) {
@@ -148,7 +150,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
 
     // Convert primitives to conserved
     auto &u0 = pmbp->phydro->u0;
-    pmbp->phydro->peos->PrimToCons(w0, u0);
+    pmbp->phydro->peos->PrimToCons(w0, u0, is, ie, js, je, ks, ke);
   } // End initialization of Hydro variables
 
   // Initialize MHD variables -------------------------------
@@ -165,7 +167,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
     Real bx_l = pin->GetReal("problem","bxl");
     // compute Lorentz factor (needed for SR/GR)
     Real u0l = 1.0;
-    if (pmbp->pmhd->is_special_relativistic || pmbp->pmhd->is_general_relativistic) {
+    if (pmbp->pcoord->is_special_relativistic || pmbp->pcoord->is_general_relativistic) {
       u0l = 1.0/sqrt( 1.0 - (SQR(wl.vx) + SQR(wl.vy) + SQR(wl.vz)) );
     }
 
@@ -180,11 +182,11 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
     Real bx_r = pin->GetReal("problem","bxr");
     // compute Lorentz factor (needed for SR/GR)
     Real u0r = 1.0;
-    if (pmbp->pmhd->is_special_relativistic || pmbp->pmhd->is_general_relativistic) {
+    if (pmbp->pcoord->is_special_relativistic || pmbp->pcoord->is_general_relativistic) {
       u0r = 1.0/sqrt( 1.0 - (SQR(wr.vx) + SQR(wr.vy) + SQR(wr.vz)) );
     }
 
-    // set either internal energy density or temparature as primitive
+    // set either internal energy density or temparature as primitive, depending on EOS
     Real prim_l,prim_r;
     auto &eos = pmbp->pmhd->peos->eos_data;
     if (eos.use_e) {
@@ -259,7 +261,7 @@ void ProblemGenerator::ShockTube(MeshBlockPack *pmbp, ParameterInput *pin) {
     });
     // Convert primitives to conserved
     auto &u0 = pmbp->pmhd->u0;
-    pmbp->pmhd->peos->PrimToCons(w0, bcc0, u0);
+    pmbp->pmhd->peos->PrimToCons(w0, bcc0, u0, is, ie, js, je, ks, ke);
   } // End initialization of MHD variables
 
   return;

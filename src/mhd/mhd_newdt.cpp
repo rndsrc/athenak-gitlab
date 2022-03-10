@@ -16,6 +16,7 @@
 #include "driver/driver.hpp"
 #include "eos/eos.hpp"
 #include "mhd.hpp"
+#include "diffusion/conduction.hpp"
 #include "srcterms/srcterms.hpp"
 
 namespace mhd {
@@ -42,8 +43,8 @@ TaskStatus MHD::NewTimeStep(Driver *pdriver, int stage) {
   auto &w0_ = w0;
   auto &eos = pmy_pack->pmhd->peos->eos_data;
   auto &mbsize = pmy_pack->pmb->mb_size;
-  auto &is_special_relativistic_ = is_special_relativistic;
-  auto &is_general_relativistic_ = is_general_relativistic;
+  auto &is_special_relativistic_ = pmy_pack->pcoord->is_special_relativistic;
+  auto &is_general_relativistic_ = pmy_pack->pcoord->is_general_relativistic;
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
@@ -97,7 +98,7 @@ TaskStatus MHD::NewTimeStep(Driver *pdriver, int stage) {
         Real v2 = SQR(ux) + SQR(uy) + SQR(uz);
         Real lor = sqrt(1.0 + v2);
         // FIXME ERM: Ideal fluid for now
-        Real p = eos.IdealGasPressure(w0_(m,IDN,k,j,i), w0_(m,IEN,k,j,i));
+        Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
         // Calculate 4-magnetic field in left state
         Real b_0 = bcc1*ux + bcc2*uy + bcc3*uz;
         Real b_1 = (bcc1 + b_0 * ux) / lor;
@@ -121,7 +122,7 @@ TaskStatus MHD::NewTimeStep(Driver *pdriver, int stage) {
         Real &w_by = bcc0_(m,IBY,k,j,i);
         Real &w_bz = bcc0_(m,IBZ,k,j,i);
         Real cf;
-        Real p = eos.IdealGasPressure(w0_(m,IDN,k,j,i), w0_(m,IEN,k,j,i));
+        Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
         if (eos.is_ideal) {
           cf = eos.IdealMHDFastSpeed(w_d, p, w_bx, w_by, w_bz);
         } else {
@@ -155,6 +156,10 @@ TaskStatus MHD::NewTimeStep(Driver *pdriver, int stage) {
   if (pmy_pack->pmesh->multi_d) { dtnew = std::min(dtnew, dt2); }
   if (pmy_pack->pmesh->three_d) { dtnew = std::min(dtnew, dt3); }
 
+  // compute timestep for diffusion
+  if (pcond != nullptr) {
+    pcond->NewTimeStep(w0, peos->eos_data);
+  }
   // compute source terms timestep
   if (psrc->source_terms_enabled) {
     psrc->NewTimeStep(w0, peos->eos_data);

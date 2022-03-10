@@ -24,7 +24,8 @@
 //! \fn
 //  \brief Problem Generator for KHI tests
 
-void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
+void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
+  if (restart) return;
   // read problem parameters from input file
   int iprob  = pin->GetReal("problem","iprob");
   Real amp   = pin->GetReal("problem","amp");
@@ -34,11 +35,12 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real rho1  = pin->GetReal("problem","rho1");
 
   // capture variables for kernel
-  auto &indcs = pmbp->pmesh->mb_indcs;
+  auto &indcs = pmy_mesh_->mb_indcs;
   int &is = indcs.is; int &ie = indcs.ie;
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
 
+  MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
   EOS_Data &eos = pmbp->phydro->peos->eos_data;
   Real gm1 = eos.gamma - 1.0;
   auto &w0 = pmbp->phydro->w0;
@@ -75,8 +77,8 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
     // Lorentz factor (needed to initializve 4-velocity in SR)
     Real u00 = 1.0;
     bool is_relativistic = false;
-    if (pmbp->phydro->is_special_relativistic ||
-        pmbp->phydro->is_general_relativistic) {
+    if (pmbp->pcoord->is_special_relativistic ||
+        pmbp->pcoord->is_general_relativistic) {
       is_relativistic = true;
     }
 
@@ -128,7 +130,7 @@ void ProblemGenerator::UserProblem(MeshBlockPack *pmbp, ParameterInput *pin) {
 
   // Convert primitives to conserved
   auto &u0 = pmbp->phydro->u0;
-  pmbp->phydro->peos->PrimToCons(w0, u0);
+  pmbp->phydro->peos->PrimToCons(w0, u0, is, ie, js, je, ks, ke);
 
   return;
 }

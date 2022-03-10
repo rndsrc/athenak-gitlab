@@ -176,8 +176,8 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
 
       a_twid[3][0] = (-2.0/3.0)*b;
       a_twid[3][1] = (1.0 - 4.0*e)/6.0;
-      a_twid[3][2] = b + e + a - (1.0/6.0);
-      a_twid[3][3] = (2.0/3.0)*(1.0 - a);
+      a_twid[3][2] = (4.0*(b + e + a) - 1.0)/6.0;
+      a_twid[3][3] = 2.0*(1.0 - a)/3.0;
       a_impl = a;
     // Error, unrecognized integrator name.
     } else {
@@ -209,8 +209,6 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout) {
     (void) phydro->ClearRecv(this, -1);
     (void) phydro->RecvU(this, 0);
     (void) phydro->ApplyPhysicalBCs(this, 0);
-
-    // Set primitive variables in initial conditions everywhere
     (void) phydro->ConToPrim(this, 0);
   }
 
@@ -218,7 +216,6 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout) {
   // Note this requires communicating BOTH u and B
   mhd::MHD *pmhd = pmesh->pmb_pack->pmhd;
   if (pmhd != nullptr) {
-    // following functions return a TaskStatus, but it is ignored so cast to (void)
     (void) pmhd->RestrictU(this, 0);
     (void) pmhd->RestrictB(this, 0);
     (void) pmhd->InitRecv(this, -1);  // stage < 0 suppresses InitFluxRecv
@@ -229,8 +226,6 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout) {
     (void) pmhd->RecvU(this, 0);
     (void) pmhd->RecvB(this, 0);
     (void) pmhd->ApplyPhysicalBCs(this, 0);
-
-    // Set primitive variables in initial conditions everywhere
     (void) pmhd->ConToPrim(this, 0);
   }
 
@@ -390,7 +385,10 @@ void Driver::Execute(Mesh *pmesh, ParameterInput *pin, Outputs *pout) {
         float time_32 = static_cast<float>(pmesh->time);
         float next_32 = static_cast<float>(out->out_params.last_time+out->out_params.dt);
         float tlim_32 = static_cast<float>(tlim);
-        if (time_32 >= next_32 && time_32 < tlim_32) {
+        int &dcycle_ = out->out_params.dcycle;
+
+        if ( ((out->out_params.dt > 0.0) && (time_32 >= next_32)) && (time_32<tlim_32) ||
+             ((dcycle_ > 0) && ((pmesh->ncycle)%(dcycle_) == 0)) ) {
           out->LoadOutputData(pmesh);
           out->WriteOutputFile(pmesh, pin);
         }
@@ -415,7 +413,9 @@ void Driver::Finalize(Mesh *pmesh, ParameterInput *pin, Outputs *pout) {
   }
 
   // call any problem specific functions to do work after main loop
-  pmesh->pgen->ProblemGeneratorFinalize(pin, pmesh);
+  if (pmesh->pgen->pgen_final_func != nullptr) {
+    (pmesh->pgen->pgen_final_func)(pin, pmesh);
+  }
 
   float exe_time = run_time_.seconds();
 

@@ -4,9 +4,10 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file eos.cpp
-//  \brief implements constructor and some fns for EquationOfState abstract base class
+//! \brief implements constructor and some fns for EquationOfState abstract base class
 
 #include <float.h>
+#include <string>
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
@@ -16,30 +17,40 @@
 //----------------------------------------------------------------------------------------
 // EquationOfState constructor
 
-EquationOfState::EquationOfState(MeshBlockPack* pp, ParameterInput *pin) :
-  pmy_pack(pp) {
-  eos_data.density_floor = pin->GetOrAddReal("eos","density_floor",(FLT_MIN));
-  eos_data.pressure_floor = pin->GetOrAddReal("eos","pressure_floor",(FLT_MIN));
-  eos_data.temperature_floor = pin->GetOrAddReal("eos","temperature_floor",(FLT_MIN));
+EquationOfState::EquationOfState(std::string bk, MeshBlockPack* pp, ParameterInput *pin) :
+    pmy_pack(pp) {
+  eos_data.dfloor = pin->GetOrAddReal(bk,"dfloor",(FLT_MIN));
+  eos_data.pfloor = pin->GetOrAddReal(bk,"pfloor",(FLT_MIN));
+  eos_data.tfloor = pin->GetOrAddReal(bk,"tfloor",(FLT_MIN));
 }
 
 //----------------------------------------------------------------------------------------
-// \!fn void ConsToPrim()
-// \brief No-Op versions of hydro and MHD cons to prim functions.
+//! \fn void ConsToPrim()
+//! \brief No-Op versions of hydro and MHD conservative to primitive functions.
+//! Required because each derived class overrides only one.
 
-void EquationOfState::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim) {
+void EquationOfState::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
+                                 const int il, const int iu, const int jl, const int ju,
+                                 const int kl, const int ku) {
 }
 
 void EquationOfState::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
-                                 DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) {
+                                 DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
+                                 const int il, const int iu, const int jl, const int ju,
+                                 const int kl, const int ku) {
 }
 
 //----------------------------------------------------------------------------------------
-// \!fn void PrimToCon()
-// \brief No-Op versions of hydro and MHD prim to cons functions.
+//! \fn void PrimToCon()
+//! \brief No-Op versions of hydro and MHD primitive to conservative functions.
+//! Required because each derived class overrides only one.
 
-void EquationOfState::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons) {
+void EquationOfState::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons,
+                                 const int il, const int iu, const int jl, const int ju,
+                                 const int kl, const int ku) {
 }
 void EquationOfState::PrimToCons(const DvceArray5D<Real> &prim,
-                                 const DvceArray5D<Real> &bcc, DvceArray5D<Real> &cons) {
+                                 const DvceArray5D<Real> &bcc, DvceArray5D<Real> &cons,
+                                 const int il, const int iu, const int jl, const int ju,
+                                 const int kl, const int ku) {
 }

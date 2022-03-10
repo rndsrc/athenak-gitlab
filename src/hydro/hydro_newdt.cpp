@@ -16,6 +16,7 @@
 #include "driver/driver.hpp"
 #include "eos/eos.hpp"
 #include "hydro.hpp"
+#include "diffusion/conduction.hpp"
 #include "srcterms/srcterms.hpp"
 
 namespace hydro {
@@ -42,8 +43,8 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
   auto &w0_ = w0;
   auto &eos = pmy_pack->phydro->peos->eos_data;
   auto &mbsize = pmy_pack->pmb->mb_size;
-  auto &is_special_relativistic_ = is_special_relativistic;
-  auto &is_general_relativistic_ = is_general_relativistic;
+  auto &is_special_relativistic_ = pmy_pack->pcoord->is_special_relativistic;
+  auto &is_general_relativistic_ = pmy_pack->pcoord->is_general_relativistic;
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
@@ -86,7 +87,7 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
         Real v2 = SQR(w0_(m,IVX,k,j,i)) + SQR(w0_(m,IVY,k,j,i)) + SQR(w0_(m,IVZ,k,j,i));
         Real lor = sqrt(1.0 + v2);
         // FIXME ERM: Ideal fluid for now
-        Real p = eos.IdealGasPressure(w0_(m,IDN,k,j,i), w0_(m,IEN,k,j,i));
+        Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
 
         Real lm, lp;
         eos.IdealSRHydroSoundSpeeds(w0_(m,IDN,k,j,i), p, w0_(m,IVX,k,j,i), lor, lp, lm);
@@ -100,7 +101,7 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
       } else {
         Real cs;
         if (eos.is_ideal) {
-          Real p = eos.IdealGasPressure(w0_(m,IDN,k,j,i), w0_(m,IEN,k,j,i));
+          Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
           cs = eos.IdealHydroSoundSpeed(w0_(m,IDN,k,j,i), p);
         } else         {
           cs = eos.iso_cs;
@@ -120,6 +121,10 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
   if (pmy_pack->pmesh->multi_d) { dtnew = std::min(dtnew, dt2); }
   if (pmy_pack->pmesh->three_d) { dtnew = std::min(dtnew, dt3); }
 
+  // compute timestep for diffusion
+  if (pcond != nullptr) {
+    pcond->NewTimeStep(w0, peos->eos_data);
+  }
   // compute source terms timestep
   if (psrc->source_terms_enabled) {
     psrc->NewTimeStep(w0, peos->eos_data);

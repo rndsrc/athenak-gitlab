@@ -13,7 +13,6 @@
 #include "driver/driver.hpp"
 #include "srcterms/srcterms.hpp"
 #include "diffusion/resistivity.hpp"
-#include "eos/eos.hpp"
 #include "mhd.hpp"
 
 #include "coordinates/coordinates.hpp"
@@ -31,7 +30,6 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage) {
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
   int nmb1 = pmy_pack->nmb_thispack - 1;
-  auto &eos = pmy_pack->pmhd->peos->eos_data;
   auto &size = pmy_pack->pmb->mb_size;
   auto &flat = pmy_pack->pcoord->coord_data.is_minkowski;
   auto &spin = pmy_pack->pcoord->coord_data.bh_spin;
@@ -66,7 +64,7 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage) {
     auto e3cc_ = e3_cc;
 
     // compute cell-centered EMF in GR MHD
-    if (is_general_relativistic) {
+    if (pmy_pack->pcoord->is_general_relativistic) {
       par_for("e_cc_2d", DevExeSpace(), 0, nmb1, js-1, je+1, is-1, ie+1,
       KOKKOS_LAMBDA(int m, int j, int i) {
         // Extract components of metric
@@ -110,7 +108,7 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage) {
       });
 
     // compute cell-centered EMF in SR MHD
-    } else if (is_special_relativistic) {
+    } else if (pmy_pack->pcoord->is_special_relativistic) {
       par_for("e_cc_2d", DevExeSpace(), 0, nmb1, js-1, je+1, is-1, ie+1,
       KOKKOS_LAMBDA(int m, int j, int i) {
         const Real &u1 = w0_(m,IVX,ks,j,i);
@@ -192,7 +190,7 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage) {
     auto e3cc_ = e3_cc;
 
     // compute cell-centered EMFs in GR MHD
-    if (is_general_relativistic) {
+    if (pmy_pack->pcoord->is_general_relativistic) {
       par_for("e_cc_3d", DevExeSpace(), 0, nmb1, ks-1, ke+1, js-1, je+1, is-1, ie+1,
       KOKKOS_LAMBDA(int m, int k, int j, int i) {
         // Extract components of metric
@@ -238,7 +236,7 @@ TaskStatus MHD::CornerE(Driver *pdriver, int stage) {
       });
 
     // compute cell-centered EMFs in SR MHD
-    } else if (is_special_relativistic) {
+    } else if (pmy_pack->pcoord->is_special_relativistic) {
       par_for("e_cc_3d", DevExeSpace(), 0, nmb1, ks-1, ke+1, js-1, je+1, is-1, ie+1,
       KOKKOS_LAMBDA(int m, int k, int j, int i) {
         const Real &u1 = w0_(m,IVX,k,j,i);

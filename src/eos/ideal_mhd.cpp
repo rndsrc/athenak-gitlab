@@ -4,7 +4,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file ideal_mhd.cpp
-//  \brief derived class that implements ideal gas EOS in nonrelativistic mhd
+//! \brief derived class that implements ideal gas EOS in nonrelativistic mhd
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -16,60 +16,49 @@
 // ctor: also calls EOS base class constructor
 
 IdealMHD::IdealMHD(MeshBlockPack *pp, ParameterInput *pin) :
-  EquationOfState(pp, pin) {
+    EquationOfState("mhd", pp, pin) {
   eos_data.is_ideal = true;
   eos_data.gamma = pin->GetReal("mhd","gamma");
   eos_data.iso_cs = 0.0;
-
-  // Read flags specifying which variable to use in primitives
-  // if nothing set in input file, use e as default
-  if (!(pin->DoesParameterExist("mhd","use_e")) &&
-      !(pin->DoesParameterExist("mhd","use_t")) ) {
-    eos_data.use_e = true;
-    eos_data.use_t = false;
-  } else {
-    eos_data.use_e = pin->GetOrAddBoolean("mhd","use_e",false);
-    eos_data.use_t = pin->GetOrAddBoolean("mhd","use_t",false);
-  }
-  if (!(eos_data.use_e) && !(eos_data.use_t)) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Both use_e and use_t set to false" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
-  if (eos_data.use_e && eos_data.use_t) {
-    std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-              << "Both use_e and use_t set to true" << std::endl;
-    std::exit(EXIT_FAILURE);
-  }
+  eos_data.use_e = true;  // ideal gas EOS always uses internal energy
+  eos_data.use_t = false;
 }
 
 //----------------------------------------------------------------------------------------
-// \!fn void ConsToPrim()
-// \brief Converts conserved into primitive variables.  Operates over entire MeshBlock,
-//  including ghost cells.
-// Note that the primitive variables contain the cell-centered magnetic fields, so that
-// W contains (nmhd+3+nscalars) elements, while U contains (nmhd+nscalars)
+//! \!fn void ConsToPrim()
+//! \brief Converts conserved into primitive variables.  Operates over range of cells
+//! given in argument list.
+//! Note that the primitive variables contain the cell-centered magnetic fields, so that
+//! W contains (nmhd+3+nscalars) elements, while U contains (nmhd+nscalars)
 
 void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
-                              DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc) {
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int &ng = indcs.ng;
-  int n1 = indcs.nx1 + 2*ng;
-  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
-  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
+                          DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
+                          const int il, const int iu, const int jl, const int ju,
+                          const int kl, const int ku) {
   int &nmhd  = pmy_pack->pmhd->nmhd;
   int &nscal = pmy_pack->pmhd->nscalars;
   int &nmb = pmy_pack->nmb_thispack;
   Real gm1 = (eos_data.gamma - 1.0);
   Real igm1 = 1.0/(gm1);
 
-  Real &dfloor_ = eos_data.density_floor;
-  Real &pfloor_ = eos_data.pressure_floor;
-  Real &tfloor_ = eos_data.temperature_floor;
-  bool &use_e = eos_data.use_e;
+  Real &dfloor_ = eos_data.dfloor;
+  Real efloor = eos_data.pfloor/gm1;
 
-  par_for("mhd_con2prim", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+  const int ni   = (iu - il + 1);
+  const int nji  = (ju - jl + 1)*ni;
+  const int nkji = (ku - kl + 1)*nji;
+  const int nmkji = nmb*nkji;
+
+  int nfloord_=0, nfloore_=0;
+  Kokkos::parallel_reduce("hyd_c2p",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
+  KOKKOS_LAMBDA(const int &idx, int &sum_d, int &sum_e) {
+    int m = (idx)/nkji;
+    int k = (idx - m*nkji)/nji;
+    int j = (idx - m*nkji - k*nji)/ni;
+    int i = (idx - m*nkji - k*nji - j*ni) + il;
+    j += jl;
+    k += kl;
+
     Real& u_d  = cons(m,IDN,k,j,i);
     Real& u_e  = cons(m,IEN,k,j,i);
     const Real& u_m1 = cons(m,IVX,k,j,i);
@@ -80,9 +69,13 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
     Real& w_vx = prim(m,IVX,k,j,i);
     Real& w_vy = prim(m,IVY,k,j,i);
     Real& w_vz = prim(m,IVZ,k,j,i);
+    Real& w_e  = prim(m,IEN,k,j,i);
 
     // apply density floor, without changing momentum or energy
-    u_d = (u_d > dfloor_) ?  u_d : dfloor_;
+    if (u_d < dfloor_) {
+      u_d = dfloor_;
+      sum_d++;
+    }
     w_d = u_d;
 
     Real di = 1.0/u_d;
@@ -103,48 +96,42 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
                  +  ( SQR(b.x2f(m,k,j,i)) + SQR(b.x2f(m,k,j+1,i)) )
                  +  ( SQR(b.x3f(m,k,j,i)) + SQR(b.x3f(m,k+1,j,i)) ));
 
+    // set internal energy, apply floor, correcting total energy
     Real e_k = 0.5*di*(SQR(u_m1) + SQR(u_m2) + SQR(u_m3));
-    if (use_e) {  // internal energy density is primitive
-      Real& w_e  = prim(m,IEN,k,j,i);
-      w_e = (u_e - e_k - pb);
-      // apply pressure floor, correct total energy
-      u_e = (w_e > (pfloor_*igm1)) ?  u_e : ((pfloor_*igm1) + e_k + pb);
-      w_e = (w_e > (pfloor_*igm1)) ?  w_e : (pfloor_*igm1);
-    } else {  // temperature is primitive
-      Real& w_t  = prim(m,ITM,k,j,i);
-      w_t = (gm1/u_d)*(u_e - e_k - pb);
-      // apply temperature floor, correct total energy
-      u_e = (w_t > tfloor_) ?  u_e : ((u_d*igm1*tfloor_) + e_k + pb);
-      w_t = (w_t > tfloor_) ?  w_t : tfloor_;
+    w_e = (u_e - e_k - pb);
+    if (w_e < efloor) {
+      w_e = efloor;
+      u_e = efloor + e_k + pb;
+      sum_e++;
     }
 
     // convert scalars (if any), always stored at end of cons and prim arrays.
     for (int n=nmhd; n<(nmhd+nscal); ++n) {
       prim(m,n,k,j,i) = cons(m,n,k,j,i)*di;
     }
-  });
+  }, Kokkos::Sum<int>(nfloord_), Kokkos::Sum<int>(nfloore_));
+
+  // store counters
+  pmy_pack->pmesh->ecounter.neos_dfloor += nfloord_;
+  pmy_pack->pmesh->ecounter.neos_efloor += nfloore_;
 
   return;
 }
 
 //----------------------------------------------------------------------------------------
-// \!fn void PrimToCons()
-// \brief Converts conserved into primitive variables.  Operates over only active cells.
-//  Does not change cell- or face-centered magnetic fields.
+//! \!fn void PrimToCons()
+//! \brief Converts conserved into primitive variables.  Operates over range of cells
+//! given in argument list.  Does not change cell- or face-centered magnetic fields.
 
 void IdealMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc,
-                              DvceArray5D<Real> &cons) {
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int &is = indcs.is; int &ie = indcs.ie;
-  int &js = indcs.js; int &je = indcs.je;
-  int &ks = indcs.ks; int &ke = indcs.ke;
+                          DvceArray5D<Real> &cons, const int il, const int iu,
+                          const int jl, const int ju, const int kl, const int ku) {
   int &nmhd  = pmy_pack->pmhd->nmhd;
   int &nscal = pmy_pack->pmhd->nscalars;
   int &nmb = pmy_pack->nmb_thispack;
   Real igm1 = 1.0/(eos_data.gamma - 1.0);
-  bool &use_e = eos_data.use_e;
 
-  par_for("mhd_prim2con", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
+  par_for("mhd_prim2con", DevExeSpace(), 0, (nmb-1), kl, ku, jl, ju, il, iu,
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real& u_d  = cons(m,IDN,k,j,i);
     Real& u_e  = cons(m,IEN,k,j,i);
@@ -156,24 +143,18 @@ void IdealMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real>
     const Real& w_vx = prim(m,IVX,k,j,i);
     const Real& w_vy = prim(m,IVY,k,j,i);
     const Real& w_vz = prim(m,IVZ,k,j,i);
+    const Real& w_e  = prim(m,IEN,k,j,i);
 
     const Real& bcc1 = bcc(m,IBX,k,j,i);
     const Real& bcc2 = bcc(m,IBY,k,j,i);
     const Real& bcc3 = bcc(m,IBZ,k,j,i);
 
-    u_d = w_d;
+    u_d  = w_d;
     u_m1 = w_vx*w_d;
     u_m2 = w_vy*w_d;
     u_m3 = w_vz*w_d;
-    if (use_e) {  // internal energy density is primitive
-      const Real& w_e  = prim(m,IEN,k,j,i);
-      u_e = w_e + 0.5*(w_d*(SQR(w_vx) + SQR(w_vy) + SQR(w_vz)) +
-                           (SQR(bcc1) + SQR(bcc2) + SQR(bcc3)));
-    } else {  // temperature is primitive
-      const Real& w_t  = prim(m,ITM,k,j,i);
-      u_e = w_t*w_d*igm1 + 0.5*(w_d*(SQR(w_vx) + SQR(w_vy) + SQR(w_vz)) +
-                                    (SQR(bcc1) + SQR(bcc2) + SQR(bcc3)));
-    }
+    u_e  = w_e + 0.5*( w_d*(SQR(w_vx) + SQR(w_vy) + SQR(w_vz)) +
+                           (SQR(bcc1) + SQR(bcc2) + SQR(bcc3)) );
 
     // convert scalars (if any), always stored at end of cons and prim arrays.
     for (int n=nmhd; n<(nmhd+nscal); ++n) {
