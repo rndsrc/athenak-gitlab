@@ -23,6 +23,7 @@
 
 ProblemGenerator::ProblemGenerator(ParameterInput *pin, Mesh *pm) :
     user_bcs(false),
+    user_srcs(false),
     pmy_mesh_(pm) {
   // check for user-defined boundary conditions
   for (int dir=0; dir<6; ++dir) {
@@ -30,6 +31,9 @@ ProblemGenerator::ProblemGenerator(ParameterInput *pin, Mesh *pm) :
       user_bcs = true;
     }
   }
+
+  // check for user-defined source terms
+  user_srcs = pin->GetOrAddBoolean("problem","user_srcs",false);
 
 #if USER_PROBLEM_ENABLED
   // call user-defined problem generator
@@ -70,6 +74,15 @@ ProblemGenerator::ProblemGenerator(ParameterInput *pin, Mesh *pm) :
       exit(EXIT_FAILURE);
     }
   }
+  // Check that user defined srcterms were enrolled if needed
+  if (user_srcs) {
+    if (user_srcs_func == nullptr) {
+      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                << std::endl << "User srcterms specified in <problem> block, but not "
+                << "enrolled by SetProblemData()." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -82,7 +95,18 @@ ProblemGenerator::ProblemGenerator(ParameterInput *pin, Mesh *pm) :
 
 ProblemGenerator::ProblemGenerator(ParameterInput *pin, Mesh *pm, IOWrapper resfile) :
     user_bcs(false),
+    user_srcs(false),
     pmy_mesh_(pm) {
+  // check for user-defined boundary conditions
+  for (int dir=0; dir<6; ++dir) {
+    if (pm->mesh_bcs[dir] == BoundaryFlag::user) {
+      user_bcs = true;
+    }
+  }
+
+  // check for user-defined source terms
+  user_srcs = pin->GetOrAddBoolean("problem","user_srcs",false);
+
   // Read size of CC and FC data arrays from restart file
   IOWrapperSizeT ccdata_size, fcdata_size;
   if (global_variable::my_rank == 0) { // the master process reads the header data
@@ -232,6 +256,15 @@ std::cout << "ccdata_size = "<<ccdata_size<<"  fcdata_size = "<<fcdata_size<<std
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                 << std::endl << "User BCs specified in <mesh> block, but not enrolled "
                 << "during restart by SetProblemData()." << std::endl;
+      exit(EXIT_FAILURE);
+    }
+  }
+  // Check that user defined srcterms were enrolled if needed
+  if (user_srcs) {
+    if (user_srcs_func == nullptr) {
+      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                << std::endl << "User srcterms specified in <problem> block, but not "
+                << "enrolled by SetProblemData()." << std::endl;
       exit(EXIT_FAILURE);
     }
   }

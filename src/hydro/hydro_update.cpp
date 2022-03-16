@@ -90,6 +90,12 @@ TaskStatus Hydro::ExpRKUpdate(Driver *pdriver, int stage) {
     if (psrc->shearing_box) psrc->AddShearingBox(u0, w0, beta_dt);
   }
 
+  // Add user-defined source terms
+  if (pmy_pack->pmesh->pgen->user_srcs) {
+    (pmy_pack->pmesh->pgen->user_srcs_func)(pmy_pack->pmesh, beta_dt, u0, w0,
+                                            peos->eos_data);
+  }
+
   // Add coordinate source terms in GR.  Again, must be computed with only primitives.
   if (pmy_pack->pcoord->is_general_relativistic) {
     pmy_pack->pcoord->AddCoordTerms(w0, peos->eos_data, beta_dt, u0);
