@@ -21,6 +21,7 @@ add_executable(
         bvals/prolongation.cpp
         bvals/physics/hydro_bcs.cpp
         bvals/physics/bfield_bcs.cpp
+        bvals/physics/radiation_bcs.cpp
 
         coordinates/coordinates.cpp
         coordinates/excision.cpp
@@ -82,6 +83,14 @@ add_executable(
         pgen/tests/lw_implode.cpp
         pgen/tests/orszag_tang.cpp
         pgen/tests/shock_tube.cpp
+
+        radiation/radiation.cpp
+        radiation/radiation_fluxes.cpp
+        radiation/radiation_geom.cpp
+        radiation/radiation_newdt.cpp
+        radiation/radiation_source.cpp
+        radiation/radiation_tasks.cpp
+        radiation/radiation_update.cpp
 
         srcterms/srcterms.cpp
         srcterms/srcterms_newdt.cpp

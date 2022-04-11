@@ -13,11 +13,14 @@
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
+#include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
+#include "radiation/radiation_tetrad.hpp"
 #include "turb_driver.hpp"
 #include "srcterms.hpp"
 #include "ismcooling.hpp"
@@ -57,6 +60,21 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
   if (ism_cooling) {
     source_terms_enabled = true;
     hrate = pin->GetReal(block,"hrate");
+  }
+
+  // (4) beam source (radiation)
+  beam_source = pin->GetOrAddBoolean(block,"beam_source",false);
+  if (beam_source) {
+    source_terms_enabled = true;
+    pos_1 = pin->GetReal(block, "pos_1");
+    pos_2 = pin->GetReal(block, "pos_2");
+    pos_3 = pin->GetReal(block, "pos_3");
+    dir_1 = pin->GetReal(block, "dir_1");
+    dir_2 = pin->GetReal(block, "dir_2");
+    dir_3 = pin->GetReal(block, "dir_3");
+    width = pin->GetReal(block, "width");
+    spread = pin->GetReal(block, "spread");
+    dii_dt = pin->GetReal(block, "dii_dt");
   }
 }
 
@@ -244,6 +262,98 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
 
     u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) *
                         (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating);
+  });
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn
+// Add beam of radiation
+// NOTE Radiation beam source terms calculation does not depend on values stored in i0.
+// Rather, it directly updates i0.
+
+void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
+  Real &p1 = pos_1;
+  Real &p2 = pos_2;
+  Real &p3 = pos_3;
+  Real &d1 = dir_1;
+  Real &d2 = dir_2;
+  Real &d3 = dir_3;
+  Real &width_ = width;
+  Real &spread_ = spread;
+  Real &dii_dt_ = dii_dt;
+
+  auto &indcs = pmy_pack->pmesh->mb_indcs;
+  auto &size = pmy_pack->pmb->mb_size;
+  int is = indcs.is, ie = indcs.ie;
+  int js = indcs.js, je = indcs.je;
+  int ks = indcs.ks, ke = indcs.ke;
+
+  int nmb1 = (pmy_pack->nmb_thispack-1);
+  int nang1 = (pmy_pack->prad->nangles-1);
+
+  auto &coord = pmy_pack->pcoord->coord_data;
+  auto nh_c_ = pmy_pack->prad->nh_c;
+
+  par_for_outer("beam_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    int nx1 = indcs.nx1;
+    Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    int nx2 = indcs.nx2;
+    Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
+
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    int nx3 = indcs.nx3;
+    Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
+
+    Real g_[NMETRIC], gi_[NMETRIC];
+    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
+    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+
+    // Calculate proper distance to beam origin and minimum angle between directions
+    Real dx1 = x1v - p1;
+    Real dx2 = x2v - p2;
+    Real dx3 = x3v - p3;
+    Real dx_sq = (g_[I11]*dx1*dx1 + 2.0*g_[I12]*dx1*dx2 + 2.0*g_[I13]*dx1*dx3
+                                  +     g_[I22]*dx2*dx2 + 2.0*g_[I23]*dx2*dx3
+                                                        +     g_[I33]*dx3*dx3);
+    Real mu_min = cos(spread_/2.0*M_PI/180.0);
+
+    // Calculate contravariant time component of direction
+    Real temp_a = g_[I00];
+    Real temp_b = 2.0*(g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3);
+    Real temp_c = (g_[I11]*d1*d1 + 2.0*g_[I12]*d1*d2 + 2.0*g_[I13]*d1*d3
+                                 +     g_[I22]*d2*d2 + 2.0*g_[I23]*d2*d3
+                                                     +     g_[I33]*d3*d3);
+    Real d0 = ((-temp_b - sqrt(SQR(temp_b) - 4.0*temp_a*temp_c))/(2.0*temp_a));
+
+    // lower indices
+    Real dc0 = g_[I00]*d0 + g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3;
+    Real dc1 = g_[I01]*d0 + g_[I11]*d1 + g_[I12]*d2 + g_[I13]*d3;
+    Real dc2 = g_[I02]*d0 + g_[I12]*d1 + g_[I22]*d2 + g_[I23]*d3;
+    Real dc3 = g_[I03]*d0 + g_[I13]*d1 + g_[I23]*d2 + g_[I33]*d3;
+
+    // Calculate covariant direction in tetrad frame
+    Real dtc0 = (e[0][0]*dc0 + e[0][1]*dc1 + e[0][2]*dc2 + e[0][3]*dc3);
+    Real dtc1 = (e[1][0]*dc0 + e[1][1]*dc1 + e[1][2]*dc2 + e[1][3]*dc3)/(-dtc0);
+    Real dtc2 = (e[2][0]*dc0 + e[2][1]*dc1 + e[2][2]*dc2 + e[2][3]*dc3)/(-dtc0);
+    Real dtc3 = (e[3][0]*dc0 + e[3][1]*dc1 + e[3][2]*dc2 + e[3][3]*dc3)/(-dtc0);
+
+    // Go through angles
+    par_for_inner(member, 0, nang1, [&](const int n) {
+      Real mu = (nh_c_.d_view(n,1) * dtc1
+               + nh_c_.d_view(n,2) * dtc2
+               + nh_c_.d_view(n,3) * dtc3);
+      Real dcons_dt = ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) ? dii_dt_ : 0.0;
+      i0(m,n,k,j,i) += dcons_dt*bdt;
+    });
   });
   return;
 }

@@ -18,6 +18,7 @@
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 #include "srcterms/srcterms.hpp"
 #include "srcterms/turb_driver.hpp"
 #include "outputs.hpp"
@@ -69,6 +70,13 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
        << "Output of Force variable requested in <output> block '"
        << out_params.block_name << "' but no Force object has been constructed."
        << std::endl << "Input file is likely missing a <forcing> block" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  if ((ivar==41 || ivar==42) && (pm->pmb_pack->prad == nullptr)) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+       << "Output of Radiation moments requested in <output> block '"
+       << out_params.block_name << "' but no Radiation object has been constructed."
+       << std::endl << "Input file is likely missing a <radiation> block" << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -275,27 +283,68 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
   // hydro/mhd z-component of vorticity (useful in 2D)
   if (out_params.variable.compare("hydro_wz") == 0 ||
       out_params.variable.compare("mhd_wz") == 0) {
-    outvars.emplace_back(true,"vorz",0,&(derived_var));
+    out_params.derived = true;
+    outvars.emplace_back("vorz",0,&(derived_var));
     ndvars++;
   }
 
   // hydro/mhd magnitude of vorticity (useful in 3D)
   if (out_params.variable.compare("hydro_w2") == 0 ||
       out_params.variable.compare("mhd_w2") == 0) {
-    outvars.emplace_back(true,"vor2",0,&(derived_var));
+    out_params.derived = true;
+    outvars.emplace_back("vor2",0,&(derived_var));
     ndvars++;
   }
 
   // mhd z-component of current density (useful in 2D)
   if (out_params.variable.compare("mhd_jz") == 0) {
-    outvars.emplace_back(true,"jz",0,&(derived_var));
+    out_params.derived = true;
+    outvars.emplace_back("jz",0,&(derived_var));
     ndvars++;
   }
 
   // mhd magnitude of current density (useful in 3D)
   if (out_params.variable.compare("mhd_j2") == 0) {
-    outvars.emplace_back(true,"j2",0,&(derived_var));
+    out_params.derived = true;
+    outvars.emplace_back("j2",0,&(derived_var));
     ndvars++;
+  }
+
+  // mhd magnitude of current density (useful in 3D)
+  if (out_params.variable.compare("mhd_j2") == 0) {
+    out_params.derived = true;
+    outvars.emplace_back("j2",0,&(derived_var));
+    ndvars++;
+  }
+
+  if (out_params.variable.compare("rad_coord") == 0) {
+    out_params.derived = true;
+    outvars.emplace_back("r00",0,&(derived_var));
+    outvars.emplace_back("r01",1,&(derived_var));
+    outvars.emplace_back("r02",2,&(derived_var));
+    outvars.emplace_back("r03",3,&(derived_var));
+    outvars.emplace_back("r11",4,&(derived_var));
+    outvars.emplace_back("r12",5,&(derived_var));
+    outvars.emplace_back("r13",6,&(derived_var));
+    outvars.emplace_back("r22",7,&(derived_var));
+    outvars.emplace_back("r23",8,&(derived_var));
+    outvars.emplace_back("r33",9,&(derived_var));
+    ndvars += 10;
+  }
+
+  if (out_params.variable.compare("rad_fluid") == 0) {
+    out_params.derived = true;
+    outvars.emplace_back("r00_ff",0,&(derived_var));
+    outvars.emplace_back("r01_ff",1,&(derived_var));
+    outvars.emplace_back("r02_ff",2,&(derived_var));
+    outvars.emplace_back("r03_ff",3,&(derived_var));
+    outvars.emplace_back("r11_ff",4,&(derived_var));
+    outvars.emplace_back("r12_ff",5,&(derived_var));
+    outvars.emplace_back("r13_ff",6,&(derived_var));
+    outvars.emplace_back("r22_ff",7,&(derived_var));
+    outvars.emplace_back("r23_ff",8,&(derived_var));
+    outvars.emplace_back("r33_ff",9,&(derived_var));
+    ndvars += 10;
   }
 
   // turbulent forcing
@@ -419,13 +468,13 @@ void BaseTypeOutput::LoadOutputData(Mesh *pm) {
     Kokkos::realloc(outarray, nout_vars, nout_mbs, nout3, nout2, nout1);
   }
 
+  // Calculate derived variable, if required
+  if (out_params.derived) {
+    ComputeDerivedVariable(out_params.variable, pm);
+  }
+
   // Now load data over all variables and MeshBlocks
   for (int n=0; n<nout_vars; ++n) {
-    // Calculate derived variable, if required
-    if (outvars[n].derived) {
-      ComputeDerivedVariable(out_params.variable, pm);
-    }
-
     for (int m=0; m<nout_mbs; ++m) {
       int &ois = outmbs[m].ois;
       int &oie = outmbs[m].oie;
