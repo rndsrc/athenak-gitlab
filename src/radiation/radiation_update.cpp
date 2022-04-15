@@ -50,14 +50,13 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto num_neighbors_ = num_neighbors;
   auto arc_lengths_ = arc_lengths;
   auto solid_angle_ = solid_angle;
-  auto &coord = pmy_pack->pcoord->coord_data;
 
   auto &flat = pmy_pack->pcoord->coord_data.is_minkowski;
   auto &spin = pmy_pack->pcoord->coord_data.bh_spin;
   auto angular_fluxes_ = angular_fluxes;
 
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
-  auto &cc_mask_ = pmy_pack->pcoord->cc_mask;
+  auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
   par_for("r_update",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
@@ -88,7 +87,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
 
     // if excising, handle r_ks < 0.5*(r_inner + r_outer)
     if (excise) {
-      if (cc_mask_(m,k,j,i)) {
+      if (cc_rad_mask_(m,k,j,i)) {
         i0_(m,n,k,j,i) = 0.0;
       }
     }

@@ -40,6 +40,7 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
   hydro::Hydro *phyd = pmy_pack->phydro;
   mhd::MHD *pmhd = pmy_pack->pmhd;
   if (pmhd != nullptr && !(fixed_fluid)) {  // radiation MHD
+    // start task list
     id.rad_irecv = start.AddTask(&Radiation::InitRecv, this, none);
     id.mhd_irecv = start.AddTask(&mhd::MHD::InitRecv, pmhd, none);
 
@@ -50,32 +51,33 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
     id.mhd_flux  = run.AddTask(&mhd::MHD::CalcFluxes<MHD_RSolver::hlle_gr>,
                                pmhd,id.rad_flux);
 
-    id.rad_sendf = run.AddTask(&Radiation::SendFlux, this, id.rad_flux);
+    id.rad_sendf = run.AddTask(&Radiation::SendFlux, this, id.mhd_flux);
     id.rad_recvf = run.AddTask(&Radiation::RecvFlux, this, id.rad_sendf);
     id.mhd_sendf = run.AddTask(&mhd::MHD::SendFlux, pmhd, id.rad_recvf);
     id.mhd_recvf = run.AddTask(&mhd::MHD::RecvFlux, pmhd, id.mhd_sendf);
 
-    id.rad_expl  = run.AddTask(&Radiation::ExpRKUpdate, this, id.mhd_flux);
+    id.rad_expl  = run.AddTask(&Radiation::ExpRKUpdate, this, id.mhd_recvf);
     id.mhd_expl  = run.AddTask(&mhd::MHD::ExpRKUpdate, pmhd, id.rad_expl);
 
-    id.rad_src   = run.AddTask(&Radiation::AddRadiationSourceTerm, this, id.mhd_expl);
-
-    id.rad_resti = run.AddTask(&Radiation::RestrictI, this, id.rad_src);
-    id.mhd_restu = run.AddTask(&mhd::MHD::RestrictU, pmhd, id.rad_src);
-
-    id.rad_sendi = run.AddTask(&Radiation::SendI, this, id.rad_resti);
-    id.mhd_sendu = run.AddTask(&mhd::MHD::SendU, pmhd, id.mhd_restu);
-
-    id.rad_recvi = run.AddTask(&Radiation::RecvI, this, id.rad_sendi);
-    id.mhd_recvu = run.AddTask(&mhd::MHD::RecvU, pmhd, id.mhd_sendu);
-
-    id.mhd_efld  = run.AddTask(&mhd::MHD::CornerE, pmhd, id.mhd_recvu);
+    id.mhd_efld  = run.AddTask(&mhd::MHD::CornerE, pmhd, id.mhd_expl);
     id.mhd_sende = run.AddTask(&mhd::MHD::SendE, pmhd, id.mhd_efld);
     id.mhd_recve = run.AddTask(&mhd::MHD::RecvE, pmhd, id.mhd_sende);
 
-    id.mhd_ct    = run.AddTask(&mhd::MHD::CT, pmhd, id.mhd_efld);
-    id.mhd_restb = run.AddTask(&mhd::MHD::RestrictB, pmhd, id.mhd_ct);
-    id.mhd_sendb = run.AddTask(&mhd::MHD::SendB, pmhd, id.mhd_restb);
+    id.mhd_ct    = run.AddTask(&mhd::MHD::CT, pmhd, id.mhd_recve);
+
+    id.rad_src   = run.AddTask(&Radiation::AddRadiationSourceTerm, this, id.mhd_ct);
+
+    id.rad_resti = run.AddTask(&Radiation::RestrictI, this, id.rad_src);
+    id.mhd_restu = run.AddTask(&mhd::MHD::RestrictU, pmhd, id.rad_resti);
+    id.mhd_restb = run.AddTask(&mhd::MHD::RestrictB, pmhd, id.mhd_restu);
+
+    id.rad_sendi = run.AddTask(&Radiation::SendI, this, id.mhd_restb);
+    id.rad_recvi = run.AddTask(&Radiation::RecvI, this, id.rad_sendi);
+
+    id.mhd_sendu = run.AddTask(&mhd::MHD::SendU, pmhd, id.rad_recvi);
+    id.mhd_recvu = run.AddTask(&mhd::MHD::RecvU, pmhd, id.mhd_sendu);
+
+    id.mhd_sendb = run.AddTask(&mhd::MHD::SendB, pmhd, id.mhd_recvu);
     id.mhd_recvb = run.AddTask(&mhd::MHD::RecvB, pmhd, id.mhd_sendb);
 
     id.rad_bcs   = run.AddTask(&Radiation::ApplyPhysicalBCs, this, id.rad_recvi);

@@ -277,9 +277,9 @@ void Radiation::InitAngularMesh() {
     for (int z=0, n=0; z<2; ++z) {
       for (int p=0; p<4; ++p, ++n) {
         nh_c_.h_view(n,0) = 1.0;
-        nh_c_.h_view(n,1) = std::sin(zeta_v[z])*std::cos(psi_v[p])*std::sqrt(4.0/3.0);
-        nh_c_.h_view(n,2) = std::sin(zeta_v[z])*std::sin(psi_v[p])*std::sqrt(4.0/3.0);
-        nh_c_.h_view(n,3) = std::cos(zeta_v[z])*std::sqrt(2.0/3.0);
+        nh_c_.h_view(n,1) = sin(zeta_v[z])*cos(psi_v[p])*sqrt(4.0/3.0);
+        nh_c_.h_view(n,2) = sin(zeta_v[z])*sin(psi_v[p])*sqrt(4.0/3.0);
+        nh_c_.h_view(n,3) = cos(zeta_v[z])*sqrt(2.0/3.0);
         solid_angle_.h_view(n) = 4.0*M_PI/nangles;
       }
     }
@@ -495,7 +495,7 @@ void Radiation::InitRadiationFrame() {
                       -  nh_f_.d_view(n,nb,3)*omega[0][q][p]));
               na2 += (1.0/SQR(sin(zeta_f))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
                       * (nh_f_.d_view(n,nb,2)*omega[1][q][p]
-                      -  nh_f_.d_view(n,nb,1)*omega[q][p][2]));
+                      -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
             }
           }
           Real unit_zeta, unit_psi;

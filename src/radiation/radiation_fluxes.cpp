@@ -77,7 +77,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
     if (coord.bh_excise) {
       if (fc_mask_.x1f(m,k,j,i)) {
         flx1(m,n,k,j,i) = (n1_n_0_(m,n,k,j,i) *
-                          (n1_n_0_(m,n,k,j,i)<0.0 ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
+                          (n1_n_0_(m,n,k,j,i) < 0.0 ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
       }
     }
   });
@@ -89,7 +89,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
     auto flx2 = iflx.x2f;
     par_for("rflux_x2",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je+1,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
-      // compute x1flux
+      // compute x2flux
       Real iil, iir, scr;
       switch (recon_method_) {
         case ReconstructionMethod::dc:
@@ -132,7 +132,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
     auto flx3 = iflx.x3f;
     par_for("rflux_x3",DevExeSpace(),0,nmb1,0,nang1,ks,ke+1,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
-      // compute x1flux
+      // compute x3flux
       Real iil, iir, scr;
       switch (recon_method_) {
         case ReconstructionMethod::dc:

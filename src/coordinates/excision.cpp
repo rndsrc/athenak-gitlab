@@ -36,9 +36,12 @@ void Coordinates::SetExcisionMasks() {
 
   auto &size = pmy_pack->pmb->mb_size;
   auto &spin = coord_data.bh_spin;
+  Real a2 = spin*spin;
 
   auto &cc_mask_ = cc_mask;
+  auto &cc_rad_mask_ = cc_rad_mask;
   auto &fc_mask_ = fc_mask;
+
   // NOTE(@pdmullen):
   // cc_mask: if r_ks evaluated at *this cell-center* is <= 1, mask the cell.
   // fc_mask: if r_ks evaluated at *this face-center* is <=1, or if *any other
@@ -83,11 +86,12 @@ void Coordinates::SetExcisionMasks() {
     Real x3fp1 = LeftEdgeX  (k+1-ks, indcs.nx3, x3min, x3max);
     Real x3fp2 = LeftEdgeX  (k+2-ks, indcs.nx3, x3min, x3max);
 
-    // Set cc_mask
+    // Set cc_masks
     x1 = x1v;
     x2 = x2v;
     x3 = x3v;
     cc_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+    cc_rad_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
 
     // Set fc_mask.x1f
     x1 = x1v;
@@ -101,14 +105,14 @@ void Coordinates::SetExcisionMasks() {
     x3 = x3v;
     x3 = (fabs(x3) < fabs(x3f))   ? x3 : x3f;
     x3 = (fabs(x3) < fabs(x3fp1)) ? x3 : x3fp1;
-    fc_mask_.x1f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+    fc_mask_.x1f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     if (i==(n1-1)) {
       x1 = x1vp1;
       x1 = (fabs(x1) < fabs(x1v))   ? x1 : x1v;
       x1 = (fabs(x1) < fabs(x1fp1)) ? x1 : x1fp1;
       x1 = (fabs(x1) < fabs(x1f))   ? x1 : x1f;
       x1 = (fabs(x1) < fabs(x1fp2)) ? x1 : x1fp2;
-      fc_mask_.x1f(m,k,j,i+1) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+      fc_mask_.x1f(m,k,j,i+1) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     }
 
     // Set fc_mask.x2f
@@ -123,14 +127,14 @@ void Coordinates::SetExcisionMasks() {
     x3 = x3v;
     x3 = (fabs(x3) < fabs(x3f))   ? x3 : x3f;
     x3 = (fabs(x3) < fabs(x3fp1)) ? x3 : x3fp1;
-    fc_mask_.x2f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+    fc_mask_.x2f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     if (j==(n2-1)) {
       x2 = x2vp1;
       x2 = (fabs(x2) < fabs(x2v))   ? x2 : x2v;
       x2 = (fabs(x2) < fabs(x2fp1)) ? x2 : x2fp1;
       x2 = (fabs(x2) < fabs(x2f))   ? x2 : x2f;
       x2 = (fabs(x2) < fabs(x2fp2)) ? x2 : x2fp2;
-      fc_mask_.x2f(m,k,j+1,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+      fc_mask_.x2f(m,k,j+1,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     }
 
     // Set fc_mask.x3f
@@ -145,14 +149,14 @@ void Coordinates::SetExcisionMasks() {
     x3 = (fabs(x3) < fabs(x3f))   ? x3 : x3f;
     x3 = (fabs(x3) < fabs(x3fm1)) ? x3 : x3fm1;
     x3 = (fabs(x3) < fabs(x3fp1)) ? x3 : x3fp1;
-    fc_mask_.x3f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+    fc_mask_.x3f(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     if (k==(n3-1)) {
       x3 = x3vp1;
       x3 = (fabs(x3) < fabs(x3v))   ? x3 : x3v;
       x3 = (fabs(x3) < fabs(x3fp1)) ? x3 : x3fp1;
       x3 = (fabs(x3) < fabs(x3f))   ? x3 : x3f;
       x3 = (fabs(x3) < fabs(x3fp2)) ? x3 : x3fp2;
-      fc_mask_.x3f(m,k+1,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+      fc_mask_.x3f(m,k+1,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
     }
   });
 

@@ -93,15 +93,16 @@ class Radiation {
   bool is_mhd_enabled;
 
   // Radiation source term parameters
-  bool rad_source;         // flag to enable/disable radiation source term
-  bool fixed_fluid;        // flag to enable/disable feedback of radiation field on fluid
-  bool affect_fluid;       // flag to enable/disable feedback of radiation field on fluid
-  Real arad;               // radiation constant
-  Real kappa_a;            // Rosseland mean absoprtion coefficient
-  Real kappa_s;            // scattering coefficient
-  Real kappa_p;            // coefficient specifying difference b/w Rosseland and Planck
-  bool constant_opacity;   // flag to enable opacity with fixed kappa
-  bool power_opacity;      // flag to enable opacity that is powerlaw of density and temp
+  bool rad_source;            // flag to enable/disable radiation source term
+  bool fixed_fluid;           // flag to enable/disable fluid integration
+  bool affect_fluid;          // flag to enable/disable feedback of rad field on fluid
+  bool zero_radiation_force;  // flag to enable/disable radiation momentum force
+  Real arad;                  // radiation constant
+  Real kappa_a;               // Rosseland mean absoprtion coefficient
+  Real kappa_s;               // scattering coefficient
+  Real kappa_p;               // coefficient specifying diff b/w Rosseland and Planck
+  bool constant_opacity;      // flag to enable opacity with fixed kappa
+  bool power_opacity;         // flag to enable opacity that is powerlaw of rho and temp
 
   // Object(s) for extra physics (i.e., other srcterms)
   SourceTerms *psrc = nullptr;
@@ -111,7 +112,6 @@ class Radiation {
   int nangles;                        // number of angles
   bool rotate_geo;                    // rotate geodesic mesh
   bool angular_fluxes;                // flag to enable/disable angular fluxes
-  bool moments_fluid;                 // flag to enable moment evaluation in fluid frame
   static const int not_a_patch = -1;  // set array elem that remain otherwise unaccessed
   DualArray4D<Real> amesh_normals;    // normal components for hexagonal faces
   DualArray2D<Real> ameshp_normals;   // normal components for pentagonal faces
@@ -131,8 +131,7 @@ class Radiation {
   DvceArray5D<Real> n2_n_0;           // n^2*n_0
   DvceArray5D<Real> n3_n_0;           // n^3*n_0
   DvceArray6D<Real> na_n_0;           // n^a*n_0
-  DvceArray6D<Real> norm_to_tet;      // used in transform b/w fluid frame and coord frame
-  DvceArray5D<Real> moments;          // moments of the radiation field
+  DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
   int  GetNeighbors(int n, int neighbors[6]) const;
   Real ComputeWeightAndDualEdges(int n, Real length[6]) const;
   void GetGridCartPosition(int n, Real *x, Real *y, Real *z) const;
@@ -182,9 +181,6 @@ class Radiation {
   TaskStatus RestrictI(Driver *d, int stage);
   TaskStatus NewTimeStep(Driver *d, int stage);
   TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage);
-
-  // Functoin to set radiation moments
-  void SetMoments(DvceArray5D<Real> &prim);
 
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro

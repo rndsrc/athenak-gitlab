@@ -19,6 +19,7 @@
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
+#include "radiation/radiation.hpp"
 #include "pgen/pgen.hpp"
 
 namespace {
@@ -176,6 +177,15 @@ void ProblemGenerator::BondiAccretion(ParameterInput *pin, const bool restart) {
     pmbp->phydro->peos->PrimToCons(w0_, u1_, 0, (n1-1), 0, (n2-1), 0, (n3-1));
   } else {
     pmbp->phydro->peos->PrimToCons(w0_, u0_, 0, (n1-1), 0, (n2-1), 0, (n3-1));
+  }
+
+  if (pmbp->prad != nullptr) {
+    auto &i0 = pmbp->prad->i0;
+    int nang1 = (pmbp->prad->nangles-1);
+    par_for("rad_beam",DevExeSpace(),0,(nmb-1),0,nang1,0,(n3-1),0,(n2-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
+      i0(m,n,k,j,i) = 1.0e-5;
+    });
   }
 
   return;

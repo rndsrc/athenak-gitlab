@@ -46,8 +46,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     n2_n_0("n2_n_0",1,1,1,1,1),
     n3_n_0("n3_n_0",1,1,1,1,1),
     na_n_0("na_n_0",1,1,1,1,1,1),
-    norm_to_tet("norm_to_tet",1,1,1,1,1,1),
-    moments("moments",1,1,1,1,1) {
+    norm_to_tet("norm_to_tet",1,1,1,1,1,1) {
   // Check for general relativity
   if (!(pmy_pack->pcoord->is_general_relativistic)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
@@ -75,6 +74,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   }
   fixed_fluid = pin->GetOrAddBoolean("radiation","fixed_fluid",false);
   affect_fluid = pin->GetOrAddBoolean("radiation","affect_fluid",true);
+  zero_radiation_force = pin->GetOrAddBoolean("radiation","zero_radiation_force",false);
   arad = pin->GetOrAddReal("radiation","arad",1.0);
   kappa_a = pin->GetOrAddReal("radiation","kappa_a",0.0);
   kappa_s = pin->GetOrAddReal("radiation","kappa_s",0.0);
@@ -96,7 +96,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   nangles = (nlevel > 0) ? (5*2*SQR(nlevel) + 2) : 8;
   rotate_geo = pin->GetOrAddBoolean("radiation","rotate_geo",true);
   angular_fluxes = pin->GetOrAddBoolean("radiation","angular_fluxes",true);
-  moments_fluid = pin->GetOrAddBoolean("radiation","moments_fluid",false);
   int nmb = ppack->nmb_thispack;
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   {
@@ -122,7 +121,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(n3_n_0, nmb, nangles, ncells3+1, ncells2, ncells1);
   Kokkos::realloc(na_n_0, nmb, nangles, ncells3, ncells2, ncells1, 6);
   Kokkos::realloc(norm_to_tet, nmb, 4, 4, ncells3, ncells2, ncells1);
-  Kokkos::realloc(moments,nmb,10,ncells3,ncells2,ncells1);
   }
   InitAngularMesh();
   InitRadiationFrame();
