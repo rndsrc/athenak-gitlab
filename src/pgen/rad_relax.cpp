@@ -123,6 +123,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     u_tet_[3] = (norm_to_tet_(m,3,0,k,j,i)*uu0 + norm_to_tet_(m,3,1,k,j,i)*uu1 +
                  norm_to_tet_(m,3,2,k,j,i)*uu2 + norm_to_tet_(m,3,3,k,j,i)*uu3);
 
+    std::cout << u_tet_[0] << " " << u_tet_[1] << std::endl;
+
     // Go through each angle
     for (int n=0; n<=nang1; ++n) {
       // Calculate direction in fluid frame

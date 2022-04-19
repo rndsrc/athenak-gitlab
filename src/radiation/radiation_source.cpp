@@ -111,7 +111,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   Real dt_ = (pdriver->beta[stage-1])*(pmy_pack->pmesh->dt);
 
   // compute implicit source term
-  par_for_outer("beam_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
+  par_for_outer("radiation_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
     // coordinates
     Real &x1min = size.d_view(m).x1min;
@@ -132,16 +132,23 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
 
     // fluid state
-    Real &wdn  = w0_(m,IDN,k,j,i);
-    Real &wvx  = w0_(m,IVX,k,j,i);
-    Real &wvy  = w0_(m,IVY,k,j,i);
-    Real &wvz  = w0_(m,IVZ,k,j,i);
+    Real &wdn = w0_(m,IDN,k,j,i);
+    Real &wvx = w0_(m,IVX,k,j,i);
+    Real &wvy = w0_(m,IVY,k,j,i);
+    Real &wvz = w0_(m,IVZ,k,j,i);
+    Real &wen = w0_(m,IEN,k,j,i);
 
     // derived quantities
-    Real tgas = gm1_*w0_(m,IEN,k,j,i)/wdn;
+    Real tgas = (gm1_*wen)/wdn;
     Real gg = sqrt(1. + (g_[I11]*wvx*wvx + 2.*g_[I12]*wvx*wvy + 2.*g_[I13]*wvx*wvz
                                          +    g_[I22]*wvy*wvy + 2.*g_[I23]*wvy*wvz
                                                               +    g_[I33]*wvz*wvz));
+
+    // set opacities
+    Real sigma_a = 0.0, sigma_s = 0.0, sigma_p = 0.0;
+    OpacityFunction(wdn, tgas, kappa_a_, kappa_s_, kappa_p_,
+                    constant_opacity_, power_opacity_,
+                    sigma_a, sigma_s, sigma_p);
 
     // compute fluid velocity in tetrad frame
     Real u_tet[4];
@@ -164,11 +171,6 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
       wght_sum += solid_angle_.d_view(n)/SQR(n0_cm);
     }
 
-    // set opacities
-    Real sigma_a = 0.0, sigma_s = 0.0, sigma_p = 0.0;
-    OpacityFunction(wdn, tgas, kappa_a_, kappa_s_, kappa_p_,
-                    constant_opacity_, power_opacity_,
-                    sigma_a, sigma_s, sigma_p);
     Real dtcsigmaa = dt_*sigma_a;
     Real dtcsigmas = dt_*sigma_s;
     Real dtcsigmap = dt_*sigma_p;
