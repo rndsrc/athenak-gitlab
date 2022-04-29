@@ -186,45 +186,5 @@ class Radiation {
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
 };
 
-// inline function to retrieve neighbors when in DevExeSpace()
-KOKKOS_INLINE_FUNCTION
-int DeviceGetNeighbors(int n, int nlvl, DualArray3D<Real> a_indcs, int neighbors[6]) {
-  int num_neighbors;
-
-  // handle north pole
-  if (n==10*nlvl*nlvl) {
-    for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = a_indcs.d_view(bl,1,1);
-    }
-    neighbors[5] = -1;
-    num_neighbors = 5;
-  } else if (n == 10*nlvl*nlvl + 1) {  // handle south pole
-    for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = a_indcs.d_view(bl,nlvl,2*nlvl);
-    }
-    neighbors[5] = -1;
-    num_neighbors = 5;
-  } else {
-    int ibl0 = (n / (2*nlvl*nlvl));
-    int ibl1 = (n % (2*nlvl*nlvl)) / (2*nlvl);
-    int ibl2 = (n % (2*nlvl*nlvl)) % (2*nlvl);
-    neighbors[0] = a_indcs.d_view(ibl0, ibl1+1, ibl2+2);
-    neighbors[1] = a_indcs.d_view(ibl0, ibl1+2, ibl2+1);
-    neighbors[2] = a_indcs.d_view(ibl0, ibl1+2, ibl2);
-    neighbors[3] = a_indcs.d_view(ibl0, ibl1+1, ibl2);
-    neighbors[4] = a_indcs.d_view(ibl0, ibl1  , ibl2+1);
-
-    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
-    if (n % (2*nlvl*nlvl) == nlvl-1 || n % (2*nlvl*nlvl) == 2*nlvl-1) {
-      neighbors[5] = -1;
-      num_neighbors = 5;
-    } else {
-      neighbors[5] = a_indcs.d_view(ibl0, ibl1, ibl2+2);
-      num_neighbors = 6;
-    }
-  }
-  return num_neighbors;
-}
-
 } // namespace radiation
 #endif // RADIATION_RADIATION_HPP_

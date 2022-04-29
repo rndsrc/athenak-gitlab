@@ -79,7 +79,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
       if (fc_mask_.x1f(m,k,j,i)) {
         flx1(m,n,k,j,i) = (n1_n_0_(m,n,k,j,i) *
                           (n1_n_0_(m,n,k,j,i) < 0.0 ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
-
       }
     }
   });
