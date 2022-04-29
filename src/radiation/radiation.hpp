@@ -78,6 +78,28 @@ struct RadiationTaskIDs {
   TaskID mhd_clear;
 };
 
+//----------------------------------------------------------------------------------------
+//! \struct RegionIndcs
+//! \brief Cell indices and number of active and ghost cells in the angular mesh
+
+struct AMeshIndcs {
+  int ng;                   // number of ghost cells
+  int nzeta,npsi;           // number of active cells (not including ghost zones)
+  int zs,ze,ps,pe;          // indices of ACTIVE cells
+};
+
+//----------------------------------------------------------------------------------------
+//! int AngleInd(int z, int p, bool zeta_face, bool psi_face, struct AMeshIndcs amidcs)
+//! \brief Inline function for indexing angles
+
+KOKKOS_INLINE_FUNCTION
+int AngleInd(int z, int p, bool zeta_face, bool psi_face, struct AMeshIndcs amidcs) {
+  if (psi_face) {
+    return z * (amidcs.npsi + 2*amidcs.ng + 1) + p;
+  }
+  return z * (amidcs.npsi + 2*amidcs.ng) + p;
+}
+
 namespace radiation {
 
 //----------------------------------------------------------------------------------------
@@ -108,41 +130,30 @@ class Radiation {
   SourceTerms *psrc = nullptr;
 
   // Angular mesh parameters and functions
-  int nlevel;                         // geodesic nlevel
+  AMeshIndcs amesh_indcs;             // indices of cells in angular mesh
   int nangles;                        // number of angles
-  bool rotate_geo;                    // rotate geodesic mesh
   bool angular_fluxes;                // flag to enable/disable angular fluxes
-  static const int not_a_patch = -1;  // set array elem that remain otherwise unaccessed
-  DualArray4D<Real> amesh_normals;    // normal components for hexagonal faces
-  DualArray2D<Real> ameshp_normals;   // normal components for pentagonal faces
-  DualArray3D<Real> amesh_indices;    // indexing for hexagonal faces
-  DualArray1D<Real> ameshp_indices;   // indexing for pentagonal faces
-  DualArray1D<int>  num_neighbors;    // number of neighbors
-  DualArray2D<int>  ind_neighbors;    // indicies of neighbors
-  DualArray2D<Real> arc_lengths;      // arc lengths
-  DualArray1D<Real> solid_angle;      // solid angles
-  DualArray2D<Real> nh_c;             // normal vector computed at face center
-  DualArray3D<Real> nh_f;             // normal vector computed at face edges
-  DualArray2D<Real> xi_mn;            // xi angles
-  DualArray2D<Real> eta_mn;           // eta angles
-  DvceArray6D<Real> nmu;              // n^mu
-  DvceArray6D<Real> n_mu;             // n_mu
-  DvceArray5D<Real> n1_n_0;           // n^1*n_0
-  DvceArray5D<Real> n2_n_0;           // n^2*n_0
-  DvceArray5D<Real> n3_n_0;           // n^3*n_0
-  DvceArray6D<Real> na_n_0;           // n^a*n_0
+  DualArray1D<Real> zetaf;
+  DualArray1D<Real> zetav;
+  DualArray1D<Real> dzetaf;
+  DualArray1D<Real> psif;
+  DualArray1D<Real> psiv;
+  DualArray1D<Real> dpsif;
+  DualArray2D<Real> zeta_length;
+  DualArray2D<Real> psi_length;
+  DualArray2D<Real> solid_angle;
+
+  DualArray3D<Real> nh_c;             // normal vector computed at face center
+  DualArray3D<Real> nh_zf;            // normal vector computed at zeta faces
+  DualArray3D<Real> nh_pf;            // normal vector computed at psi  faces
+  DvceArray7D<Real> nmu;              // n^mu
+  DvceArray7D<Real> n_mu;             // n_mu
+  DvceArray6D<Real> n1_n_0;           // n^1*n_0
+  DvceArray6D<Real> n2_n_0;           // n^2*n_0
+  DvceArray6D<Real> n3_n_0;           // n^3*n_0
+  DvceArray6D<Real> na1_n_0;          // n^a1*n_0
+  DvceArray6D<Real> na2_n_0;          // n^a2*n_0
   DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
-  int  GetNeighbors(int n, int neighbors[6]) const;
-  Real ComputeWeightAndDualEdges(int n, Real length[6]) const;
-  void GetGridCartPosition(int n, Real *x, Real *y, Real *z) const;
-  void GetGridCartPositionMid(int n, int nb, Real *x, Real *y, Real *z) const;
-  void CircumcenterNormalized(Real x1, Real x2, Real x3, Real y1, Real y2, Real y3,
-                              Real z1, Real z2, Real z3, Real *x, Real *y, Real *z) const;
-  void GetGridPositionPolar(int ic, Real *theta, Real *phi) const;
-  void OptimalAngles(Real ang[2]) const;
-  void RotateGrid(Real zeta, Real psi);
-  Real ArcLength(int ic1, int ic2) const;
-  void ComputeXiEta(int n, Real xi[6], Real eta[6]) const;
   void InitAngularMesh();
   void InitRadiationFrame();
 
@@ -154,9 +165,10 @@ class Radiation {
   BoundaryValuesCC *pbval_i;
 
   // following only used for time-evolving flow
-  DvceArray5D<Real> i1;       // intensity at intermediate step
-  DvceFaceFld5D<Real> iflx;   // spatial fluxes on zone faces
-  DvceArray6D<Real> iaflx;    // angular fluxes on face edges
+  DvceArray5D<Real> i1;        // intensity at intermediate step
+  DvceFaceFld5D<Real> iflx;    // spatial fluxes on zone faces
+  DvceArray5D<Real> ia1flx;    // angular fluxes on face edges
+  DvceArray5D<Real> ia2flx;    // angular fluxes on face edges
   Real dtnew;
 
   // reconstruction method
@@ -185,46 +197,6 @@ class Radiation {
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
 };
-
-// inline function to retrieve neighbors when in DevExeSpace()
-KOKKOS_INLINE_FUNCTION
-int DeviceGetNeighbors(int n, int nlvl, DualArray3D<Real> a_indcs, int neighbors[6]) {
-  int num_neighbors;
-
-  // handle north pole
-  if (n==10*nlvl*nlvl) {
-    for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = a_indcs.d_view(bl,1,1);
-    }
-    neighbors[5] = -1;
-    num_neighbors = 5;
-  } else if (n == 10*nlvl*nlvl + 1) {  // handle south pole
-    for (int bl = 0; bl < 5; ++bl) {
-      neighbors[bl] = a_indcs.d_view(bl,nlvl,2*nlvl);
-    }
-    neighbors[5] = -1;
-    num_neighbors = 5;
-  } else {
-    int ibl0 = (n / (2*nlvl*nlvl));
-    int ibl1 = (n % (2*nlvl*nlvl)) / (2*nlvl);
-    int ibl2 = (n % (2*nlvl*nlvl)) % (2*nlvl);
-    neighbors[0] = a_indcs.d_view(ibl0, ibl1+1, ibl2+2);
-    neighbors[1] = a_indcs.d_view(ibl0, ibl1+2, ibl2+1);
-    neighbors[2] = a_indcs.d_view(ibl0, ibl1+2, ibl2);
-    neighbors[3] = a_indcs.d_view(ibl0, ibl1+1, ibl2);
-    neighbors[4] = a_indcs.d_view(ibl0, ibl1  , ibl2+1);
-
-    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
-    if (n % (2*nlvl*nlvl) == nlvl-1 || n % (2*nlvl*nlvl) == 2*nlvl-1) {
-      neighbors[5] = -1;
-      num_neighbors = 5;
-    } else {
-      neighbors[5] = a_indcs.d_view(ibl0, ibl1, ibl2+2);
-      num_neighbors = 6;
-    }
-  }
-  return num_neighbors;
-}
 
 } // namespace radiation
 #endif // RADIATION_RADIATION_HPP_

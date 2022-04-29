@@ -11,6 +11,7 @@
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
+#include "radiation/radiation.hpp"
 
 //----------------------------------------------------------------------------------------
 // \!fn void BoundaryValues::RadiationBCs()
@@ -29,7 +30,50 @@ void BoundaryValues::RadiationBCs(MeshBlockPack *ppack, DualArray2D<Real> i_in,
   int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
   int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int nvar = i0.extent_int(1);  // TODO(@user): 2nd index from L of in array must be NVAR
+  auto &aindcs = ppack->prad->amesh_indcs;
+  int zs = aindcs.zs; int ze = aindcs.ze;
+  int ps = aindcs.ps; int pe = aindcs.pe;
   int nmb = ppack->nmb_thispack;
+
+  // set angular ghost zones
+  par_for("radiationbc_xa",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    // Populate angular ghost zones in azimuthal angle
+    for (int z=zs; z<=ze; ++z) {
+      for (int p=ps-aindcs.ng; p<=ps-1; ++p) {
+        int p_src = pe - ps + 1 + p;
+        int n = AngleInd(z,p,false,false,aindcs);
+        int n_src = AngleInd(z,p_src,false,false,aindcs);
+        i0(m,n,k,j,i) = i0(m,n_src,k,j,i);
+      }
+      for (int p=pe+1; p<=pe+aindcs.ng; ++p) {
+        int p_src = ps - pe - 1 + p;
+        int n = AngleInd(z,p,false,false,aindcs);
+        int n_src = AngleInd(z,p_src,false,false,aindcs);
+        i0(m,n,k,j,i) = i0(m,n_src,k,j,i);
+      }
+    }
+
+    // Populate angular ghost zones in polar angle
+    for (int z=zs-aindcs.ng; z<=zs-1; ++z) {
+      for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
+        int z_src = 2*zs - 1 - z;
+        int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
+        int n = AngleInd(z,p,false,false,aindcs);
+        int n_src = AngleInd(z_src,p_src,false,false,aindcs);
+        i0(m,n,k,j,i) = i0(m,n_src,k,j,i);
+      }
+    }
+    for (int z=ze+1; z<=ze+aindcs.ng; ++z) {
+      for (int p=ps-aindcs.ng; p<=pe+aindcs.ng; ++p) {
+        int z_src = 2*ze + 1 - z;
+        int p_src = (p + aindcs.npsi/2) % (aindcs.npsi + 2*aindcs.ng);
+        int n = AngleInd(z,p,false,false,aindcs);
+        int n_src = AngleInd(z_src,p_src,false,false,aindcs);
+        i0(m,n,k,j,i) = i0(m,n_src,k,j,i);
+      }
+    }
+  });
 
   // only apply BCs if not periodic
   if (pm->mesh_bcs[BoundaryFace::inner_x1] != BoundaryFlag::periodic) {

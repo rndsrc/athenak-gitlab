@@ -50,8 +50,8 @@ rsolver     = hlle   # Riemann-solver to be used
 gamma       = 2.0
 
 <radiation>
-nlevel = 2            # number of levels for geodesic mesh
-rotate_geo = false    # rotate geodesic grid
+nzeta = 8
+npsi  = 8
 fixed_fluid = true
 affect_fluid = false  # radiation affects fluid
 arad = 1.0            # radiation constant

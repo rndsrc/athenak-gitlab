@@ -414,30 +414,33 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
                  norm_to_tet_(m,3,2,k,j,i)*uu2 + norm_to_tet_(m,3,3,k,j,i)*uu3);
 
     // Go through each angle
-    for (int n=0; n<nangles_; ++n) {
-      // Calculate direction in fluid frame
-      Real un_t =  (u_tet_[1]*nh_c_.d_view(n,1) + u_tet_[2]*nh_c_.d_view(n,2) +
-                    u_tet_[3]*nh_c_.d_view(n,3));
+    for (int z=zs; z<=ze; ++z) {
+      for (int p=ps; p<=pe; ++p) {
+        int n = AngleInd(z,p,false,false,aindcs);
+        // Calculate direction in fluid frame
+        Real un_t =  (u_tet_[1]*nh_c_.d_view(z,p,1) + u_tet_[2]*nh_c_.d_view(z,p,2) +
+                      u_tet_[3]*nh_c_.d_view(z,p,3));
 
-      Real n0_f =  u_tet_[0]*nh_c_.d_view(n,0) - un_t;
-      Real n1_f = (-u_tet_[1]*nh_c_.d_view(n,0) + u_tet_[1]/(u_tet_[0] + 1.0)*un_t +
-                   nh_c_.d_view(n,1));
-      Real n2_f = (-u_tet_[2]*nh_c_.d_view(n,0) + u_tet_[2]/(u_tet_[0] + 1.0)*un_t +
-                   nh_c_.d_view(n,2));
-      Real n3_f = (-u_tet_[3]*nh_c_.d_view(n,0) + u_tet_[3]/(u_tet_[0] + 1.0)*un_t +
-                   nh_c_.d_view(n,3));
+        Real n0_f =  u_tet_[0]*nh_c_.d_view(z,p,0) - un_t;
+        Real n1_f = (-u_tet_[1]*nh_c_.d_view(z,p,0) + u_tet_[1]/(u_tet_[0] + 1.0)*un_t +
+                     nh_c_.d_view(z,p,1));
+        Real n2_f = (-u_tet_[2]*nh_c_.d_view(z,p,0) + u_tet_[2]/(u_tet_[0] + 1.0)*un_t +
+                     nh_c_.d_view(z,p,2));
+        Real n3_f = (-u_tet_[3]*nh_c_.d_view(z,p,0) + u_tet_[3]/(u_tet_[0] + 1.0)*un_t +
+                     nh_c_.d_view(z,p,3));
 
-      // Calculate intensity in fluid frame
-      Real fn_f = f1_f*n1_f + f2_f*n2_f + f3_f*n3_f;
-      Real ii_f = 0.0;
-      if (f_f <= 1.0/3.0) {
-        ii_f = ee_f/(4.0*M_PI)*(1.0 + 3.0*f_f*fn_f);
-      } else {
-        ii_f = ee_f/(9.0*M_PI)*(fn_f - 3.0*f_f + 2.0)/SQR(1.0 - f_f);
+        // Calculate intensity in fluid frame
+        Real fn_f = f1_f*n1_f + f2_f*n2_f + f3_f*n3_f;
+        Real ii_f = 0.0;
+        if (f_f <= 1.0/3.0) {
+          ii_f = ee_f/(4.0*M_PI)*(1.0 + 3.0*f_f*fn_f);
+        } else {
+          ii_f = ee_f/(9.0*M_PI)*(fn_f - 3.0*f_f + 2.0)/SQR(1.0 - f_f);
+        }
+
+        // Calculate intensity in tetrad frame
+        i0(m,n,k,j,i) = ii_f/SQR(SQR(n0_f));
       }
-
-      // Calculate intensity in tetrad frame
-      i0(m,n,k,j,i) = ii_f/SQR(SQR(n0_f));
     }
   });
 

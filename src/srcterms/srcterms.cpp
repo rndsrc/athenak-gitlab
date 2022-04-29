@@ -288,9 +288,11 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
+  auto &aindcs = pmy_pack->prad->amesh_indcs;
+  int &zs = aindcs.zs, &ze = aindcs.ze;
+  int &ps = aindcs.ps, &pe = aindcs.pe;
 
   int nmb1 = (pmy_pack->nmb_thispack-1);
-  int nang1 = (pmy_pack->prad->nangles-1);
 
   auto &coord = pmy_pack->pcoord->coord_data;
   auto nh_c_ = pmy_pack->prad->nh_c;
@@ -347,14 +349,17 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
     Real dtc3 = (e[3][0]*dc0 + e[3][1]*dc1 + e[3][2]*dc2 + e[3][3]*dc3)/(-dtc0);
 
     // Go through angles
-    par_for_inner(member, 0, nang1, [&](const int n) {
-      Real mu = (nh_c_.d_view(n,1) * dtc1
-               + nh_c_.d_view(n,2) * dtc2
-               + nh_c_.d_view(n,3) * dtc3);
-      if ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) {
-        i0(m,n,k,j,i) += dii_dt_*bdt;
+    for (int z=zs; z<=ze; ++z) {
+      for (int p=ps; p<=pe; ++p) {
+        int n = AngleInd(z,p,false,false,aindcs);
+        Real mu = (nh_c_.d_view(z,p,1) * dtc1
+                 + nh_c_.d_view(z,p,2) * dtc2
+                 + nh_c_.d_view(z,p,3) * dtc3);
+        if ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) {
+          i0(m,n,k,j,i) += dii_dt_*bdt;
+        }
       }
-    });
+    }
   });
   return;
 }

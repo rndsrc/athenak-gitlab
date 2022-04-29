@@ -33,7 +33,9 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
   int is = indcs.is, nx1 = indcs.nx1;
   int js = indcs.js, nx2 = indcs.nx2;
   int ks = indcs.ks, nx3 = indcs.nx3;
-  int nangles_ = nangles;
+  auto &aindcs = amesh_indcs;
+  int &zs = aindcs.zs, &ze = aindcs.ze;
+  int &ps = aindcs.ps, &pe = aindcs.pe;
 
   Real dt1 = std::numeric_limits<float>::max();
   Real dt2 = std::numeric_limits<float>::max();
@@ -47,9 +49,10 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
   const int nji  = nx2*nx1;
 
   auto nh_c_ = nh_c;
-  auto nh_f_ = nh_f;
-  auto num_neighbors_ = num_neighbors;
-  auto ind_neighbors_ = ind_neighbors;
+  auto zetav_ = zetav;
+  auto dzetaf_ = dzetaf;
+  auto dpsif_ = dpsif;
+
   bool angular_fluxes_ = angular_fluxes;
   auto &coord = pmy_pack->pcoord->coord_data;
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
@@ -82,36 +85,28 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
 
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
       ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-
-      for (int n=0; n<nangles_; ++n) {
-        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          Real zeta_f = acos(nh_f_.d_view(n,nb,3));
-          Real psi_f  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
-          Real dzeta  = fabs(acos(nh_c_.d_view(n,3)) -
-                             acos(nh_c_.d_view(ind_neighbors_.d_view(n,nb),3)));
-          Real dpsi = fabs(atan2(nh_c_.d_view(n,2), nh_c_.d_view(n,1)) -
-                           atan2(nh_c_.d_view(ind_neighbors_.d_view(n,nb),2),
-                                 nh_c_.d_view(ind_neighbors_.d_view(n,nb),1)));
+      for (int z=zs; z<=ze; ++z) {
+        for (int p=ps; p<=pe; ++p) {
           Real na1 = 0.0;
           Real na2 = 0.0;
-          for (int q=0; q<4; ++q) {
-            for (int p=0; p<4; ++p) {
-              na1 += (1.0/sin(zeta_f)*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
-                      * (nh_f_.d_view(n,nb,0)*omega[3][q][p]
-                      -  nh_f_.d_view(n,nb,3)*omega[0][q][p]));
-              na2 += (1.0/SQR(sin(zeta_f))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
-                      * (nh_f_.d_view(n,nb,2)*omega[1][q][p]
-                      -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
+          for (int d1=0; d1<4; ++d1) {
+            for (int d2=0; d2<4; ++d2) {
+              na1 += (1.0/sin(zetav_.d_view(z))*nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
+                      * (nh_c_.d_view(z,p,0)*omega[3][d1][d2]
+                      -  nh_c_.d_view(z,p,3)*omega[0][d1][d2]));
+              na2 += (1.0/SQR(sin(zetav_.d_view(z)))*nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
+                      * (nh_c_.d_view(z,p,2)*omega[1][d1][d2]
+                      -  nh_c_.d_view(z,p,1)*omega[2][d1][d2]));
             }
           }
           Real n0 = 0.0;
           for (int q=0; q<4; ++q) {
-            n0 += e[q][0]*nh_f_.d_view(n,nb,q);
+            n0 += e[q][0]*nh_c_.d_view(z,p,q);
           }
           if (excise) {
             if (!(cc_rad_mask_(m,k,j,i))) {
-              tmp_min_dta = fmin(tmp_min_dta,
-                                 fmin(dzeta/fabs(na1/n0), dpsi/fabs(na2/n0)));
+              tmp_min_dta = fmin(tmp_min_dta, fmin(dzetaf_.d_view(z)/fabs(na1/n0),
+                                                   dpsif_.d_view(p) /fabs(na2/n0)));
             }
           }
         }

@@ -42,8 +42,11 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
+  auto &aindcs = amesh_indcs;
+  int &zs = aindcs.zs, &ze = aindcs.ze;
+  int &ps = aindcs.ps, &pe = aindcs.pe;
+
   int nmb1 = pmy_pack->nmb_thispack - 1;
-  int nang1 = nangles - 1;
   auto &size = pmy_pack->pmb->mb_size;
   auto &coord = pmy_pack->pcoord->coord_data;
 
@@ -163,12 +166,14 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
 
     // compute intensities and solid angles in comoving frame
     Real wght_sum = 0.0;
-    for (int n=0; n<=nang1; ++n) {
-      Real un_tet = (u_tet[1]*nh_c_.d_view(n,1) +
-                     u_tet[2]*nh_c_.d_view(n,2) +
-                     u_tet[3]*nh_c_.d_view(n,3));
-      Real n0_cm  = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
-      wght_sum += solid_angle_.d_view(n)/SQR(n0_cm);
+    for (int z=zs; z<=ze; ++z) {
+      for (int p=ps; p<=pe; ++p) {
+        Real un_tet = (u_tet[1]*nh_c_.d_view(z,p,1) +
+                       u_tet[2]*nh_c_.d_view(z,p,2) +
+                       u_tet[3]*nh_c_.d_view(z,p,3));
+        Real n0_cm  = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
+        wght_sum += solid_angle_.d_view(z,p)/SQR(n0_cm);
+      }
     }
 
     Real dtcsigmaa = dt_*sigma_a;
@@ -182,20 +187,23 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     Real suma1 = 0.0;
     Real suma2 = 0.0;
     Real jr_cm = 0.0;
-    for (int n=0; n<=nang1; ++n) {
-      Real n0_local = nmu_(m,n,k,j,i,0);
-      Real un_tet   = (u_tet[1]*nh_c_.d_view(n,1) +
-                       u_tet[2]*nh_c_.d_view(n,2) +
-                       u_tet[3]*nh_c_.d_view(n,3));
-      Real n0_cm    = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
-      Real omega_cm = solid_angle_.d_view(n)/SQR(n0_cm)/wght_sum;
-      Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
-      Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
-      Real vncsigma2 = n0_cm*vncsigma;
-      Real ir_weight = intensity_cm*omega_cm;
-      jr_cm += ir_weight;
-      suma1 += omega_cm*vncsigma2;
-      suma2 += ir_weight*n0_local*vncsigma;
+    for (int z=zs; z<=ze; ++z) {
+      for (int p=ps; p<=pe; ++p) {
+        int n = AngleInd(z,p,false,false,aindcs);
+        Real n0_local = nmu_(m,z,p,k,j,i,0);
+        Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
+                         u_tet[2]*nh_c_.d_view(z,p,2) +
+                         u_tet[3]*nh_c_.d_view(z,p,3));
+        Real n0_cm    = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
+        Real omega_cm = solid_angle_.d_view(z,p)/SQR(n0_cm)/wght_sum;
+        Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
+        Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
+        Real vncsigma2 = n0_cm*vncsigma;
+        Real ir_weight = intensity_cm*omega_cm;
+        jr_cm += ir_weight;
+        suma1 += omega_cm*vncsigma2;
+        suma2 += ir_weight*n0_local*vncsigma;
+      }
     }
     Real suma3 = suma1*(dtcsigmas - dtcsigmap);
     suma1 *= (dtcsigmaa + dtcsigmap);
@@ -222,12 +230,15 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     // compute moments before coupling
     Real m_old[4] = {0.0};
     if (affect_fluid_ && !(zero_radiation_force_)) {
-      for (int n=0; n<=nang1; ++n) {
-        Real sa = solid_angle_.d_view(n);
-        m_old[0] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,0)*i0_(m,n,k,j,i)*sa);
-        m_old[1] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,1)*i0_(m,n,k,j,i)*sa);
-        m_old[2] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,2)*i0_(m,n,k,j,i)*sa);
-        m_old[3] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+      for (int z=zs; z<=ze; ++z) {
+        for (int p=ps; p<=pe; ++p) {
+          int n = AngleInd(z,p,false,false,aindcs);
+          Real sa = solid_angle_.d_view(z,p);
+          m_old[0] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0)*i0_(m,n,k,j,i)*sa);
+          m_old[1] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,1)*i0_(m,n,k,j,i)*sa);
+          m_old[2] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,2)*i0_(m,n,k,j,i)*sa);
+          m_old[3] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+        }
       }
     }
 
@@ -236,25 +247,28 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
       // Calculate emission coefficient and updated jr_cm
       Real emission = arad_*SQR(SQR(tgasnew));
       jr_cm = (suma1*emission + suma2)/(1.0 - suma3);
-      par_for_inner(member, 0, nang1, [&](const int n) {
-        Real n0_local = nmu_(m,n,k,j,i,0);
-        Real un_tet   = (u_tet[1]*nh_c_.d_view(n,1) +
-                         u_tet[2]*nh_c_.d_view(n,2) +
-                         u_tet[3]*nh_c_.d_view(n,3));
-        Real n0_cm    = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
-        Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
-        Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
-        Real vncsigma2 = n0_cm*vncsigma;
-        Real di_cm = ( ((dtcsigmas-dtcsigmap)*jr_cm
-                      + (dtcsigmaa+dtcsigmap)*emission
-                      - (dtcsigmas+dtcsigmaa)*intensity_cm)*vncsigma2);
-        i0_(m,n,k,j,i) = fmax((i0_(m,n,k,j,i)+(di_cm/(4.0*M_PI*SQR(SQR(n0_cm))))), 0.0);
-        if (excise) {
-          if (cc_rad_mask_(m,k,j,i)) {
-            i0_(m,n,k,j,i) = 0.0;
+      for (int z=zs; z<=ze; ++z) {
+        for (int p=ps; p<=pe; ++p) {
+          int n = AngleInd(z,p,false,false,aindcs);
+          Real n0_local = nmu_(m,z,p,k,j,i,0);
+          Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
+                           u_tet[2]*nh_c_.d_view(z,p,2) +
+                           u_tet[3]*nh_c_.d_view(z,p,3));
+          Real n0_cm    = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
+          Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
+          Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
+          Real vncsigma2 = n0_cm*vncsigma;
+          Real di_cm = ( ((dtcsigmas-dtcsigmap)*jr_cm
+                        + (dtcsigmaa+dtcsigmap)*emission
+                        - (dtcsigmas+dtcsigmaa)*intensity_cm)*vncsigma2);
+          i0_(m,n,k,j,i) = fmax((i0_(m,n,k,j,i)+(di_cm/(4.0*M_PI*SQR(SQR(n0_cm))))), 0.0);
+          if (excise) {
+            if (cc_rad_mask_(m,k,j,i)) {
+              i0_(m,n,k,j,i) = 0.0;
+            }
           }
         }
-      });
+      }
     }
 
     // apply coupling to hydro
@@ -302,12 +316,15 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         }
       } else {
         Real m_new[4] = {0.0};
-        for (int n=0; n<=nang1; ++n) {
-          Real sa = solid_angle_.d_view(n);
-          m_new[0] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,0)*i0_(m,n,k,j,i)*sa);
-          m_new[1] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,1)*i0_(m,n,k,j,i)*sa);
-          m_new[2] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,2)*i0_(m,n,k,j,i)*sa);
-          m_new[3] += (nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+        for (int z=zs; z<=ze; ++z) {
+          for (int p=ps; p<=pe; ++p) {
+            int n = AngleInd(z,p,false,false,aindcs);
+            Real sa = solid_angle_.d_view(z,p);
+            m_new[0] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0)*i0_(m,n,k,j,i)*sa);
+            m_new[1] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,1)*i0_(m,n,k,j,i)*sa);
+            m_new[2] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,2)*i0_(m,n,k,j,i)*sa);
+            m_new[3] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+          }
         }
         u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);
         u0_(m,IM1,k,j,i) += (m_old[1] - m_new[1]);

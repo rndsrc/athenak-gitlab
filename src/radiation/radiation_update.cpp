@@ -29,11 +29,13 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   int &is = indcs.is, &ie = indcs.ie;
   int &js = indcs.js, &je = indcs.je;
   int &ks = indcs.ks, &ke = indcs.ke;
-  int nang1 = nangles - 1;
+  auto &aindcs = amesh_indcs;
+  int &zs = aindcs.zs, &ze = aindcs.ze;
+  int &ps = aindcs.ps, &pe = aindcs.pe;
+
   int nmb1 = pmy_pack->nmb_thispack - 1;
 
   auto &mbsize  = pmy_pack->pmb->mb_size;
-
   bool &multi_d = pmy_pack->pmesh->multi_d;
   bool &three_d = pmy_pack->pmesh->three_d;
 
@@ -46,23 +48,26 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto flx1 = iflx.x1f;
   auto flx2 = iflx.x2f;
   auto flx3 = iflx.x3f;
-  auto flxa = iaflx;
+  auto flxa1 = ia1flx;
+  auto flxa2 = ia2flx;
 
   auto nmu_ = nmu;
   auto n_mu_ = n_mu;
 
   auto &angular_fluxes_ = angular_fluxes;
-  auto &num_neighbors_ = num_neighbors;
-  auto &arc_lengths_ = arc_lengths;
+  auto &zeta_length_ = zeta_length;
+  auto &psi_length_ = psi_length;
   auto &solid_angle_ = solid_angle;
 
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
-  par_for("r_update",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
+  par_for("r_update",DevExeSpace(),0,nmb1,zs,ze,ps,pe,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i) {
+    int n = AngleInd(z,p,false,false,aindcs);
+
     // coordinate unit normal components n^0 n_0
-    Real n0_n_0 = nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,0);
+    Real n0_n_0 = nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0);
 
     // spatial fluxes
     Real divf_s = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
@@ -76,10 +81,21 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
 
     // angular fluxes
     if (angular_fluxes_) {
-      Real divf_a = 0.0;
-      for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-        divf_a += arc_lengths_.d_view(n,nb)*flxa(m,n,k,j,i,nb)/solid_angle_.d_view(n);
-      }
+      // Add zeta flux divergence
+      int nz   = AngleInd(z  ,p,true,false,aindcs);
+      int nzp1 = AngleInd(z+1,p,true,false,aindcs);
+      int np   = AngleInd(z,p  ,false,true,aindcs);
+      int npp1 = AngleInd(z,p+1,false,true,aindcs);
+      bool left_pole = (z==zs); bool right_pole = (z==ze);
+      Real zflux_l = (left_pole ) ? 0.0 : -psi_length_.d_view(z  ,p)*flxa1(m,nz,  k,j,i);
+      Real zflux_r = (right_pole) ? 0.0 :  psi_length_.d_view(z+1,p)*flxa1(m,nzp1,k,j,i);
+      Real divf_a = zflux_l + zflux_r;
+
+      // Add psi flux divergence
+      divf_a += (zeta_length_.d_view(z,p+1)*flxa2(m,npp1,k,j,i)
+                -zeta_length_.d_view(z,p  )*flxa2(m,np  ,k,j,i));
+
+      divf_a /= solid_angle_.d_view(z,p);
       i0_(m,n,k,j,i) -= beta_dt*divf_a/n0_n_0;
     }
 

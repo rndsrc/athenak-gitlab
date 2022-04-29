@@ -45,8 +45,8 @@ rsolver     = hlle   # Riemann-solver to be used
 gamma       = 2.0
 
 <radiation>
-nlevel = 10              # number of levels for geodesic mesh
-rotate_geo = true        # rotate geodesic grid
+nzeta = 8
+npsi  = 8
 arad = 1.0               # radiation constant
 reconstruct = dc         # reconstruction method
 constant_opacity = true  # constant opacity

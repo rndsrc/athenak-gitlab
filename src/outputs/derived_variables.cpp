@@ -37,6 +37,9 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   int &is = indcs.is;  int &ie  = indcs.ie;
   int &js = indcs.js;  int &je  = indcs.je;
   int &ks = indcs.ks;  int &ke  = indcs.ke;
+  auto &aindcs = pm->pmb_pack->prad->amesh_indcs;
+  int &zs = aindcs.zs, &ze = aindcs.ze;
+  int &ps = aindcs.ps, &pe = aindcs.pe;
   auto &size = pm->pmb_pack->pmb->mb_size;
   auto &two_d = pm->two_d;
   auto &three_d = pm->three_d;
@@ -118,7 +121,6 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   if (name.compare("rad_coord") == 0) {
     auto dv = derived_var;
     auto i0_ = pm->pmb_pack->prad->i0;
-    int nangles_ = pm->pmb_pack->prad->nangles;
     auto nmu_ = pm->pmb_pack->prad->nmu;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     par_for("moments_coord",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
@@ -126,9 +128,12 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
       for (int n1=0, n12=0; n1<4; ++n1) {
         for (int n2=n1; n2<4; ++n2, ++n12) {
           dv(m,n12,k,j,i) = 0.0;
-          for (int n=0; n<nangles_; ++n) {
-            dv(m,n12,k,j,i) += (nmu_(m,n,k,j,i,n1)*nmu_(m,n,k,j,i,n2)
-                                *i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+          for (int z=zs; z<=ze; ++z) {
+            for (int p=ps; p<=pe; ++p) {
+              int n = AngleInd(z,p,false,false,aindcs);
+              dv(m,n12,k,j,i) += (nmu_(m,z,p,k,j,i,n1)*nmu_(m,z,p,k,j,i,n2)
+                                  *i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+            }
           }
         }
       }
@@ -138,7 +143,6 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // radiation moments evaluated in the coordinate frame
   if (name.compare("rad_fluid") == 0) {
     auto dv = derived_var;
-    int nangles_ = pm->pmb_pack->prad->nangles;
     auto nmu_ = pm->pmb_pack->prad->nmu;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     auto &coord = pm->pmb_pack->pcoord->coord_data;
@@ -202,9 +206,12 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
       for (int n1=0, n12=0; n1<4; ++n1) {
         for (int n2=n1; n2<4; ++n2, ++n12) {
           dv(m,n12,k,j,i) = 0.0;
-          for (int n=0; n<nangles_; ++n) {
-            dv(m,n12,k,j,i) += (nmu_(m,n,k,j,i,n1)*nmu_(m,n,k,j,i,n2)
-                                *i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+          for (int z=zs; z<=ze; ++z) {
+            for (int p=ps; p<=pe; ++p) {
+              int n = AngleInd(z,p,false,false,aindcs);
+              dv(m,n12,k,j,i) += (nmu_(m,z,p,k,j,i,n1)*nmu_(m,z,p,k,j,i,n2)
+                                  *i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+            }
           }
         }
       }
