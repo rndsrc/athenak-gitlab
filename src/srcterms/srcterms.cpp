@@ -351,8 +351,9 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
       Real mu = (nh_c_.d_view(n,1) * dtc1
                + nh_c_.d_view(n,2) * dtc2
                + nh_c_.d_view(n,3) * dtc3);
-      Real dcons_dt = ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) ? dii_dt_ : 0.0;
-      i0(m,n,k,j,i) += dcons_dt*bdt;
+      if ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) {
+        i0(m,n,k,j,i) += dii_dt_*bdt;
+      }
     });
   });
   return;

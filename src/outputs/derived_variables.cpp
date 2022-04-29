@@ -34,11 +34,6 @@
 void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   int nmb = pm->pmb_pack->nmb_thispack;
   auto &indcs = pm->mb_indcs;
-  int &ng = indcs.ng;
-  int n1 = indcs.nx1 + 2*ng;
-  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
-  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
-
   int &is = indcs.is;  int &ie  = indcs.ie;
   int &js = indcs.js;  int &je  = indcs.je;
   int &ks = indcs.ks;  int &ke  = indcs.ke;

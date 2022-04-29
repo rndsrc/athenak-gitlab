@@ -26,39 +26,40 @@ namespace radiation {
 
 TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int is = indcs.is, ie = indcs.ie;
-  int js = indcs.js, je = indcs.je;
-  int ks = indcs.ks, ke = indcs.ke;
-  int nangles_ = nangles;
+  int &is = indcs.is, &ie = indcs.ie;
+  int &js = indcs.js, &je = indcs.je;
+  int &ks = indcs.ks, &ke = indcs.ke;
+  int nang1 = nangles - 1;
+  int nmb1 = pmy_pack->nmb_thispack - 1;
+
+  auto &mbsize  = pmy_pack->pmb->mb_size;
+
   bool &multi_d = pmy_pack->pmesh->multi_d;
   bool &three_d = pmy_pack->pmesh->three_d;
 
   Real &gam0 = pdriver->gam0[stage-1];
   Real &gam1 = pdriver->gam1[stage-1];
   Real beta_dt = (pdriver->beta[stage-1])*(pmy_pack->pmesh->dt);
-  int nmb1 = pmy_pack->nmb_thispack - 1;
+
   auto i0_ = i0;
   auto i1_ = i1;
   auto flx1 = iflx.x1f;
   auto flx2 = iflx.x2f;
   auto flx3 = iflx.x3f;
   auto flxa = iaflx;
-  auto &mbsize = pmy_pack->pmb->mb_size;
 
   auto nmu_ = nmu;
   auto n_mu_ = n_mu;
-  auto num_neighbors_ = num_neighbors;
-  auto arc_lengths_ = arc_lengths;
-  auto solid_angle_ = solid_angle;
 
-  auto &flat = pmy_pack->pcoord->coord_data.is_minkowski;
-  auto &spin = pmy_pack->pcoord->coord_data.bh_spin;
-  auto angular_fluxes_ = angular_fluxes;
+  auto &angular_fluxes_ = angular_fluxes;
+  auto &num_neighbors_ = num_neighbors;
+  auto &arc_lengths_ = arc_lengths;
+  auto &solid_angle_ = solid_angle;
 
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
-  par_for("r_update",DevExeSpace(),0,nmb1,0,nangles_-1,ks,ke,js,je,is,ie,
+  par_for("r_update",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
     // coordinate unit normal components n^0 n_0
     Real n0_n_0 = nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,0);
@@ -85,7 +86,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
     // zero intensity if negative
     i0_(m,n,k,j,i) = fmax(i0_(m,n,k,j,i), 0.0);
 
-    // if excising, handle r_ks < 0.5*(r_inner + r_outer)
+    // if excising, handle r_ks <= r_outer
     if (excise) {
       if (cc_rad_mask_(m,k,j,i)) {
         i0_(m,n,k,j,i) = 0.0;

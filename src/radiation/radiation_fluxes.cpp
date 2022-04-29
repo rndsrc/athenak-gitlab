@@ -25,18 +25,19 @@ namespace radiation {
 
 TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
   RegionIndcs &indcs = pmy_pack->pmesh->mb_indcs;
-  int is = indcs.is, ie = indcs.ie;
-  int js = indcs.js, je = indcs.je;
-  int ks = indcs.ks, ke = indcs.ke;
-
+  int &is = indcs.is, &ie = indcs.ie;
+  int &js = indcs.js, &je = indcs.je;
+  int &ks = indcs.ks, &ke = indcs.ke;
   int nang1 = nangles - 1;
   int nmb1 = pmy_pack->nmb_thispack - 1;
-  const auto recon_method_ = recon_method;
+
+  const auto &recon_method_ = recon_method;
+
   auto &i0_ = i0;
-  auto n1_n_0_ = n1_n_0;
-  auto n2_n_0_ = n2_n_0;
-  auto n3_n_0_ = n3_n_0;
-  auto na_n_0_ = na_n_0;
+  auto &n1_n_0_ = n1_n_0;
+  auto &n2_n_0_ = n2_n_0;
+  auto &n3_n_0_ = n3_n_0;
+  auto &na_n_0_ = na_n_0;
 
   auto &coord = pmy_pack->pcoord->coord_data;
   auto &fc_mask_ = pmy_pack->pcoord->fc_mask;
@@ -78,6 +79,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
       if (fc_mask_.x1f(m,k,j,i)) {
         flx1(m,n,k,j,i) = (n1_n_0_(m,n,k,j,i) *
                           (n1_n_0_(m,n,k,j,i) < 0.0 ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
+
       }
     }
   });
@@ -171,37 +173,14 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
   //--------------------------------------------------------------------------------------
   // Angular Fluxes
   if (angular_fluxes) {
-    auto nlev_ = nlevel;
+    auto num_neighbors_ = num_neighbors;
+    auto indn_ = ind_neighbors;
     auto flxa_ = iaflx;
-    auto eta_mn_ = eta_mn;
-    auto xi_mn_ = xi_mn;
-    auto amesh_indices_ = amesh_indices;
     par_for("rflux_a",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
-      int neighbors[6];
-      int num_neighbors = DeviceGetNeighbors(n, nlev_, amesh_indices_, neighbors);
-      Real s_av = HUGE_NUMBER, s_xi = HUGE_NUMBER, s_eta = HUGE_NUMBER;
-      Real im = i0_(m,n,k,j,i);
-      for (int nb=0; nb<num_neighbors; ++nb) {
-        int nb_1 = nb;
-        int nb_2 = (nb+1)%num_neighbors;
-        Real imn = i0_(m,neighbors[nb_1],k,j,i);
-        Real imnp1 = i0_(m,neighbors[nb_2],k,j,i);
-        Real denom = (1.0/(eta_mn_.d_view(n,nb_1)*xi_mn_.d_view(n,nb_2)
-                           - xi_mn_.d_view(n,nb_1)*eta_mn_.d_view(n,nb_2)));
-        Real s_xi_tmp = (eta_mn_.d_view(n,nb_1)*(imnp1-im)
-                         - eta_mn_.d_view(n,nb_2)*(imn-im))*denom;
-        Real s_eta_tmp = -(xi_mn_.d_view(n,nb_1)*(imnp1-im)
-                           - xi_mn_.d_view(n,nb_2)*(imn-im))*denom;
-        if (sqrt(SQR(s_xi_tmp)+SQR(s_eta_tmp)) < s_av) {
-          s_xi = s_xi_tmp;
-          s_eta = s_eta_tmp;
-          s_av = sqrt(SQR(s_xi)+SQR(s_eta));
-        }
-      }
-      for (int nb=0; nb<num_neighbors; ++nb) {
-        Real iedge = (im + 0.5*(s_xi*xi_mn_.d_view(n,nb) + s_eta*eta_mn_.d_view(n,nb)));
-        flxa_(m,n,k,j,i,nb) = na_n_0_(m,n,k,j,i,nb)*iedge;
+      for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
+        flxa_(m,n,k,j,i,nb) = (na_n_0_(m,n,k,j,i,nb) *
+        (na_n_0_(m,n,k,j,i,nb) > 0.0 ? i0_(m,indn_.d_view(n,nb),k,j,i) : i0_(m,n,k,j,i)));
       }
     });
   }

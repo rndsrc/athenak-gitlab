@@ -23,15 +23,10 @@
 
 namespace radiation {
 
-// TODO(@pdmullen) To get things running on GPUs, I duplicated the functions
-// below and preprended Device to the function name.  Presently, this is required as
-// the instantiation of the geodesic mesh is done on the Host but the below functions are
-// also called in the DevExeSpace() elsewhere.  I know there is a better way, but this
-// gets things running in the near term.
 KOKKOS_INLINE_FUNCTION
-void DeviceUnitFluxDir(int ic1, int ic2, int nlvl,
-                       DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                       Real *dtheta, Real *dphi);
+void UnitFluxDir(int ic1, int ic2, int nlvl,
+                 DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
+                 Real *dtheta, Real *dphi);
 KOKKOS_INLINE_FUNCTION
 void DeviceGetGridCartPosition(int n, int nlvl,
                                DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
@@ -41,8 +36,8 @@ void DeviceGetGridCartPositionMid(int n, int nb, int nlvl,
                                   DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
                                   Real *x, Real *y, Real *z);
 KOKKOS_INLINE_FUNCTION
-void DeviceGreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
-                            Real *apar, Real *psi0);
+void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
+                      Real *apar, Real *psi0);
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Radiation::InitMesh()
@@ -53,7 +48,8 @@ void Radiation::InitAngularMesh() {
   auto nh_c_ = nh_c;
   auto nh_f_ = nh_f;
   auto solid_angle_ = solid_angle;
-  if (nlev != 0) {  // geodesic mesh
+
+  if (nlev != 0) {  // setup geodesic mesh
     Real sin_ang = 2.0/sqrt(5.0);
     Real cos_ang = 1.0/sqrt(5.0);
     Real p1[3] = {0.0, 0.0, 1.0};
@@ -157,11 +153,6 @@ void Radiation::InitAngularMesh() {
       }
     }
 
-    amesh_normals_.template modify<HostMemSpace>();
-    ameshp_normals_.template modify<HostMemSpace>();
-    amesh_normals_.template sync<DevExeSpace>();
-    ameshp_normals_.template sync<DevExeSpace>();
-
     // generate 2d -> 1d map, seting center (non-ghost) values
     auto amesh_indices_ = amesh_indices;
     auto ameshp_indices_ = ameshp_indices;
@@ -193,11 +184,6 @@ void Radiation::InitAngularMesh() {
       blocks_i.h_view(bl,0,     2*nlev+1) = blocks_i.h_view(bl,0,2*nlev);
     }
 
-    amesh_indices_.template modify<HostMemSpace>();
-    ameshp_indices_.template modify<HostMemSpace>();
-    amesh_indices.template sync<DevExeSpace>();
-    ameshp_indices.template sync<DevExeSpace>();
-
     // set up geometric factors and neighbor information arrays
     auto num_neighbors_ = num_neighbors;
     auto ind_neighbors_ = ind_neighbors;
@@ -209,39 +195,12 @@ void Radiation::InitAngularMesh() {
       solid_angle_.h_view(n) = ComputeWeightAndDualEdges(n,dual_edge);
       num_neighbors_.h_view(n) = GetNeighbors(n,neighbors);
       for (int nb=0; nb<6; ++nb) {
-        // TODO(@gnwong, @pdmullen) is it necessary to save this information?
         ind_neighbors_.h_view(n,nb) = neighbors[nb];
         arc_lengths_.h_view(n,nb) = dual_edge[nb];
       }
     }
 
-    num_neighbors_.template modify<HostMemSpace>();
-    ind_neighbors_.template modify<HostMemSpace>();
-    arc_lengths_.template modify<HostMemSpace>();
-    solid_angle_.template sync<DevExeSpace>();
-    num_neighbors_.template sync<DevExeSpace>();
-    ind_neighbors_.template sync<DevExeSpace>();
-    arc_lengths_.template sync<DevExeSpace>();
-
-    auto xi_mn_ = xi_mn;
-    auto eta_mn_ = eta_mn;
-    for (int n=0; n<nangles; ++n) {
-      Real xi_coord[6];
-      Real eta_coord[6];
-      ComputeXiEta(n, xi_coord, eta_coord);
-      for (int nb = 0; nb < 6; ++nb) {
-        xi_mn_.h_view(n,nb) = xi_coord[nb];
-        eta_mn_.h_view(n,nb) = eta_coord[nb];
-      }
-    }
-
-    xi_mn_.template modify<HostMemSpace>();
-    eta_mn_.template modify<HostMemSpace>();
-
-    xi_mn_.template sync<DevExeSpace>();
-    eta_mn_.template sync<DevExeSpace>();
-
-    // TODO(@gnwong, @pdmullen) make this prettier
+    // Rotate geodesic mesh
     Real rotangles[2];
     OptimalAngles(rotangles);
     if (rotate_geo) {
@@ -271,6 +230,52 @@ void Radiation::InitAngularMesh() {
         nh_f_.h_view(n,5,3) = HUGE_NUMBER;
       }
     }
+
+    for (int n=0; n<nangles; ++n) {
+      for (int nb=0; nb<num_neighbors_.h_view(n); ++nb) {
+        bool match_not_found = true;
+        Real this_zeta = acos(nh_f_.h_view(n,nb,3));
+        Real this_psi  = atan2(nh_f_.h_view(n,nb,2), nh_f_.h_view(n,nb,1));
+        Real this_arc = arc_lengths_.h_view(n,nb);
+        for (int nnb=0; nnb<num_neighbors_.h_view(ind_neighbors_.h_view(n,nb)); ++nnb) {
+          Real neigh_zeta = acos(nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,3));
+          Real neigh_psi  = atan2(nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,2),
+                                 nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,1));
+          Real neigh_arc = arc_lengths_.h_view(ind_neighbors_.h_view(n,nb),nnb);
+          if (fabs(neigh_zeta-this_zeta) < 1.0e-12 &&
+              fabs(neigh_psi -this_psi)  < 1.0e-12) {
+            match_not_found = false;
+            Real arc_avg = 0.5*(this_arc+neigh_arc);
+            arc_lengths_.h_view(n,nb) = arc_avg;
+            arc_lengths_.h_view(ind_neighbors_.h_view(n,nb),nnb) = arc_avg;
+          }
+        }
+        if (match_not_found) {
+          std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+            << std::endl << "Error in geodesic grid initialization" << std::endl;
+          std::exit(EXIT_FAILURE);
+        }
+      }
+    }
+
+    amesh_normals_.template modify<HostMemSpace>();
+    ameshp_normals_.template modify<HostMemSpace>();
+    amesh_normals_.template sync<DevExeSpace>();
+    ameshp_normals_.template sync<DevExeSpace>();
+
+    amesh_indices_.template modify<HostMemSpace>();
+    ameshp_indices_.template modify<HostMemSpace>();
+    amesh_indices_.template sync<DevExeSpace>();
+    ameshp_indices_.template sync<DevExeSpace>();
+
+    num_neighbors_.template modify<HostMemSpace>();
+    ind_neighbors_.template modify<HostMemSpace>();
+    num_neighbors_.template sync<DevExeSpace>();
+    ind_neighbors_.template sync<DevExeSpace>();
+
+    arc_lengths_.template modify<HostMemSpace>();
+    arc_lengths_.template sync<DevExeSpace>();
+
   } else {  // simple one angle per octant mesh for testing
     Real zeta_v[2] = {M_PI/4.0, 3.0*M_PI/4.0};
     Real psi_v[4] = {M_PI/4.0, 3.0*M_PI/4.0, 5.0*M_PI/4.0, 7.0*M_PI/4.0};
@@ -287,8 +292,10 @@ void Radiation::InitAngularMesh() {
 
   nh_c_.template modify<HostMemSpace>();
   nh_c_.template sync<DevExeSpace>();
+
   nh_f_.template modify<HostMemSpace>();
   nh_f_.template sync<DevExeSpace>();
+
   solid_angle_.template modify<HostMemSpace>();
   solid_angle_.template sync<DevExeSpace>();
 
@@ -331,7 +338,6 @@ void Radiation::InitRadiationFrame() {
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -380,7 +386,6 @@ void Radiation::InitRadiationFrame() {
     Real &x1max = size.d_view(m).x1max;
     Real x1f = LeftEdgeX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -410,7 +415,6 @@ void Radiation::InitRadiationFrame() {
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2f = LeftEdgeX(j-js, indcs.nx2, x2min, x2max);
@@ -440,7 +444,6 @@ void Radiation::InitRadiationFrame() {
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -471,7 +474,6 @@ void Radiation::InitRadiationFrame() {
       Real &x1max = size.d_view(m).x1max;
       Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-      // Extract components of metric
       Real &x2min = size.d_view(m).x2min;
       Real &x2max = size.d_view(m).x2max;
       Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -485,7 +487,6 @@ void Radiation::InitRadiationFrame() {
       for (int n=0; n<nangles_; ++n) {
         for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
           Real zeta_f = acos(nh_f_.d_view(n,nb,3));
-          Real psi_f  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
           Real na1 = 0.0;
           Real na2 = 0.0;
           for (int q=0; q<4; ++q) {
@@ -499,8 +500,8 @@ void Radiation::InitRadiationFrame() {
             }
           }
           Real unit_zeta, unit_psi;
-          DeviceUnitFluxDir(n,ind_neighbors_.d_view(n,nb),nlev_,
-                            amesh_normals_,ameshp_normals_,&unit_zeta,&unit_psi);
+          UnitFluxDir(n,ind_neighbors_.d_view(n,nb),nlev_,
+                      amesh_normals_,ameshp_normals_,&unit_zeta,&unit_psi);
           Real na = na1*unit_zeta + na2*unit_psi;
           Real n_0 = 0.0;
           for (int q=0; q<4; ++q) {
@@ -509,6 +510,27 @@ void Radiation::InitRadiationFrame() {
           na_n_0_(m,n,k,j,i,nb) = na*n_0;
         }
       }
+      for (int n=0; n<nangles_; ++n) {
+        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
+          Real this_zeta = acos(nh_f_.d_view(n,nb,3));
+          Real this_psi  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
+          Real this_na_n_0 = na_n_0_(m,n,k,j,i,nb);
+          for (int nnb=0; nnb<num_neighbors_.d_view(ind_neighbors_.d_view(n,nb)); ++nnb) {
+            Real neigh_zeta = acos(nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,3));
+            Real neigh_psi  = atan2(nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,2),
+                                    nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,1));
+            Real neigh_na_n_0 = na_n_0_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb);
+            if (fabs(neigh_zeta-this_zeta) < 1.0e-12 &&
+                fabs(neigh_psi -this_psi)  < 1.0e-12) {
+              Real na_n_0_avg = 0.5*(fabs(this_na_n_0)+fabs(neigh_na_n_0));
+              na_n_0_(m,n,k,j,i,nb) = copysign(na_n_0_avg, this_na_n_0);
+              na_n_0_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb) = copysign(na_n_0_avg,
+                                                                          neigh_na_n_0);
+            }
+          }
+        }
+      }
+
     });
   }
 
@@ -520,7 +542,6 @@ void Radiation::InitRadiationFrame() {
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -765,38 +786,6 @@ void Radiation::RotateGrid(Real zeta, Real psi) {
   }
 }
 
-void Radiation::ComputeXiEta(int n, Real xi[6], Real eta[6]) const {
-  Real x0, y0, z0;
-  GetGridCartPosition(n, &x0,&y0,&z0);
-  int nvec[6];
-  int nn = GetNeighbors(n, nvec);
-  Real a_angle = 0;
-  for (int nb=0; nb<nn; ++nb) {
-    Real xn1, yn1, zn1;
-    Real xn2, yn2, zn2;
-    GetGridCartPosition(nvec[nb],         &xn1,&yn1,&zn1);
-    GetGridCartPosition(nvec[(nb + 1)%nn],&xn2,&yn2,&zn2);
-    Real n1_x = y0*zn1 - yn1*z0;
-    Real n1_y = z0*xn1 - zn1*x0;
-    Real n1_z = x0*yn1 - xn1*y0;
-    Real n2_x = y0*zn2 - yn2*z0;
-    Real n2_y = z0*xn2 - zn2*x0;
-    Real n2_z = x0*yn2 - xn2*y0;
-    Real norm1 = sqrt(SQR(n1_x)+SQR(n1_y)+SQR(n1_z));
-    Real norm2 = sqrt(SQR(n2_x)+SQR(n2_y)+SQR(n2_z));
-    Real cos_a = fmin((n1_x*n2_x+n1_y*n2_y+n1_z*n2_z)/(norm1*norm2),1.0);
-    Real scalprod_c1 = x0*xn1 + y0*yn1 + z0*zn1;
-    Real c_len = acos(scalprod_c1);
-    xi[nb] = c_len*cos(a_angle);
-    eta[nb] = c_len*sin(a_angle);
-    a_angle += acos(cos_a);
-  }
-  if (nn==5) {
-    xi[5] = HUGE_NUMBER;
-    eta[5] = HUGE_NUMBER;
-  }
-}
-
 Real Radiation::ArcLength(int ic1, int ic2) const {
   Real x1, y1, z1;
   GetGridCartPosition(ic1,&x1,&y1,&z1);
@@ -826,9 +815,9 @@ void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
 }
 
 KOKKOS_INLINE_FUNCTION
-void DeviceUnitFluxDir(int ic1, int ic2, int nlvl,
-                       DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                       Real *dtheta, Real *dphi) {
+void UnitFluxDir(int ic1, int ic2, int nlvl,
+                 DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
+                 Real *dtheta, Real *dphi) {
   Real x, y, z;
   DeviceGetGridCartPosition(ic1,nlvl,ah_norm,ap_norm,&x,&y,&z);
   Real zeta1 = acos(z);
@@ -846,7 +835,7 @@ void DeviceUnitFluxDir(int ic1, int ic2, int nlvl,
     *dphi = 0.0;
   } else {
     Real a_par, p_par;
-    DeviceGreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
+    GreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
     Real zeta_deriv = (a_par*sin(psim-p_par)
                        / (1.0+a_par*a_par*cos(psim-p_par)*cos(psim-p_par)));
     Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetam)*sin(zetam));
@@ -893,8 +882,8 @@ void DeviceGetGridCartPositionMid(int n, int nb, int nlvl,
 }
 
 KOKKOS_INLINE_FUNCTION
-void DeviceGreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
-                            Real *apar, Real *psi0) {
+void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
+                      Real *apar, Real *psi0) {
   Real atilde = (sin(psi2)/tan(zeta1)-sin(psi1)/tan(zeta2))/sin(psi2-psi1);
   Real btilde = (cos(psi2)/tan(zeta1)-cos(psi1)/tan(zeta2))/sin(psi1-psi2);
   *psi0 = atan2(btilde, atilde);
