@@ -39,8 +39,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
   auto &i0_ = i0;
   auto &nh_c_ = nh_c;
 
-  auto &coord = pmy_pack->pcoord->coord_data;
-  auto &fc_mask_ = pmy_pack->pcoord->fc_mask;
+  // auto &fc_mask_ = pmy_pack->pcoord->fc_mask;
 
   //--------------------------------------------------------------------------------------
   // i-direction

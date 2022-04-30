@@ -195,9 +195,6 @@ void Radiation::SetOrthonormalTetrad() {
   int &nmb = pmy_pack->nmb_thispack;
   auto &coord = pmy_pack->pcoord->coord_data;
 
-  int ncellsa1 = amesh_indcs.nzeta + 2*(amesh_indcs.ng);
-  int ncellsa2 = amesh_indcs.npsi + 2*(amesh_indcs.ng);
-
   auto nh_c_ = nh_c;
   auto nh_zf_ = nh_zf;
   auto nh_pf_ = nh_pf;
