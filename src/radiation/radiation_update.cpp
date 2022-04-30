@@ -51,8 +51,9 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto flxa1 = ia1flx;
   auto flxa2 = ia2flx;
 
-  auto nmu_ = nmu;
-  auto n_mu_ = n_mu;
+  auto &nh_c_ = nh_c;
+  auto &tet_c_ = tet_c;
+  auto &tetcov_c_ = tetcov_c;
 
   auto &angular_fluxes_ = angular_fluxes;
   auto &zeta_length_ = zeta_length;
@@ -66,8 +67,11 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i) {
     int n = AngleInd(z,p,false,false,aindcs);
 
-    // coordinate unit normal components n^0 n_0
-    Real n0_n_0 = nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0);
+    Real n0 = 0.0; Real n_0 = 0.0;
+    for (int d=0; d<4; ++d) {
+      n0 += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+      n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+    }
 
     // spatial fluxes
     Real divf_s = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
@@ -77,7 +81,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
     if (three_d) {
       divf_s += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
     }
-    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/n0_n_0;
+    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/(n0*n_0);
 
     // angular fluxes
     if (angular_fluxes_) {
@@ -96,7 +100,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
                 -zeta_length_.d_view(z,p  )*flxa2(m,np  ,k,j,i));
 
       divf_a /= solid_angle_.d_view(z,p);
-      i0_(m,n,k,j,i) -= beta_dt*divf_a/n0_n_0;
+      i0_(m,n,k,j,i) -= beta_dt*divf_a/(n0*n_0);
     }
 
     // zero intensity if negative

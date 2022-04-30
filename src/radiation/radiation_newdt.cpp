@@ -19,7 +19,6 @@
 #include "coordinates/cell_locations.hpp"
 #include "driver/driver.hpp"
 #include "radiation.hpp"
-#include "radiation_tetrad.hpp"
 
 namespace radiation {
 
@@ -48,13 +47,14 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
 
-  auto nh_c_ = nh_c;
-  auto zetav_ = zetav;
-  auto dzetaf_ = dzetaf;
-  auto dpsif_ = dpsif;
+  auto &nh_c_ = nh_c;
+  auto &zetav_ = zetav;
+  auto &dzetaf_ = dzetaf;
+  auto &dpsif_ = dpsif;
+  auto &ricci_ = ricci;
+  auto &tet_c_ = tet_c;
 
-  bool angular_fluxes_ = angular_fluxes;
-  auto &coord = pmy_pack->pcoord->coord_data;
+  bool &angular_fluxes_ = angular_fluxes;
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
@@ -71,37 +71,25 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
 
     Real tmp_min_dta = (FLT_MAX);
     if (angular_fluxes_) {
-      Real &x1min = size.d_view(m).x1min;
-      Real &x1max = size.d_view(m).x1max;
-      Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-      Real &x2min = size.d_view(m).x2min;
-      Real &x2max = size.d_view(m).x2max;
-      Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-      Real &x3min = size.d_view(m).x3min;
-      Real &x3max = size.d_view(m).x3max;
-      Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
       for (int z=zs; z<=ze; ++z) {
         for (int p=ps; p<=pe; ++p) {
           Real na1 = 0.0;
           Real na2 = 0.0;
           for (int d1=0; d1<4; ++d1) {
             for (int d2=0; d2<4; ++d2) {
-              na1 += (1.0/sin(zetav_.d_view(z))*nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
-                      * (nh_c_.d_view(z,p,0)*omega[3][d1][d2]
-                      -  nh_c_.d_view(z,p,3)*omega[0][d1][d2]));
-              na2 += (1.0/SQR(sin(zetav_.d_view(z)))*nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
-                      * (nh_c_.d_view(z,p,2)*omega[1][d1][d2]
-                      -  nh_c_.d_view(z,p,1)*omega[2][d1][d2]));
+              na1 += (1.0/sin(zetav_.d_view(z))
+                      * nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
+                      * (nh_c_.d_view(z,p,0)*ricci_(m,3,d1,d2,k,j,i)
+                      -  nh_c_.d_view(z,p,3)*ricci_(m,0,d1,d2,k,j,i)));
+              na2 += (1.0/SQR(sin(zetav_.d_view(z)))
+                      * nh_c_.d_view(z,p,d1)*nh_c_.d_view(z,p,d2)
+                      * (nh_c_.d_view(z,p,2)*ricci_(m,1,d1,d2,k,j,i)
+                      -  nh_c_.d_view(z,p,1)*ricci_(m,2,d1,d2,k,j,i)));
             }
           }
           Real n0 = 0.0;
           for (int q=0; q<4; ++q) {
-            n0 += e[q][0]*nh_c_.d_view(z,p,q);
+            n0 += tet_c_(m,q,0,k,j,i)*nh_c_.d_view(z,p,q);
           }
           if (excise) {
             if (!(cc_rad_mask_(m,k,j,i))) {

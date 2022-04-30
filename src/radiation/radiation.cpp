@@ -41,13 +41,15 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     nh_c("nh_c",1,1,1),
     nh_zf("nh_zf",1,1,1),
     nh_pf("nh_pf",1,1,1),
-    nmu("nmu",1,1,1,1,1,1,1),
-    n_mu("n_mu",1,1,1,1,1,1,1),
-    n1_n_0("n1_n_0",1,1,1,1,1,1),
-    n2_n_0("n2_n_0",1,1,1,1,1,1),
-    n3_n_0("n3_n_0",1,1,1,1,1,1),
-    na1_n_0("na1_n_0",1,1,1,1,1,1),
-    na2_n_0("na2_n_0",1,1,1,1,1,1),
+    tet_c("tet_c",1,1,1,1,1,1),
+    tetcov_c("tetcov_c",1,1,1,1,1,1),
+    tet_d1_x1f("tet_d1_x1f",1,1,1,1,1),
+    tetcov_d0_x1f("tetcov_d0_x1f",1,1,1,1,1),
+    tet_d2_x2f("tet_d2_x2f",1,1,1,1,1),
+    tetcov_d0_x2f("tetcov_d0_x2f",1,1,1,1,1),
+    tet_d3_x3f("tet_d3_x3f",1,1,1,1,1),
+    tetcov_d0_x3f("tetcov_d0_x3f",1,1,1,1,1),
+    ricci("ricci",1,1,1,1,1,1,1),
     norm_to_tet("norm_to_tet",1,1,1,1,1,1) {
   // Check for general relativity
   if (!(pmy_pack->pcoord->is_general_relativistic)) {
@@ -95,7 +97,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
 
   // Setup angular mesh and radiation frame data
   auto &indcs = pmy_pack->pmesh->mb_indcs;
-  amesh_indcs.ng = indcs.ng;
+  amesh_indcs.ng = 1;
   amesh_indcs.nzeta = pin->GetInteger("radiation", "nzeta");
   amesh_indcs.npsi = pin->GetInteger("radiation", "npsi");
   amesh_indcs.zs = amesh_indcs.ng;
@@ -124,17 +126,19 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(nh_c,ncellsa1,ncellsa2,4);
   Kokkos::realloc(nh_zf,(ncellsa1+1),ncellsa2,4);
   Kokkos::realloc(nh_pf,ncellsa1,(ncellsa2+1),4);
-  Kokkos::realloc(nmu,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1,4);
-  Kokkos::realloc(n_mu,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1,4);
-  Kokkos::realloc(n1_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2,ncells1+1);
-  Kokkos::realloc(n2_n_0,nmb,ncellsa1,ncellsa2,ncells3,ncells2+1,ncells1);
-  Kokkos::realloc(n3_n_0,nmb,ncellsa1,ncellsa2,ncells3+1,ncells2,ncells1);
-  Kokkos::realloc(na1_n_0,nmb,(ncellsa1+1),ncellsa2,ncells3,ncells2,ncells1);
-  Kokkos::realloc(na2_n_0,nmb,ncellsa1,(ncellsa2+1),ncells3,ncells2,ncells1);
+  Kokkos::realloc(tet_c,nmb,4,4,ncells3,ncells2,ncells1);
+  Kokkos::realloc(tetcov_c,nmb,4,4,ncells3,ncells2,ncells1);
+  Kokkos::realloc(tet_d1_x1f,nmb,4,ncells3,ncells2,ncells1+1);
+  Kokkos::realloc(tetcov_d0_x1f,nmb,4,ncells3,ncells2,ncells1+1);
+  Kokkos::realloc(tet_d2_x2f,nmb,4,ncells3,ncells2+1,ncells1);
+  Kokkos::realloc(tetcov_d0_x2f,nmb,4,ncells3,ncells2+1,ncells1);
+  Kokkos::realloc(tet_d3_x3f,nmb,4,ncells3+1,ncells2,ncells1);
+  Kokkos::realloc(tetcov_d0_x3f,nmb,4,ncells3+1,ncells2,ncells1);
+  Kokkos::realloc(ricci,nmb,4,4,4,ncells3,ncells2,ncells1);
   Kokkos::realloc(norm_to_tet,nmb,4,4,ncells3,ncells2,ncells1);
   }
   InitAngularMesh();
-  InitRadiationFrame();
+  SetOrthonormalTetrad();
 
   // (3) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers

@@ -20,7 +20,6 @@
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "radiation/radiation.hpp"
-#include "radiation/radiation_tetrad.hpp"
 #include "turb_driver.hpp"
 #include "srcterms.hpp"
 #include "ismcooling.hpp"
@@ -296,6 +295,8 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
 
   auto &coord = pmy_pack->pcoord->coord_data;
   auto nh_c_ = pmy_pack->prad->nh_c;
+  auto tet_c_ = pmy_pack->prad->tet_c;
+  auto tetcov_c_ = pmy_pack->prad->tetcov_c;
 
   par_for_outer("beam_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
@@ -316,8 +317,6 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
 
     Real g_[NMETRIC], gi_[NMETRIC];
     ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-    ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
 
     // Calculate proper distance to beam origin and minimum angle between directions
     Real dx1 = x1v - p1;
@@ -343,10 +342,14 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
     Real dc3 = g_[I03]*d0 + g_[I13]*d1 + g_[I23]*d2 + g_[I33]*d3;
 
     // Calculate covariant direction in tetrad frame
-    Real dtc0 = (e[0][0]*dc0 + e[0][1]*dc1 + e[0][2]*dc2 + e[0][3]*dc3);
-    Real dtc1 = (e[1][0]*dc0 + e[1][1]*dc1 + e[1][2]*dc2 + e[1][3]*dc3)/(-dtc0);
-    Real dtc2 = (e[2][0]*dc0 + e[2][1]*dc1 + e[2][2]*dc2 + e[2][3]*dc3)/(-dtc0);
-    Real dtc3 = (e[3][0]*dc0 + e[3][1]*dc1 + e[3][2]*dc2 + e[3][3]*dc3)/(-dtc0);
+    Real dtc0 = (tet_c_(m,0,0,k,j,i)*dc0 + tet_c_(m,0,1,k,j,i)*dc1 +
+                 tet_c_(m,0,2,k,j,i)*dc2 + tet_c_(m,0,3,k,j,i)*dc3);
+    Real dtc1 = (tet_c_(m,1,0,k,j,i)*dc0 + tet_c_(m,1,1,k,j,i)*dc1 +
+                 tet_c_(m,1,2,k,j,i)*dc2 + tet_c_(m,1,3,k,j,i)*dc3)/(-dtc0);
+    Real dtc2 = (tet_c_(m,2,0,k,j,i)*dc0 + tet_c_(m,2,1,k,j,i)*dc1 +
+                 tet_c_(m,2,2,k,j,i)*dc2 + tet_c_(m,2,3,k,j,i)*dc3)/(-dtc0);
+    Real dtc3 = (tet_c_(m,3,0,k,j,i)*dc0 + tet_c_(m,3,1,k,j,i)*dc1 +
+                 tet_c_(m,3,2,k,j,i)*dc2 + tet_c_(m,3,3,k,j,i)*dc3)/(-dtc0);
 
     // Go through angles
     for (int z=zs; z<=ze; ++z) {

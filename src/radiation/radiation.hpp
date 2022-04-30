@@ -146,16 +146,18 @@ class Radiation {
   DualArray3D<Real> nh_c;             // normal vector computed at face center
   DualArray3D<Real> nh_zf;            // normal vector computed at zeta faces
   DualArray3D<Real> nh_pf;            // normal vector computed at psi  faces
-  DvceArray7D<Real> nmu;              // n^mu
-  DvceArray7D<Real> n_mu;             // n_mu
-  DvceArray6D<Real> n1_n_0;           // n^1*n_0
-  DvceArray6D<Real> n2_n_0;           // n^2*n_0
-  DvceArray6D<Real> n3_n_0;           // n^3*n_0
-  DvceArray6D<Real> na1_n_0;          // n^a1*n_0
-  DvceArray6D<Real> na2_n_0;          // n^a2*n_0
+  DvceArray6D<Real> tet_c;            // tetrad components at cell centers
+  DvceArray6D<Real> tetcov_c;         // covariant tetrad components at cell centers
+  DvceArray5D<Real> tet_d1_x1f;       // tetrad components (subset) at x1f
+  DvceArray5D<Real> tetcov_d0_x1f;;   // covariant tetrad components (subset) at x1f
+  DvceArray5D<Real> tet_d2_x2f;       // tetrad components (subset) at x2f
+  DvceArray5D<Real> tetcov_d0_x2f;    // covariant tetrad components (subset) at x2f
+  DvceArray5D<Real> tet_d3_x3f;       // tetrad components (subset) at x3f
+  DvceArray5D<Real> tetcov_d0_x3f;    // covariant tetrad components (subset) at x3f
+  DvceArray7D<Real> ricci;            // Ricci rotation coefficients
   DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
   void InitAngularMesh();
-  void InitRadiationFrame();
+  void SetOrthonormalTetrad();
 
   // intensity arrays
   DvceArray5D<Real> i0;         // intensities

@@ -20,7 +20,6 @@
 #include "mhd/mhd.hpp"
 #include "radiation.hpp"
 
-#include "radiation/radiation_tetrad.hpp"
 #include "radiation/radiation_opacities.hpp"
 
 namespace radiation {
@@ -56,12 +55,12 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   Real gammap_ = gamma_/gm1_;
   auto arad_ = arad;
 
-  // extract frame data
-  auto nmu_ = nmu;
+  // extract tetrad data
   auto nh_c_ = nh_c;
-  auto n_mu_ = n_mu;
-  auto solid_angle_ = solid_angle;
+  auto tet_c_ = tet_c;
+  auto tetcov_c_ = tetcov_c;
   auto norm_to_tet_ = norm_to_tet;
+  auto solid_angle_ = solid_angle;
 
   // extract coupling flags
   bool is_hydro_enabled_ = is_hydro_enabled;
@@ -190,7 +189,10 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     for (int z=zs; z<=ze; ++z) {
       for (int p=ps; p<=pe; ++p) {
         int n = AngleInd(z,p,false,false,aindcs);
-        Real n0_local = nmu_(m,z,p,k,j,i,0);
+        Real n0_local = 0.0;
+        for (int d=0; d<4; ++d) {
+          n0_local += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+        }
         Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
                          u_tet[2]*nh_c_.d_view(z,p,2) +
                          u_tet[3]*nh_c_.d_view(z,p,3));
@@ -233,11 +235,18 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
       for (int z=zs; z<=ze; ++z) {
         for (int p=ps; p<=pe; ++p) {
           int n = AngleInd(z,p,false,false,aindcs);
-          Real sa = solid_angle_.d_view(z,p);
-          m_old[0] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0)*i0_(m,n,k,j,i)*sa);
-          m_old[1] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,1)*i0_(m,n,k,j,i)*sa);
-          m_old[2] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,2)*i0_(m,n,k,j,i)*sa);
-          m_old[3] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+          Real n0 = 0.0; Real n_0 = 0.0; Real n_1 = 0.0; Real n_2 = 0.0; Real n_3 = 0.0;
+          for (int d=0; d<4; ++d) {
+            n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+            n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+            n_1 += tetcov_c_(m,d,1,k,j,i)*nh_c_.d_view(z,p,d);
+            n_2 += tetcov_c_(m,d,2,k,j,i)*nh_c_.d_view(z,p,d);
+            n_3 += tetcov_c_(m,d,3,k,j,i)*nh_c_.d_view(z,p,d);
+          }
+          m_old[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_old[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_old[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_old[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
         }
       }
     }
@@ -250,7 +259,10 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
       for (int z=zs; z<=ze; ++z) {
         for (int p=ps; p<=pe; ++p) {
           int n = AngleInd(z,p,false,false,aindcs);
-          Real n0_local = nmu_(m,z,p,k,j,i,0);
+          Real n0_local = 0.0;
+          for (int d=0; d<4; ++d) {
+            n0_local += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+          }
           Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
                            u_tet[2]*nh_c_.d_view(z,p,2) +
                            u_tet[3]*nh_c_.d_view(z,p,3));
@@ -319,11 +331,18 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         for (int z=zs; z<=ze; ++z) {
           for (int p=ps; p<=pe; ++p) {
             int n = AngleInd(z,p,false,false,aindcs);
-            Real sa = solid_angle_.d_view(z,p);
-            m_new[0] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,0)*i0_(m,n,k,j,i)*sa);
-            m_new[1] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,1)*i0_(m,n,k,j,i)*sa);
-            m_new[2] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,2)*i0_(m,n,k,j,i)*sa);
-            m_new[3] += (nmu_(m,z,p,k,j,i,0)*n_mu_(m,z,p,k,j,i,3)*i0_(m,n,k,j,i)*sa);
+            Real n0 = 0.0; Real n_0 = 0.0; Real n_1 = 0.0; Real n_2 = 0.0; Real n_3 = 0.0;
+            for (int d=0; d<4; ++d) {
+              n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+              n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
+              n_1 += tetcov_c_(m,d,1,k,j,i)*nh_c_.d_view(z,p,d);
+              n_2 += tetcov_c_(m,d,2,k,j,i)*nh_c_.d_view(z,p,d);
+              n_3 += tetcov_c_(m,d,3,k,j,i)*nh_c_.d_view(z,p,d);
+            }
+            m_new[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+            m_new[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+            m_new[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+            m_new[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
           }
         }
         u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);

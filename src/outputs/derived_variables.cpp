@@ -121,7 +121,8 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   if (name.compare("rad_coord") == 0) {
     auto dv = derived_var;
     auto i0_ = pm->pmb_pack->prad->i0;
-    auto nmu_ = pm->pmb_pack->prad->nmu;
+    auto tet_c_ = pm->pmb_pack->prad->tet_c;
+    auto nh_c_ = pm->pmb_pack->prad->nh_c;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     par_for("moments_coord",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -130,9 +131,13 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
           dv(m,n12,k,j,i) = 0.0;
           for (int z=zs; z<=ze; ++z) {
             for (int p=ps; p<=pe; ++p) {
+              Real nmu_n1 = 0.0; Real nmu_n2 = 0.0;
+              for (int d=0; d<4; ++d) {
+                nmu_n1  += tet_c_(m,d,n1,k,j,i)*nh_c_.d_view(z,p,d);
+                nmu_n2  += tet_c_(m,d,n2,k,j,i)*nh_c_.d_view(z,p,d);
+              }
               int n = AngleInd(z,p,false,false,aindcs);
-              dv(m,n12,k,j,i) += (nmu_(m,z,p,k,j,i,n1)*nmu_(m,z,p,k,j,i,n2)
-                                  *i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+              dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
             }
           }
         }
@@ -143,7 +148,9 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // radiation moments evaluated in the coordinate frame
   if (name.compare("rad_fluid") == 0) {
     auto dv = derived_var;
-    auto nmu_ = pm->pmb_pack->prad->nmu;
+    auto tet_c_ = pm->pmb_pack->prad->tet_c;
+    auto tetcov_c_ = pm->pmb_pack->prad->tetcov_c;
+    auto nh_c_ = pm->pmb_pack->prad->nh_c;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     auto &coord = pm->pmb_pack->pcoord->coord_data;
 
@@ -152,12 +159,10 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
     auto norm_to_tet_ = pm->pmb_pack->prad->norm_to_tet;
     par_for("moments_fluid",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
-      // Set tetrad-frame components
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
       Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-      // Extract components of metric
       Real &x2min = size.d_view(m).x2min;
       Real &x2max = size.d_view(m).x2max;
       Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -166,10 +171,10 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
       Real &x3max = size.d_view(m).x3max;
       Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
+      // Extract components of metric
       Real g_[NMETRIC], gi_[NMETRIC];
       ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+
       // fluid velocity
       Real uu1 = w0_(m,IVX,k,j,i);
       Real uu2 = w0_(m,IVY,k,j,i);
@@ -208,9 +213,13 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
           dv(m,n12,k,j,i) = 0.0;
           for (int z=zs; z<=ze; ++z) {
             for (int p=ps; p<=pe; ++p) {
+              Real nmu_n1 = 0.0; Real nmu_n2 = 0.0;
+              for (int d=0; d<4; ++d) {
+                nmu_n1  += tet_c_(m,d,n1,k,j,i)*nh_c_.d_view(z,p,d);
+                nmu_n2  += tet_c_(m,d,n2,k,j,i)*nh_c_.d_view(z,p,d);
+              }
               int n = AngleInd(z,p,false,false,aindcs);
-              dv(m,n12,k,j,i) += (nmu_(m,z,p,k,j,i,n1)*nmu_(m,z,p,k,j,i,n2)
-                                  *i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+              dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
             }
           }
         }
@@ -241,7 +250,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
           dv(m,n12,k,j,i) = 0.0;
           for (int m1=0; m1<4; ++m1) {
             for (int m2=0; m2<4; ++m2) {
-              dv(m,n12,k,j,i) += (e_cov[n1][m1]*e_cov[n2][m2]
+              dv(m,n12,k,j,i) += (tetcov_c_(m,n1,m1,k,j,i)*tetcov_c_(m,n2,m2,k,j,i)
                                   *moments_coord_full[m1][m2]);
             }
           }
