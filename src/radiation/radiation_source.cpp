@@ -29,14 +29,15 @@ bool FourthPolyRoot(const Real coef4, const Real tconst, Real &root);
 
 //----------------------------------------------------------------------------------------
 //! \fn TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage)
-// Add implicit radiation source term
+//  \brief Add implicit radiation source term
 
 TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
+  // Skip if radiation source term disabled
   if (!(rad_source)) {
     return TaskStatus::complete;
   }
 
-  // extract indices and size/coord data
+  // Extract indices and size/coord data
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
@@ -44,25 +45,24 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   auto &aindcs = amesh_indcs;
   int &zs = aindcs.zs, &ze = aindcs.ze;
   int &ps = aindcs.ps, &pe = aindcs.pe;
-
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto &size = pmy_pack->pmb->mb_size;
   auto &coord = pmy_pack->pcoord->coord_data;
 
-  // extract gas and radiation constants
+  // Extract gas and radiation constants
   Real gamma_ = pmy_pack->phydro->peos->eos_data.gamma;
   Real gm1_ = pmy_pack->phydro->peos->eos_data.gamma - 1.0;
   Real gammap_ = gamma_/gm1_;
   auto arad_ = arad;
 
-  // extract tetrad data
+  // Extract tetrad data
   auto nh_c_ = nh_c;
   auto tet_c_ = tet_c;
   auto tetcov_c_ = tetcov_c;
   auto norm_to_tet_ = norm_to_tet;
   auto solid_angle_ = solid_angle;
 
-  // extract coupling flags
+  // Extract coupling flags
   bool is_hydro_enabled_ = is_hydro_enabled;
   bool is_mhd_enabled_ = is_mhd_enabled;
   bool fixed_fluid_ = fixed_fluid;
@@ -88,7 +88,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     bcc0_ = pmy_pack->pmhd->bcc0;
   }
 
-  // NOTE(@pdmullen): ConsToPrim over active zones
+  // ConsToPrim over active zones
   if (!(fixed_fluid_)) {
     if (is_hydro_enabled_) {
       pmy_pack->phydro->peos->ConsToPrim(u0_, w0_, is, ie, js, je, ks, ke);
@@ -98,29 +98,27 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     }
   }
 
-  // opacities
+  // Opacities
   bool constant_opacity_ = constant_opacity;
   bool power_opacity_ = power_opacity;
   auto kappa_a_ = kappa_a;
   auto kappa_s_ = kappa_s;
   auto kappa_p_ = kappa_p;
 
-  // extract excision flags
+  // Extract excision flags
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
-  // timestep
+  // Timestep
   Real dt_ = (pdriver->beta[stage-1])*(pmy_pack->pmesh->dt);
 
   // compute implicit source term
-  par_for_outer("radiation_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
-    // coordinates
+  par_for("radiation_source",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
 
-    // Extract components of metric
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
@@ -129,30 +127,36 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     Real &x3max = size.d_view(m).x3max;
     Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-    // compute metric and inverse
+    // Compute metric and inverse
     Real g_[NMETRIC], gi_[NMETRIC];
     ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
 
-    // fluid state
+    // Fluid state
     Real &wdn = w0_(m,IDN,k,j,i);
     Real &wvx = w0_(m,IVX,k,j,i);
     Real &wvy = w0_(m,IVY,k,j,i);
     Real &wvz = w0_(m,IVZ,k,j,i);
     Real &wen = w0_(m,IEN,k,j,i);
 
-    // derived quantities
+    // Derived quantities
     Real tgas = (gm1_*wen)/wdn;
     Real gg = sqrt(1. + (g_[I11]*wvx*wvx + 2.*g_[I12]*wvx*wvy + 2.*g_[I13]*wvx*wvz
                                          +    g_[I22]*wvy*wvy + 2.*g_[I23]*wvy*wvz
                                                               +    g_[I33]*wvz*wvz));
 
-    // set opacities
+    // Set opacities
     Real sigma_a = 0.0, sigma_s = 0.0, sigma_p = 0.0;
     OpacityFunction(wdn, tgas, kappa_a_, kappa_s_, kappa_p_,
                     constant_opacity_, power_opacity_,
                     sigma_a, sigma_s, sigma_p);
+    Real dtcsigmaa = dt_*sigma_a;
+    Real dtcsigmas = dt_*sigma_s;
+    Real dtcsigmap = dt_*sigma_p;
+    Real dtaucsigmaa = dtcsigmaa/(gg*sqrt(-gi_[I00]));
+    Real dtaucsigmas = dtcsigmas/(gg*sqrt(-gi_[I00]));
+    Real dtaucsigmap = dtcsigmap/(gg*sqrt(-gi_[I00]));
 
-    // compute fluid velocity in tetrad frame
+    // Compute fluid velocity in tetrad frame
     Real u_tet[4];
     u_tet[0] = (norm_to_tet_(m,0,0,k,j,i)*gg  + norm_to_tet_(m,0,1,k,j,i)*wvx +
                 norm_to_tet_(m,0,2,k,j,i)*wvy + norm_to_tet_(m,0,3,k,j,i)*wvz);
@@ -163,50 +167,34 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     u_tet[3] = (norm_to_tet_(m,3,0,k,j,i)*gg  + norm_to_tet_(m,3,1,k,j,i)*wvx +
                 norm_to_tet_(m,3,2,k,j,i)*wvy + norm_to_tet_(m,3,3,k,j,i)*wvz);
 
-    // compute intensities and solid angles in comoving frame
-    Real wght_sum = 0.0;
-    for (int z=zs; z<=ze; ++z) {
-      for (int p=ps; p<=pe; ++p) {
-        Real un_tet = (u_tet[1]*nh_c_.d_view(z,p,1) +
-                       u_tet[2]*nh_c_.d_view(z,p,2) +
-                       u_tet[3]*nh_c_.d_view(z,p,3));
-        Real n0_cm  = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
-        wght_sum += solid_angle_.d_view(z,p)/SQR(n0_cm);
-      }
-    }
-
-    Real dtcsigmaa = dt_*sigma_a;
-    Real dtcsigmas = dt_*sigma_s;
-    Real dtcsigmap = dt_*sigma_p;
-    Real dtaucsigmaa = dtcsigmaa/(gg*sqrt(-gi_[I00]));
-    Real dtaucsigmas = dtcsigmas/(gg*sqrt(-gi_[I00]));
-    Real dtaucsigmap = dtcsigmap/(gg*sqrt(-gi_[I00]));
-
     // Calculate polynomial coefficients
+    Real wght_sum  = 0.0;
     Real suma1 = 0.0;
     Real suma2 = 0.0;
     Real jr_cm = 0.0;
     for (int z=zs; z<=ze; ++z) {
       for (int p=ps; p<=pe; ++p) {
         int n = AngleInd(z,p,false,false,aindcs);
-        Real n0_local = 0.0;
-        for (int d=0; d<4; ++d) {
-          n0_local += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
-        }
+        Real n0 = 0.0;
+        for (int d=0; d<4; ++d) { n0 += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d); }
         Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
                          u_tet[2]*nh_c_.d_view(z,p,2) +
                          u_tet[3]*nh_c_.d_view(z,p,3));
         Real n0_cm    = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
-        Real omega_cm = solid_angle_.d_view(z,p)/SQR(n0_cm)/wght_sum;
+        Real omega_cm = solid_angle_.d_view(z,p)/SQR(n0_cm);
         Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
-        Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
+        Real vncsigma = 1.0/(n0 + (dtcsigmaa + dtcsigmas)*n0_cm);
         Real vncsigma2 = n0_cm*vncsigma;
         Real ir_weight = intensity_cm*omega_cm;
+        wght_sum += omega_cm;
         jr_cm += ir_weight;
         suma1 += omega_cm*vncsigma2;
-        suma2 += ir_weight*n0_local*vncsigma;
+        suma2 += ir_weight*n0*vncsigma;
       }
     }
+    jr_cm /= wght_sum;
+    suma1 /= wght_sum;
+    suma2 /= wght_sum;
     Real suma3 = suma1*(dtcsigmas - dtcsigmap);
     suma1 *= (dtcsigmaa + dtcsigmap);
 
@@ -221,7 +209,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     bool badcell = false;
     if (fabs(coef[1]) > 1.0e-20) {
       bool flag = FourthPolyRoot(coef[1], coef[0], tgasnew);
-      if (!(flag) || isnan(tgasnew)) {
+      if (!(flag) || !(isfinite(tgasnew))) {
         badcell = true;
         tgasnew = tgas;
       }
@@ -229,12 +217,21 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
       tgasnew = -coef[0];
     }
 
-    // compute moments before coupling
-    Real m_old[4] = {0.0};
-    if (affect_fluid_ && !(zero_radiation_force_)) {
+    // Update intensity and find moments before and after coupling
+    Real m_old[4] = {0.0}; Real m_new[4] = {0.0};
+    if (!(badcell)) {
+      // emission coefficient
+      Real emission = arad_*SQR(SQR(tgasnew));
+      // updated jr_cm
+      Real updated_jr_cm = (suma1*emission + suma2)/(1.0 - suma3);
+
+      // Go through angles
       for (int z=zs; z<=ze; ++z) {
         for (int p=ps; p<=pe; ++p) {
+          // set angle index
           int n = AngleInd(z,p,false,false,aindcs);
+
+          // compute unit normal coordinate components
           Real n0 = 0.0; Real n_0 = 0.0; Real n_1 = 0.0; Real n_2 = 0.0; Real n_3 = 0.0;
           for (int d=0; d<4; ++d) {
             n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
@@ -243,34 +240,22 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
             n_2 += tetcov_c_(m,d,2,k,j,i)*nh_c_.d_view(z,p,d);
             n_3 += tetcov_c_(m,d,3,k,j,i)*nh_c_.d_view(z,p,d);
           }
+
+          // compute moments before coupling
           m_old[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
           m_old[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
           m_old[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
           m_old[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
-        }
-      }
-    }
 
-    // Update the specific intensity
-    if (!(badcell)) {
-      // Calculate emission coefficient and updated jr_cm
-      Real emission = arad_*SQR(SQR(tgasnew));
-      jr_cm = (suma1*emission + suma2)/(1.0 - suma3);
-      for (int z=zs; z<=ze; ++z) {
-        for (int p=ps; p<=pe; ++p) {
-          int n = AngleInd(z,p,false,false,aindcs);
-          Real n0_local = 0.0;
-          for (int d=0; d<4; ++d) {
-            n0_local += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
-          }
+          // update intensity
           Real un_tet   = (u_tet[1]*nh_c_.d_view(z,p,1) +
                            u_tet[2]*nh_c_.d_view(z,p,2) +
                            u_tet[3]*nh_c_.d_view(z,p,3));
           Real n0_cm    = (u_tet[0]*nh_c_.d_view(z,p,0) - un_tet);
           Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
-          Real vncsigma = 1.0/(n0_local + (dtcsigmaa + dtcsigmas)*n0_cm);
+          Real vncsigma = 1.0/(n0 + (dtcsigmaa + dtcsigmas)*n0_cm);
           Real vncsigma2 = n0_cm*vncsigma;
-          Real di_cm = ( ((dtcsigmas-dtcsigmap)*jr_cm
+          Real di_cm = ( ((dtcsigmas-dtcsigmap)*updated_jr_cm
                         + (dtcsigmaa+dtcsigmap)*emission
                         - (dtcsigmas+dtcsigmaa)*intensity_cm)*vncsigma2);
           i0_(m,n,k,j,i) = fmax((i0_(m,n,k,j,i)+(di_cm/(4.0*M_PI*SQR(SQR(n0_cm))))), 0.0);
@@ -279,14 +264,25 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
               i0_(m,n,k,j,i) = 0.0;
             }
           }
+
+          // compute moments after coupling
+          m_new[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_new[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_new[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
+          m_new[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
         }
       }
     }
 
-    // apply coupling to hydro
+    // Feedback on fluid
     if (affect_fluid_) {
       // update conserved variables
-      if (zero_radiation_force_) {
+      if (!(zero_radiation_force_)) {
+        u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);
+        u0_(m,IM1,k,j,i) += (m_old[1] - m_new[1]);
+        u0_(m,IM2,k,j,i) += (m_old[2] - m_new[2]);
+        u0_(m,IM3,k,j,i) += (m_old[3] - m_new[3]);
+      } else {
         Real alpha = sqrt(-1.0/gi_[I00]);
         Real u0_tmp = gg/alpha;
         Real u1_tmp = wvx - alpha * gg * gi_[I01];
@@ -326,29 +322,6 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
           u0_(m,IM2,k,j,i) = wtot * u0_tmp * u_2_tmp - b0 * b_2;
           u0_(m,IM3,k,j,i) = wtot * u0_tmp * u_3_tmp - b0 * b_3;
         }
-      } else {
-        Real m_new[4] = {0.0};
-        for (int z=zs; z<=ze; ++z) {
-          for (int p=ps; p<=pe; ++p) {
-            int n = AngleInd(z,p,false,false,aindcs);
-            Real n0 = 0.0; Real n_0 = 0.0; Real n_1 = 0.0; Real n_2 = 0.0; Real n_3 = 0.0;
-            for (int d=0; d<4; ++d) {
-              n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
-              n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(z,p,d);
-              n_1 += tetcov_c_(m,d,1,k,j,i)*nh_c_.d_view(z,p,d);
-              n_2 += tetcov_c_(m,d,2,k,j,i)*nh_c_.d_view(z,p,d);
-              n_3 += tetcov_c_(m,d,3,k,j,i)*nh_c_.d_view(z,p,d);
-            }
-            m_new[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
-            m_new[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
-            m_new[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
-            m_new[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(z,p));
-          }
-        }
-        u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);
-        u0_(m,IM1,k,j,i) += (m_old[1] - m_new[1]);
-        u0_(m,IM2,k,j,i) += (m_old[2] - m_new[2]);
-        u0_(m,IM3,k,j,i) += (m_old[3] - m_new[3]);
       }
     }
   });

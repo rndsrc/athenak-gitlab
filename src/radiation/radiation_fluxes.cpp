@@ -220,7 +220,7 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
     auto &flxa2 = ia2flx;
     auto &zetav_ = zetav;
     auto &nh_pf_ = nh_pf;
-    par_for("rflux_a1",DevExeSpace(),0,nmb1,zs,ze,ps,pe+1,ks,ke,js,je,is,ie,
+    par_for("rflux_a2",DevExeSpace(),0,nmb1,zs,ze,ps,pe+1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int z, int p, int k, int j, int i) {
       int npl = AngleInd(z,p-1,false,false,aindcs);
       int npf = AngleInd(z,p,false,true,aindcs);
