@@ -112,19 +112,16 @@ class Radiation {
   int nangles;                        // number of angles
   bool rotate_geo;                    // rotate geodesic mesh
   bool angular_fluxes;                // flag to enable/disable angular fluxes
-  static const int not_a_patch = -1;  // set array elem that remain otherwise unaccessed
-  DualArray4D<Real> amesh_normals;    // normal components for hexagonal faces
-  DualArray2D<Real> ameshp_normals;   // normal components for pentagonal faces
-  DualArray3D<Real> amesh_indices;    // indexing for hexagonal faces
-  DualArray1D<Real> ameshp_indices;   // indexing for pentagonal faces
+  DualArray4D<Real> amesh_normals;    // normal components (regular faces)
+  DualArray2D<Real> ameshp_normals;   // normal components (at poles)
+  DualArray3D<Real> amesh_indices;    // indexing (regular faces)
+  DualArray1D<Real> ameshp_indices;   // indexing (at poles)
   DualArray1D<int>  num_neighbors;    // number of neighbors
-  DualArray2D<int>  ind_neighbors;    // indicies of neighbors
+  DualArray2D<int>  ind_neighbors;    // indices of neighbors
   DualArray2D<Real> arc_lengths;      // arc lengths
   DualArray1D<Real> solid_angle;      // solid angles
   DualArray2D<Real> nh_c;             // normal vector computed at face center
   DualArray3D<Real> nh_f;             // normal vector computed at face edges
-  DualArray2D<Real> xi_mn;            // xi angles
-  DualArray2D<Real> eta_mn;           // eta angles
   DvceArray6D<Real> nmu;              // n^mu
   DvceArray6D<Real> n_mu;             // n_mu
   DvceArray5D<Real> n1_n_0;           // n^1*n_0
@@ -132,19 +129,8 @@ class Radiation {
   DvceArray5D<Real> n3_n_0;           // n^3*n_0
   DvceArray6D<Real> na_n_0;           // n^a*n_0
   DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
-  int  GetNeighbors(int n, int neighbors[6]) const;
-  Real ComputeWeightAndDualEdges(int n, Real length[6]) const;
-  void GetGridCartPosition(int n, Real *x, Real *y, Real *z) const;
-  void GetGridCartPositionMid(int n, int nb, Real *x, Real *y, Real *z) const;
-  void CircumcenterNormalized(Real x1, Real x2, Real x3, Real y1, Real y2, Real y3,
-                              Real z1, Real z2, Real z3, Real *x, Real *y, Real *z) const;
-  void GetGridPositionPolar(int ic, Real *theta, Real *phi) const;
-  void OptimalAngles(Real ang[2]) const;
-  void RotateGrid(Real zeta, Real psi);
-  Real ArcLength(int ic1, int ic2) const;
-  void ComputeXiEta(int n, Real xi[6], Real eta[6]) const;
   void InitAngularMesh();
-  void InitRadiationFrame();
+  void SetOrthonormalTetrad();
 
   // intensity arrays
   DvceArray5D<Real> i0;         // intensities

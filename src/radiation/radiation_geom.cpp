@@ -4,9 +4,11 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file radiation_geom.cpp
-//  \brief Initializes angular mesh and coordinate frame data.
+//  \brief Initializes angular mesh and orthonormal tetrad
 
-#include <cmath>
+#include <math.h>
+#include <float.h>
+#include <limits.h>
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
@@ -19,22 +21,50 @@
 #include "radiation.hpp"
 #include "radiation_tetrad.hpp"
 
-#define HUGE_NUMBER 1.0e+36
-
 namespace radiation {
+//----------------------------------------------------------------------------------------
+// inline functions for constructing geodesic mesh
 
 KOKKOS_INLINE_FUNCTION
-void UnitFluxDir(int ic1, int ic2, int nlvl,
-                 DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
+void GridCartPosition(int n, int nlvl,
+                      DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                      Real *x, Real *y, Real *z);
+
+KOKKOS_INLINE_FUNCTION
+void GridCartPositionMid(int n, int nb, int nlvl,
+                         DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                         Real *x, Real *y, Real *z);
+
+KOKKOS_INLINE_FUNCTION
+Real ComputeWeightAndDualEdges(int n, int nlvl, DualArray4D<Real> anorm,
+                               DualArray2D<Real> apnorm, DualArray3D<Real> aind,
+                               Real length[6]);
+
+KOKKOS_INLINE_FUNCTION
+void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
                  Real *dtheta, Real *dphi);
+
 KOKKOS_INLINE_FUNCTION
-void DeviceGetGridCartPosition(int n, int nlvl,
-                               DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                               Real *x, Real *y, Real *z);
+int Neighbors(int n, int nlvl, DualArray3D<Real> aind, int neighbors[6]);
+
 KOKKOS_INLINE_FUNCTION
-void DeviceGetGridCartPositionMid(int n, int nb, int nlvl,
-                                  DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                                  Real *x, Real *y, Real *z);
+void OptimalAngles(int nangles, int nlvl,
+                   DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                   Real ang[2]);
+
+KOKKOS_INLINE_FUNCTION
+void RotateGrid(int nlvl, Real zeta, Real psi,
+                DualArray4D<Real> anorm, DualArray2D<Real> apnorm);
+
+KOKKOS_INLINE_FUNCTION
+Real ArcLength(int ic1, int ic2, int nlvl,
+               DualArray4D<Real> anorm, DualArray2D<Real> apnorm);
+
+KOKKOS_INLINE_FUNCTION
+void CircumcenterNormalized(Real x1, Real x2, Real x3,
+                            Real y1, Real y2, Real y3,
+                            Real z1, Real z2, Real z3,
+                            Real *x, Real *y, Real *z);
 KOKKOS_INLINE_FUNCTION
 void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
                       Real *apar, Real *psi0);
@@ -44,172 +74,169 @@ void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
 //! \brief Initialize angular mesh
 
 void Radiation::InitAngularMesh() {
-  int nlev = nlevel;
-  auto nh_c_ = nh_c;
-  auto nh_f_ = nh_f;
-  auto solid_angle_ = solid_angle;
+  // extract nlevel for angular mesh
+  int lev_ = nlevel;
 
-  if (nlev != 0) {  // setup geodesic mesh
+  if (lev_ > 0) {  // construct geodesic mesh
     Real sin_ang = 2.0/sqrt(5.0);
     Real cos_ang = 1.0/sqrt(5.0);
     Real p1[3] = {0.0, 0.0, 1.0};
     Real p2[3] = {sin_ang, 0.0, cos_ang};
-    Real p3[3] = {sin_ang*cos(0.2*M_PI),  sin_ang*sin(0.2*M_PI),  -cos_ang};
+    Real p3[3] = {sin_ang*cos( 0.2*M_PI), sin_ang*sin( 0.2*M_PI), -cos_ang};
     Real p4[3] = {sin_ang*cos(-0.4*M_PI), sin_ang*sin(-0.4*M_PI),  cos_ang};
     Real p5[3] = {sin_ang*cos(-0.2*M_PI), sin_ang*sin(-0.2*M_PI), -cos_ang};
     Real p6[3] = {0.0, 0.0, -1.0};
 
     // get coordinates of each face center, i.e., the normal component
-    auto amesh_normals_ = amesh_normals;
-    auto ameshp_normals_ = ameshp_normals;
+    auto anorm_ = amesh_normals;
+    auto apnorm_ = ameshp_normals;
 
     // start with poles, which we can set explicitly
-    ameshp_normals_.h_view(0,0) = 0.0;
-    ameshp_normals_.h_view(0,1) = 0.0;
-    ameshp_normals_.h_view(0,2) = 1.0;
-    ameshp_normals_.h_view(1,0) = 0.0;
-    ameshp_normals_.h_view(1,1) = 0.0;
-    ameshp_normals_.h_view(1,2) = -1.0;
+    apnorm_.h_view(0,0) = 0.0;
+    apnorm_.h_view(0,1) = 0.0;
+    apnorm_.h_view(0,2) = 1.0;
+    apnorm_.h_view(1,0) = 0.0;
+    apnorm_.h_view(1,1) = 0.0;
+    apnorm_.h_view(1,2) = -1.0;
 
-    // now move on and start by filling in one of the five ptches
+    // now move on and start by filling in one of the five patches
     // we only fill in the center (ignoring ghost values)
     int row_index = 1;
-    for (int l=0; l<nlev; ++l) {
+    for (int l=0; l<lev_; ++l) {
       int col_index = 1;
-      for (int m=l; m<nlev; ++m) {
-        Real x = ((m-l+1)*p2[0] + (nlev-m-1)*p1[0] + l*p4[0])/(Real)(nlev);
-        Real y = ((m-l+1)*p2[1] + (nlev-m-1)*p1[1] + l*p4[1])/(Real)(nlev);
-        Real z = ((m-l+1)*p2[2] + (nlev-m-1)*p1[2] + l*p4[2])/(Real)(nlev);
+      for (int m=l; m<lev_; ++m) {
+        Real x = ((m-l+1)*p2[0] + (lev_-m-1)*p1[0] + l*p4[0])/(Real)(lev_);
+        Real y = ((m-l+1)*p2[1] + (lev_-m-1)*p1[1] + l*p4[1])/(Real)(lev_);
+        Real z = ((m-l+1)*p2[2] + (lev_-m-1)*p1[2] + l*p4[2])/(Real)(lev_);
         Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
-        amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
-        amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
-        amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
+        anorm_.h_view(0,row_index,col_index,0) = x/norm;
+        anorm_.h_view(0,row_index,col_index,1) = y/norm;
+        anorm_.h_view(0,row_index,col_index,2) = z/norm;
         col_index += 1;
       }
-      for (int m=nlev-l; m<nlev; ++m) {
-        Real x = ((nlev-l)*p2[0] + (m-nlev+l+1)*p5[0] + (nlev-m-1)*p4[0])/(Real)(nlev);
-        Real y = ((nlev-l)*p2[1] + (m-nlev+l+1)*p5[1] + (nlev-m-1)*p4[1])/(Real)(nlev);
-        Real z = ((nlev-l)*p2[2] + (m-nlev+l+1)*p5[2] + (nlev-m-1)*p4[2])/(Real)(nlev);
+      for (int m=lev_-l; m<lev_; ++m) {
+        Real x = ((lev_-l)*p2[0] + (m-lev_+l+1)*p5[0] + (lev_-m-1)*p4[0])/(Real)(lev_);
+        Real y = ((lev_-l)*p2[1] + (m-lev_+l+1)*p5[1] + (lev_-m-1)*p4[1])/(Real)(lev_);
+        Real z = ((lev_-l)*p2[2] + (m-lev_+l+1)*p5[2] + (lev_-m-1)*p4[2])/(Real)(lev_);
         Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
-        amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
-        amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
-        amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
+        anorm_.h_view(0,row_index,col_index,0) = x/norm;
+        anorm_.h_view(0,row_index,col_index,1) = y/norm;
+        anorm_.h_view(0,row_index,col_index,2) = z/norm;
         col_index += 1;
       }
-      for (int m=l; m<nlev; ++m) {
-        Real x = ((m-l+1)*p3[0] + (nlev-m-1)*p2[0] + l*p5[0])/(Real)(nlev);
-        Real y = ((m-l+1)*p3[1] + (nlev-m-1)*p2[1] + l*p5[1])/(Real)(nlev);
-        Real z = ((m-l+1)*p3[2] + (nlev-m-1)*p2[2] + l*p5[2])/(Real)(nlev);
+      for (int m=l; m<lev_; ++m) {
+        Real x = ((m-l+1)*p3[0] + (lev_-m-1)*p2[0] + l*p5[0])/(Real)(lev_);
+        Real y = ((m-l+1)*p3[1] + (lev_-m-1)*p2[1] + l*p5[1])/(Real)(lev_);
+        Real z = ((m-l+1)*p3[2] + (lev_-m-1)*p2[2] + l*p5[2])/(Real)(lev_);
         Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
-        amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
-        amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
-        amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
+        anorm_.h_view(0,row_index,col_index,0) = x/norm;
+        anorm_.h_view(0,row_index,col_index,1) = y/norm;
+        anorm_.h_view(0,row_index,col_index,2) = z/norm;
         col_index += 1;
       }
-      for (int m=nlev-l; m<nlev; ++m) {
-        Real x = ((nlev-l)*p3[0] + (m-nlev+l+1)*p6[0] + (nlev-m-1)*p5[0])/(Real)(nlev);
-        Real y = ((nlev-l)*p3[1] + (m-nlev+l+1)*p6[1] + (nlev-m-1)*p5[1])/(Real)(nlev);
-        Real z = ((nlev-l)*p3[2] + (m-nlev+l+1)*p6[2] + (nlev-m-1)*p5[2])/(Real)(nlev);
+      for (int m=lev_-l; m<lev_; ++m) {
+        Real x = ((lev_-l)*p3[0] + (m-lev_+l+1)*p6[0] + (lev_-m-1)*p5[0])/(Real)(lev_);
+        Real y = ((lev_-l)*p3[1] + (m-lev_+l+1)*p6[1] + (lev_-m-1)*p5[1])/(Real)(lev_);
+        Real z = ((lev_-l)*p3[2] + (m-lev_+l+1)*p6[2] + (lev_-m-1)*p5[2])/(Real)(lev_);
         Real norm = sqrt(SQR(x) + SQR(y) + SQR(z));
-        amesh_normals_.h_view(0,row_index,col_index,0) = x/norm;
-        amesh_normals_.h_view(0,row_index,col_index,1) = y/norm;
-        amesh_normals_.h_view(0,row_index,col_index,2) = z/norm;
+        anorm_.h_view(0,row_index,col_index,0) = x/norm;
+        anorm_.h_view(0,row_index,col_index,1) = y/norm;
+        anorm_.h_view(0,row_index,col_index,2) = z/norm;
         col_index += 1;
       }
       row_index += 1;
     }
 
-    // now fill the other four ptches by rotating the first one. only set
+    // now fill the other four patches by rotating the first one. only set
     // the internal (non-ghost) values
     for (int ptch=1; ptch<5; ++ptch) {
-      for (int l=1; l<1+nlev; ++l) {
-        for (int m=1; m<1+2*nlev; ++m) {
-          Real x0 = amesh_normals_.h_view(0,l,m,0);
-          Real y0 = amesh_normals_.h_view(0,l,m,1);
-          Real z0 = amesh_normals_.h_view(0,l,m,2);
-          amesh_normals_.h_view(ptch,l,m,0) = (x0*cos(ptch*0.4*M_PI)+y0*sin(ptch*0.4*M_PI));
-          amesh_normals_.h_view(ptch,l,m,1) = (y0*cos(ptch*0.4*M_PI)-x0*sin(ptch*0.4*M_PI));
-          amesh_normals_.h_view(ptch,l,m,2) = z0;
+      for (int l=1; l<1+lev_; ++l) {
+        for (int m=1; m<1+2*lev_; ++m) {
+          Real x0 = anorm_.h_view(0,l,m,0);
+          Real y0 = anorm_.h_view(0,l,m,1);
+          Real z0 = anorm_.h_view(0,l,m,2);
+          anorm_.h_view(ptch,l,m,0) = (x0*cos(ptch*0.4*M_PI)+y0*sin(ptch*0.4*M_PI));
+          anorm_.h_view(ptch,l,m,1) = (y0*cos(ptch*0.4*M_PI)-x0*sin(ptch*0.4*M_PI));
+          anorm_.h_view(ptch,l,m,2) = z0;
         }
       }
     }
-
-    // TODO(@gnwong, @pdmullen) maybe figure out how to make this a
-    // neat function or remove entirely
-    auto blocks_n = amesh_normals_;
     for (int i=0; i<3; ++i) {
       for (int bl=0; bl<5; ++bl) {
-        for (int k=0; k<nlev; ++k) {
-          blocks_n.h_view(bl,0,     k+1,     i)=blocks_n.h_view((bl+4)%5,k+1, 1,       i);
-          blocks_n.h_view(bl,0,     k+nlev+1,i)=blocks_n.h_view((bl+4)%5,nlev,k+1,     i);
-          blocks_n.h_view(bl,k+1,   2*nlev+1,i)=blocks_n.h_view((bl+4)%5,nlev,k+nlev+1,i);
-          blocks_n.h_view(bl,k+2,   0,       i)=blocks_n.h_view((bl+1)%5,1,   k+1,     i);
-          blocks_n.h_view(bl,nlev+1,k+1,     i)=blocks_n.h_view((bl+1)%5,1,   k+nlev+1,i);
-          blocks_n.h_view(bl,nlev+1,k+nlev+1,i)=blocks_n.h_view((bl+1)%5,k+2, 2*nlev,  i);
+        for (int k=0; k<lev_; ++k) {
+          anorm_.h_view(bl,0,     k+1,     i)=anorm_.h_view((bl+4)%5,k+1, 1,       i);
+          anorm_.h_view(bl,0,     k+lev_+1,i)=anorm_.h_view((bl+4)%5,lev_,k+1,     i);
+          anorm_.h_view(bl,k+1,   2*lev_+1,i)=anorm_.h_view((bl+4)%5,lev_,k+lev_+1,i);
+          anorm_.h_view(bl,k+2,   0,       i)=anorm_.h_view((bl+1)%5,1,   k+1,     i);
+          anorm_.h_view(bl,lev_+1,k+1,     i)=anorm_.h_view((bl+1)%5,1,   k+lev_+1,i);
+          anorm_.h_view(bl,lev_+1,k+lev_+1,i)=anorm_.h_view((bl+1)%5,k+2, 2*lev_,  i);
         }
-        blocks_n.h_view(bl,1,     0,       i) = ameshp_normals_.h_view(0,i);
-        blocks_n.h_view(bl,nlev+1,2*nlev,  i) = ameshp_normals_.h_view(1,i);
-        blocks_n.h_view(bl,0,     2*nlev+1,i) = blocks_n.h_view(bl,0,2*nlev,i);
+        anorm_.h_view(bl,1,     0,       i) = apnorm_.h_view(0,i);
+        anorm_.h_view(bl,lev_+1,2*lev_,  i) = apnorm_.h_view(1,i);
+        anorm_.h_view(bl,0,     2*lev_+1,i) = anorm_.h_view(bl,0,2*lev_,i);
       }
     }
 
     // generate 2d -> 1d map, seting center (non-ghost) values
-    auto amesh_indices_ = amesh_indices;
-    auto ameshp_indices_ = ameshp_indices;
+    auto aind_ = amesh_indices;
+    auto apind_ = ameshp_indices;
     for (int ptch=0; ptch<5; ++ptch) {
-      for (int l=0; l<nlev; ++l) {
-        for (int m=0; m<2*nlev; ++m) {
-          amesh_indices_.h_view(ptch,l+1,m+1) = ptch*2*SQR(nlev) + l*2*nlev + m;
+      for (int l=0; l<lev_; ++l) {
+        for (int m=0; m<2*lev_; ++m) {
+          aind_.h_view(ptch,l+1,m+1) = ptch*2*SQR(lev_) + l*2*lev_ + m;
         }
       }
     }
 
-    ameshp_indices_.h_view(0) = 5*2*SQR(nlev);
-    ameshp_indices_.h_view(1) = 5*2*SQR(nlev) + 1;
+    // start with poles
+    apind_.h_view(0) = 5*2*SQR(lev_);
+    apind_.h_view(1) = 5*2*SQR(lev_) + 1;
 
-    // TODO(@gnwong, @pdmullen) maybe figure out how to make this a
-    // neat function or remove entirely
-    auto blocks_i = amesh_indices_;
+    // move on to regular faces
     for (int bl=0; bl<5; ++bl) {
-      for (int k=0; k<nlev; ++k) {
-        blocks_i.h_view(bl,0,     k+1     ) = blocks_i.h_view((bl+4)%5,k+1, 1       );
-        blocks_i.h_view(bl,0,     k+nlev+1) = blocks_i.h_view((bl+4)%5,nlev,k+1     );
-        blocks_i.h_view(bl,k+1,   2*nlev+1) = blocks_i.h_view((bl+4)%5,nlev,k+nlev+1);
-        blocks_i.h_view(bl,k+2,   0       ) = blocks_i.h_view((bl+1)%5,1,   k+1     );
-        blocks_i.h_view(bl,nlev+1,k+1     ) = blocks_i.h_view((bl+1)%5,1,   k+nlev+1);
-        blocks_i.h_view(bl,nlev+1,k+nlev+1) = blocks_i.h_view((bl+1)%5,k+2, 2*nlev  );
+      for (int k=0; k<lev_; ++k) {
+        aind_.h_view(bl,0,     k+1     ) = aind_.h_view((bl+4)%5,k+1, 1       );
+        aind_.h_view(bl,0,     k+lev_+1) = aind_.h_view((bl+4)%5,lev_,k+1     );
+        aind_.h_view(bl,k+1,   2*lev_+1) = aind_.h_view((bl+4)%5,lev_,k+lev_+1);
+        aind_.h_view(bl,k+2,   0       ) = aind_.h_view((bl+1)%5,1,   k+1     );
+        aind_.h_view(bl,lev_+1,k+1     ) = aind_.h_view((bl+1)%5,1,   k+lev_+1);
+        aind_.h_view(bl,lev_+1,k+lev_+1) = aind_.h_view((bl+1)%5,k+2, 2*lev_  );
       }
-      blocks_i.h_view(bl,1,     0       ) = ameshp_indices_.h_view(0);
-      blocks_i.h_view(bl,nlev+1,2*nlev  ) = ameshp_indices_.h_view(1);
-      blocks_i.h_view(bl,0,     2*nlev+1) = blocks_i.h_view(bl,0,2*nlev);
+      aind_.h_view(bl,1,     0       ) = apind_.h_view(0);
+      aind_.h_view(bl,lev_+1,2*lev_  ) = apind_.h_view(1);
+      aind_.h_view(bl,0,     2*lev_+1) = aind_.h_view(bl,0,2*lev_);
     }
 
     // set up geometric factors and neighbor information arrays
     auto num_neighbors_ = num_neighbors;
     auto ind_neighbors_ = ind_neighbors;
+    auto solid_angle_ = solid_angle;
     auto arc_lengths_ = arc_lengths;
-
     for (int n=0; n<nangles; ++n) {
       Real dual_edge[6];
       int neighbors[6];
-      solid_angle_.h_view(n) = ComputeWeightAndDualEdges(n,dual_edge);
-      num_neighbors_.h_view(n) = GetNeighbors(n,neighbors);
+      num_neighbors_.h_view(n) = Neighbors(n,lev_,aind_,neighbors);
+      solid_angle_.h_view(n) = ComputeWeightAndDualEdges(n,lev_,anorm_,apnorm_,
+                                                         aind_,dual_edge);
       for (int nb=0; nb<6; ++nb) {
         ind_neighbors_.h_view(n,nb) = neighbors[nb];
         arc_lengths_.h_view(n,nb) = dual_edge[nb];
       }
     }
 
-    // Rotate geodesic mesh
-    Real rotangles[2];
-    OptimalAngles(rotangles);
-    if (rotate_geo) {
-      RotateGrid(rotangles[0], rotangles[1]);
+    // rotate geodesic mesh
+    if (rotate_geo || angular_fluxes) {
+      Real rotangles[2];
+      OptimalAngles(nangles,lev_,anorm_,apnorm_,rotangles);
+      RotateGrid(lev_,rotangles[0],rotangles[1],anorm_,apnorm_);
     }
 
+    // set tetrad frame unit normal components
+    auto nh_c_ = nh_c;
+    auto nh_f_ = nh_f;
     for (int n=0; n<nangles; ++n) {
       Real x, y, z;
-      GetGridCartPosition(n, &x,&y,&z);
+      GridCartPosition(n,lev_,anorm_,apnorm_,&x,&y,&z);
       nh_c_.h_view(n,0) = 1.0;
       nh_c_.h_view(n,1) = x;
       nh_c_.h_view(n,2) = y;
@@ -217,33 +244,31 @@ void Radiation::InitAngularMesh() {
       int nn = num_neighbors_.h_view(n);
       for (int nb=0; nb<nn; ++nb) {
         Real xm, ym, zm;
-        GetGridCartPositionMid(n, ind_neighbors_.h_view(n,nb),&xm,&ym,&zm);
+        GridCartPositionMid(n,ind_neighbors_.h_view(n,nb),lev_,anorm_,apnorm_,
+                            &xm,&ym,&zm);
         nh_f_.h_view(n,nb,0) = 1.0;
         nh_f_.h_view(n,nb,1) = xm;
         nh_f_.h_view(n,nb,2) = ym;
         nh_f_.h_view(n,nb,3) = zm;
       }
       if (nn==5) {
-        nh_f_.h_view(n,5,0) = HUGE_NUMBER;
-        nh_f_.h_view(n,5,1) = HUGE_NUMBER;
-        nh_f_.h_view(n,5,2) = HUGE_NUMBER;
-        nh_f_.h_view(n,5,3) = HUGE_NUMBER;
+        nh_f_.h_view(n,5,0) = (FLT_MAX);
+        nh_f_.h_view(n,5,1) = (FLT_MAX);
+        nh_f_.h_view(n,5,2) = (FLT_MAX);
+        nh_f_.h_view(n,5,3) = (FLT_MAX);
       }
     }
 
+    // guarantee that arc lengths at shared faces are identical
     for (int n=0; n<nangles; ++n) {
       for (int nb=0; nb<num_neighbors_.h_view(n); ++nb) {
         bool match_not_found = true;
-        Real this_zeta = acos(nh_f_.h_view(n,nb,3));
-        Real this_psi  = atan2(nh_f_.h_view(n,nb,2), nh_f_.h_view(n,nb,1));
         Real this_arc = arc_lengths_.h_view(n,nb);
         for (int nnb=0; nnb<num_neighbors_.h_view(ind_neighbors_.h_view(n,nb)); ++nnb) {
-          Real neigh_zeta = acos(nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,3));
-          Real neigh_psi  = atan2(nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,2),
-                                 nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,1));
           Real neigh_arc = arc_lengths_.h_view(ind_neighbors_.h_view(n,nb),nnb);
-          if (fabs(neigh_zeta-this_zeta) < 1.0e-12 &&
-              fabs(neigh_psi -this_psi)  < 1.0e-12) {
+          if (nh_f_.h_view(n,nb,1) == nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,1) &&
+              nh_f_.h_view(n,nb,2) == nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,2) &&
+              nh_f_.h_view(n,nb,3) == nh_f_.h_view(ind_neighbors_.h_view(n,nb),nnb,3)) {
             match_not_found = false;
             Real arc_avg = 0.5*(this_arc+neigh_arc);
             arc_lengths_.h_view(n,nb) = arc_avg;
@@ -258,55 +283,65 @@ void Radiation::InitAngularMesh() {
       }
     }
 
-    amesh_normals_.template modify<HostMemSpace>();
-    ameshp_normals_.template modify<HostMemSpace>();
-    amesh_normals_.template sync<DevExeSpace>();
-    ameshp_normals_.template sync<DevExeSpace>();
-
-    amesh_indices_.template modify<HostMemSpace>();
-    ameshp_indices_.template modify<HostMemSpace>();
-    amesh_indices_.template sync<DevExeSpace>();
-    ameshp_indices_.template sync<DevExeSpace>();
-
+    anorm_.template modify<HostMemSpace>();
+    anorm_.template sync<DevExeSpace>();
+    apnorm_.template modify<HostMemSpace>();
+    apnorm_.template sync<DevExeSpace>();
+    aind_.template modify<HostMemSpace>();
+    aind_.template sync<DevExeSpace>();
+    apind_.template modify<HostMemSpace>();
+    apind_.template sync<DevExeSpace>();
     num_neighbors_.template modify<HostMemSpace>();
-    ind_neighbors_.template modify<HostMemSpace>();
     num_neighbors_.template sync<DevExeSpace>();
+    ind_neighbors_.template modify<HostMemSpace>();
     ind_neighbors_.template sync<DevExeSpace>();
-
     arc_lengths_.template modify<HostMemSpace>();
     arc_lengths_.template sync<DevExeSpace>();
+    solid_angle_.template modify<HostMemSpace>();
+    solid_angle_.template sync<DevExeSpace>();
+    nh_c_.template modify<HostMemSpace>();
+    nh_c_.template sync<DevExeSpace>();
+    nh_f_.template modify<HostMemSpace>();
+    nh_f_.template sync<DevExeSpace>();
 
-  } else {  // simple one angle per octant mesh for testing
-    Real zeta_v[2] = {M_PI/4.0, 3.0*M_PI/4.0};
-    Real psi_v[4] = {M_PI/4.0, 3.0*M_PI/4.0, 5.0*M_PI/4.0, 7.0*M_PI/4.0};
+  } else if (lev_==0) {  // one angle per octant mesh (only for testing)
+    auto nh_c_ = nh_c;
+    auto nh_f_ = nh_f;
+    auto solid_angle_ = solid_angle;
+    Real zetav[2] = {M_PI/4.0, 3.0*M_PI/4.0};
+    Real psiv[4] = {M_PI/4.0, 3.0*M_PI/4.0, 5.0*M_PI/4.0, 7.0*M_PI/4.0};
     for (int z=0, n=0; z<2; ++z) {
       for (int p=0; p<4; ++p, ++n) {
         nh_c_.h_view(n,0) = 1.0;
-        nh_c_.h_view(n,1) = sin(zeta_v[z])*cos(psi_v[p])*sqrt(4.0/3.0);
-        nh_c_.h_view(n,2) = sin(zeta_v[z])*sin(psi_v[p])*sqrt(4.0/3.0);
-        nh_c_.h_view(n,3) = cos(zeta_v[z])*sqrt(2.0/3.0);
+        nh_c_.h_view(n,1) = sin(zetav[z])*cos(psiv[p])*sqrt(4.0/3.0);
+        nh_c_.h_view(n,2) = sin(zetav[z])*sin(psiv[p])*sqrt(4.0/3.0);
+        nh_c_.h_view(n,3) = cos(zetav[z])*sqrt(2.0/3.0);
         solid_angle_.h_view(n) = 4.0*M_PI/nangles;
       }
     }
+
+    nh_c_.template modify<HostMemSpace>();
+    nh_c_.template sync<DevExeSpace>();
+    nh_f_.template modify<HostMemSpace>();
+    nh_f_.template sync<DevExeSpace>();
+    solid_angle_.template modify<HostMemSpace>();
+    solid_angle_.template sync<DevExeSpace>();
+
+  } else {  // invalid selection for <radiation>/nlevel
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+        << std::endl << "nlevel must be >= 0, "
+        << "but <radiation>/nlevel=" << lev_ << std::endl;
+    std::exit(EXIT_FAILURE);
   }
-
-  nh_c_.template modify<HostMemSpace>();
-  nh_c_.template sync<DevExeSpace>();
-
-  nh_f_.template modify<HostMemSpace>();
-  nh_f_.template sync<DevExeSpace>();
-
-  solid_angle_.template modify<HostMemSpace>();
-  solid_angle_.template sync<DevExeSpace>();
 
   return;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn  void Radiation::InitCoordinateFrame()
-//! \brief Initialize frame related quantities.
+//! \fn  void Radiation::SetOrthonormalTetrad()
+//! \brief Set orthonormal tetrad data
 
-void Radiation::InitRadiationFrame() {
+void Radiation::SetOrthonormalTetrad() {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &ng = indcs.ng;
   int n1 = indcs.nx1 + 2*ng;
@@ -326,8 +361,6 @@ void Radiation::InitRadiationFrame() {
   auto nh_f_ = nh_f;
   auto num_neighbors_ = num_neighbors;
   auto ind_neighbors_ = ind_neighbors;
-  auto amesh_normals_ = amesh_normals;
-  auto ameshp_normals_ = ameshp_normals;
 
   // Calculate n^mu and n_mu
   auto nmu_ = nmu;
@@ -467,7 +500,7 @@ void Radiation::InitRadiationFrame() {
 
   // Calculate n^angle n_0
   auto na_n_0_ = na_n_0;
-  if (nlev_ != 0) { // do not compute na if nlevel=0
+  if (nlev_ != 0) {  // do not compute na if nlevel=0
     par_for("rad_na_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
@@ -485,24 +518,26 @@ void Radiation::InitRadiationFrame() {
       Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
       ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
       for (int n=0; n<nangles_; ++n) {
+        Real zetav = acos(nh_c_.d_view(n,3));
+        Real psiv  = atan2(nh_c_.d_view(n,2), nh_c_.d_view(n,1));
         for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          Real zeta_f = acos(nh_f_.d_view(n,nb,3));
+          Real zetaf = acos(nh_f_.d_view(n,nb,3));
+          Real psif  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
           Real na1 = 0.0;
           Real na2 = 0.0;
           for (int q=0; q<4; ++q) {
             for (int p=0; p<4; ++p) {
-              na1 += (1.0/sin(zeta_f)*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
+              na1 += (1.0/sin(zetaf)*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
                       * (nh_f_.d_view(n,nb,0)*omega[3][q][p]
                       -  nh_f_.d_view(n,nb,3)*omega[0][q][p]));
-              na2 += (1.0/SQR(sin(zeta_f))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
+              na2 += (1.0/SQR(sin(zetaf))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
                       * (nh_f_.d_view(n,nb,2)*omega[1][q][p]
                       -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
             }
           }
           Real unit_zeta, unit_psi;
-          UnitFluxDir(n,ind_neighbors_.d_view(n,nb),nlev_,
-                      amesh_normals_,ameshp_normals_,&unit_zeta,&unit_psi);
-          Real na = na1*unit_zeta + na2*unit_psi;
+          UnitFluxDir(zetav,psiv,zetaf,psif,&unit_zeta,&unit_psi);
+          Real na = na1*unit_zeta + SQR(sin(zetaf))*na2*unit_psi;
           Real n_0 = 0.0;
           for (int q=0; q<4; ++q) {
             n_0 += e_cov[q][0]*nh_f_.d_view(n,nb,q);
@@ -510,18 +545,16 @@ void Radiation::InitRadiationFrame() {
           na_n_0_(m,n,k,j,i,nb) = na*n_0;
         }
       }
+
+      // Guarantee that na_n_0 at shared faces are identical
       for (int n=0; n<nangles_; ++n) {
         for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          Real this_zeta = acos(nh_f_.d_view(n,nb,3));
-          Real this_psi  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
           Real this_na_n_0 = na_n_0_(m,n,k,j,i,nb);
           for (int nnb=0; nnb<num_neighbors_.d_view(ind_neighbors_.d_view(n,nb)); ++nnb) {
-            Real neigh_zeta = acos(nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,3));
-            Real neigh_psi  = atan2(nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,2),
-                                    nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,1));
             Real neigh_na_n_0 = na_n_0_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb);
-            if (fabs(neigh_zeta-this_zeta) < 1.0e-12 &&
-                fabs(neigh_psi -this_psi)  < 1.0e-12) {
+            if (nh_f_.d_view(n,nb,1) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,1) &&
+                nh_f_.d_view(n,nb,2) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,2) &&
+                nh_f_.d_view(n,nb,3) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,3)) {
               Real na_n_0_avg = 0.5*(fabs(this_na_n_0)+fabs(neigh_na_n_0));
               na_n_0_(m,n,k,j,i,nb) = copysign(na_n_0_avg, this_na_n_0);
               na_n_0_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb) = copysign(na_n_0_avg,
@@ -530,7 +563,6 @@ void Radiation::InitRadiationFrame() {
           }
         }
       }
-
     });
   }
 
@@ -588,61 +620,59 @@ void Radiation::InitRadiationFrame() {
   return;
 }
 
-// TODO(@gnwong, @pdmullen) implement new function that returns num neighbors using
-// if statements instead of also computing the neighbors too
-int Radiation::GetNeighbors(int n, int neighbors[6]) const {
-  int num_neighbors;
-  int nlev = nlevel;
-  auto amesh_indices_ = amesh_indices;
-
-  // handle north pole
-  if (n==10*nlev*nlev) {
-    for (int bl=0; bl<5; ++bl) {
-      neighbors[bl] = amesh_indices_.h_view(bl,1,1);
-    }
-    neighbors[5] = not_a_patch;
-    num_neighbors = 5;
-  } else if (n==10*nlev*nlev + 1) {  // handle south pole
-    for (int bl=0; bl<5; ++bl) {
-      neighbors[bl] = amesh_indices_.h_view(bl,nlev,2*nlev);
-    }
-    neighbors[5] = not_a_patch;
-    num_neighbors = 5;
+// find position at face center
+KOKKOS_INLINE_FUNCTION
+void GridCartPosition(int n, int nlvl,
+                      DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                      Real *x, Real *y, Real *z) {
+  int ibl0 = (n / (2*nlvl*nlvl));
+  int ibl1 = (n % (2*nlvl*nlvl)) / (2*nlvl);
+  int ibl2 = (n % (2*nlvl*nlvl)) % (2*nlvl);
+  if (ibl0 == 5) {
+    *x = apnorm.h_view(ibl2, 0);
+    *y = apnorm.h_view(ibl2, 1);
+    *z = apnorm.h_view(ibl2, 2);
   } else {
-    int ibl0 = (n / (2*nlev*nlev));
-    int ibl1 = (n % (2*nlev*nlev)) / (2*nlev);
-    int ibl2 = (n % (2*nlev*nlev)) % (2*nlev);
-    neighbors[0] = amesh_indices_.h_view(ibl0, ibl1+1, ibl2+2);
-    neighbors[1] = amesh_indices_.h_view(ibl0, ibl1+2, ibl2+1);
-    neighbors[2] = amesh_indices_.h_view(ibl0, ibl1+2, ibl2);
-    neighbors[3] = amesh_indices_.h_view(ibl0, ibl1+1, ibl2);
-    neighbors[4] = amesh_indices_.h_view(ibl0, ibl1  , ibl2+1);
-
-    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
-    if (n % (2*nlev*nlev) == nlev-1 || n % (2*nlev*nlev) == 2*nlev-1) {
-      neighbors[5] = not_a_patch;
-      num_neighbors = 5;
-    } else {
-      neighbors[5] = amesh_indices_.h_view(ibl0, ibl1, ibl2+2);
-      num_neighbors = 6;
-    }
+    *x = anorm.h_view(ibl0,ibl1+1,ibl2+1,0);
+    *y = anorm.h_view(ibl0,ibl1+1,ibl2+1,1);
+    *z = anorm.h_view(ibl0,ibl1+1,ibl2+1,2);
   }
-  return num_neighbors;
 }
 
-Real Radiation::ComputeWeightAndDualEdges(int n, Real length[6]) const {
+// find mid position between two face centers
+KOKKOS_INLINE_FUNCTION
+void GridCartPositionMid(int n, int nb, int nlvl,
+                         DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                         Real *x, Real *y, Real *z) {
+  Real x1, y1, z1, x2, y2, z2;
+  GridCartPosition(n, nlvl,anorm,apnorm,&x1,&y1,&z1);
+  GridCartPosition(nb,nlvl,anorm,apnorm,&x2,&y2,&z2);
+  Real xm = 0.5*(x1+x2);
+  Real ym = 0.5*(y1+y2);
+  Real zm = 0.5*(z1+z2);
+  Real norm = sqrt(SQR(xm)+SQR(ym)+SQR(zm));
+  *x = xm/norm;
+  *y = ym/norm;
+  *z = zm/norm;
+}
+
+// inline function to retrieve weights (solid angles) and edge lengths
+KOKKOS_INLINE_FUNCTION
+Real ComputeWeightAndDualEdges(int n, int nlvl, DualArray4D<Real> anorm,
+                               DualArray2D<Real> apnorm, DualArray3D<Real> aind,
+                               Real length[6]) {
   int nvec[6];
-  int nnum = GetNeighbors(n, nvec);
+  int nnum = Neighbors(n, nlvl, aind, nvec);
   Real x0, y0, z0;
-  GetGridCartPosition(n, &x0,&y0,&z0);
+  GridCartPosition(n,nlvl,anorm,apnorm,&x0,&y0,&z0);
   Real weight = 0.0;
   for (int nb=0; nb<nnum; ++nb) {
     Real xn1, yn1, zn1;
     Real xn2, yn2, zn2;
     Real xn3, yn3, zn3;
-    GetGridCartPosition(nvec[(nb + nnum - 1)%nnum],&xn1,&yn1,&zn1);
-    GetGridCartPosition(nvec[nb],                  &xn2,&yn2,&zn2);
-    GetGridCartPosition(nvec[(nb + 1)%nnum],       &xn3,&yn3,&zn3);
+    GridCartPosition(nvec[(nb + nnum - 1)%nnum],nlvl,anorm,apnorm,&xn1,&yn1,&zn1);
+    GridCartPosition(nvec[nb],                  nlvl,anorm,apnorm,&xn2,&yn2,&zn2);
+    GridCartPosition(nvec[(nb + 1)%nnum],       nlvl,anorm,apnorm,&xn3,&yn3,&zn3);
     Real xc1, yc1, zc1;
     Real xc2, yc2, zc2;
     CircumcenterNormalized(x0,xn1,xn2,y0,yn1,yn2,z0,zn1,zn2,&xc1,&yc1,&zc1);
@@ -658,48 +688,79 @@ Real Radiation::ComputeWeightAndDualEdges(int n, Real length[6]) const {
     length[nb] = acos(scalprod_12);
   }
   if (nnum == 5) {
-    length[5] = HUGE_NUMBER;
+    length[5] = (FLT_MAX);
   }
 
   return weight;
 }
 
-void Radiation::GetGridCartPosition(int n, Real *x, Real *y, Real *z) const {
-  auto nlevel_ = nlevel;
-  auto amesh_normals_ = amesh_normals;
-  auto ameshp_normals_ = ameshp_normals;
-  int ibl0 =  n / (2*nlevel_*nlevel_);
-  int ibl1 = (n % (2*nlevel_*nlevel_)) / (2*nlevel_);
-  int ibl2 = (n % (2*nlevel_*nlevel_)) % (2*nlevel_);
-  if (ibl0 == 5) {
-    *x = ameshp_normals_.h_view(ibl2, 0);
-    *y = ameshp_normals_.h_view(ibl2, 1);
-    *z = ameshp_normals_.h_view(ibl2, 2);
+// inline function to find unit vector at face edge
+KOKKOS_INLINE_FUNCTION
+void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
+                 Real *dtheta, Real *dphi) {
+  if (fabs(psif-psiv) < 1.0e-10 ||
+      fabs(fabs(cos(zetav))-1) < 1.0e-10) {
+    *dtheta = (FLT_MAX);
+    *dphi = (FLT_MAX);
   } else {
-    *x = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,0);
-    *y = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,1);
-    *z = amesh_normals_.h_view(ibl0,ibl1+1,ibl2+1,2);
+    Real a_par, p_par;
+    GreatCircleParam(zetav,zetaf,psiv,psif,&a_par,&p_par);
+    Real zeta_deriv = (a_par*sin(psif-p_par)
+                       / (1.0+a_par*a_par*cos(psif-p_par)*cos(psif-p_par)));
+    Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetaf)*sin(zetaf));
+    Real signfactor = copysign(1.0,psif-psiv)*copysign(1.0,M_PI-fabs(psif-psiv));
+    *dtheta = signfactor*zeta_deriv*denom;
+    *dphi   = signfactor*denom;
   }
 }
 
-void Radiation::GetGridCartPositionMid(int n, int nb, Real *x, Real *y, Real *z) const {
-  Real x1, y1, z1;
-  Real x2, y2, z2;
-  GetGridCartPosition(n,&x1,&y1,&z1);
-  GetGridCartPosition(nb,&x2,&y2,&z2);
-  Real xm = 0.5*(x1+x2);
-  Real ym = 0.5*(y1+y2);
-  Real zm = 0.5*(z1+z2);
-  Real norm = sqrt(SQR(xm)+SQR(ym)+SQR(zm));
-  *x = xm/norm;
-  *y = ym/norm;
-  *z = zm/norm;
+// inline function to retrieve neighbors (and number of neighbors)
+KOKKOS_INLINE_FUNCTION
+int Neighbors(int n, int nlvl, DualArray3D<Real> aind, int neighbors[6]) {
+  int num_neighbors;
+  // handle north pole
+  if (n==10*nlvl*nlvl) {
+    for (int bl=0; bl<5; ++bl) {
+      neighbors[bl] = aind.h_view(bl,1,1);
+    }
+    neighbors[5] = (INT_MAX);
+    num_neighbors = 5;
+  } else if (n==10*nlvl*nlvl + 1) {  // handle south pole
+    for (int bl=0; bl<5; ++bl) {
+      neighbors[bl] = aind.h_view(bl,nlvl,2*nlvl);
+    }
+    neighbors[5] = (INT_MAX);
+    num_neighbors = 5;
+  } else {
+    int ibl0 = (n / (2*nlvl*nlvl));
+    int ibl1 = (n % (2*nlvl*nlvl)) / (2*nlvl);
+    int ibl2 = (n % (2*nlvl*nlvl)) % (2*nlvl);
+    neighbors[0] = aind.h_view(ibl0, ibl1+1, ibl2+2);
+    neighbors[1] = aind.h_view(ibl0, ibl1+2, ibl2+1);
+    neighbors[2] = aind.h_view(ibl0, ibl1+2, ibl2);
+    neighbors[3] = aind.h_view(ibl0, ibl1+1, ibl2);
+    neighbors[4] = aind.h_view(ibl0, ibl1  , ibl2+1);
+
+    // TODO(@gnwong, @pdmullen) check carefully, see if it can be inline optimized
+    if (n % (2*nlvl*nlvl) == nlvl-1 || n % (2*nlvl*nlvl) == 2*nlvl-1) {
+      neighbors[5] = (INT_MAX);
+      num_neighbors = 5;
+    } else {
+      neighbors[5] = aind.h_view(ibl0, ibl1, ibl2+2);
+      num_neighbors = 6;
+    }
+  }
+  return num_neighbors;
 }
 
-void Radiation::OptimalAngles(Real ang[2]) const {
-  int nzeta = 200;
-  int npsi = 200;
-  Real maxangle = ArcLength(0,1);
+// inline function to find an optimal angle by which to rotate the geodesic mesh
+KOKKOS_INLINE_FUNCTION
+void OptimalAngles(int nangles, int nlvl,
+                   DualArray4D<Real> anorm, DualArray2D<Real> apnorm,
+                   Real ang[2]) {
+  int nzeta = 200;  // nzeta val inherited from Viktoriya Giryanskaya
+  int npsi  = 200;  // npsi  val inherited from Viktoriya Giryanskaya
+  Real maxangle = ArcLength(0,1,nlvl,anorm,apnorm);
   Real deltazeta = maxangle/nzeta;
   Real deltapsi = M_PI/npsi;
   Real zeta;
@@ -711,11 +772,11 @@ void Radiation::OptimalAngles(Real ang[2]) const {
     zeta = (l+1)*deltazeta;
     for (int k=0; k<npsi; ++k) {
       psi = (k+1)*deltapsi;
-      Real kx = - sin(psi);
-      Real ky = cos(psi);
+      Real kx = -sin(psi);
+      Real ky =  cos(psi);
       Real vmin_curr = 1.0;
       for (int n=0; n<nangles; ++n) {
-        GetGridCartPosition(n,&vx,&vy,&vz);
+        GridCartPosition(n,nlvl,anorm,apnorm,&vx,&vy,&vz);
         vrx = vx*cos(zeta)+ky*vz*sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-cos(zeta));
         vry = vy*cos(zeta)-kx*vz*sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-cos(zeta));
         vrz = vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta);
@@ -732,72 +793,72 @@ void Radiation::OptimalAngles(Real ang[2]) const {
   }
 }
 
-void Radiation::RotateGrid(Real zeta, Real psi) {
+// inline function to rotate the geodesic mesh
+KOKKOS_INLINE_FUNCTION
+void RotateGrid(int nlvl, Real zeta, Real psi,
+                DualArray4D<Real> anorm, DualArray2D<Real> apnorm) {
   Real kx = -sin(psi);
-  Real ky = cos(psi);
-  Real vx, vy, vz;
-  Real vrx, vry, vrz;
-  int nlev = nlevel;
-  auto amesh_normals_ = amesh_normals;
-  auto ameshp_normals_ = ameshp_normals;
+  Real ky =  cos(psi);
+  Real vx, vy, vz, vrx, vry, vrz;
   for (int bl=0; bl<5; ++bl) {
-    for (int l=0; l<nlev; ++l) {
-      for (int m=0; m<2*nlev; ++m) {
-        vx = amesh_normals_.h_view(bl, l+1, m+1, 0);
-        vy = amesh_normals_.h_view(bl, l+1, m+1, 1);
-        vz = amesh_normals_.h_view(bl, l+1, m+1, 2);
+    for (int l=0; l<nlvl; ++l) {
+      for (int m=0; m<2*nlvl; ++m) {
+        vx = anorm.h_view(bl, l+1, m+1, 0);
+        vy = anorm.h_view(bl, l+1, m+1, 1);
+        vz = anorm.h_view(bl, l+1, m+1, 2);
         vrx = (vx*cos(zeta)+ky*vz*sin(zeta) + kx*(kx*vx+ky*vy)*(1.0-cos(zeta)));
         vry = (vy*cos(zeta)-kx*vz*sin(zeta) + ky*(kx*vx+ky*vy)*(1.0-cos(zeta)));
         vrz = (vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta));
-        amesh_normals_.h_view(bl,l+1,m+1,0) = vrx;
-        amesh_normals_.h_view(bl,l+1,m+1,1) = vry;
-        amesh_normals_.h_view(bl,l+1,m+1,2) = vrz;
+        anorm.h_view(bl,l+1,m+1,0) = vrx;
+        anorm.h_view(bl,l+1,m+1,1) = vry;
+        anorm.h_view(bl,l+1,m+1,2) = vrz;
       }
     }
   }
   for (int pl=0; pl<2; ++pl) {
-    vx = ameshp_normals_.h_view(pl,0);
-    vy = ameshp_normals_.h_view(pl,1);
-    vz = ameshp_normals_.h_view(pl,2);
+    vx = apnorm.h_view(pl,0);
+    vy = apnorm.h_view(pl,1);
+    vz = apnorm.h_view(pl,2);
     vrx = vx*cos(zeta)+ky*vz*sin(zeta)+kx*(kx*vx+ky*vy)*(1.0-cos(zeta));
     vry = vy*cos(zeta)-kx*vz*sin(zeta)+ky*(kx*vx+ky*vy)*(1.0-cos(zeta));
     vrz = vz*cos(zeta)+(kx*vy-ky*vx)*sin(zeta);
-    ameshp_normals_.h_view(pl,0) = vrx;
-    ameshp_normals_.h_view(pl,1) = vry;
-    ameshp_normals_.h_view(pl,2) = vrz;
+    apnorm.h_view(pl,0) = vrx;
+    apnorm.h_view(pl,1) = vry;
+    apnorm.h_view(pl,2) = vrz;
   }
-
-  auto blocks_n = amesh_normals_;
-  // TODO (@gnwong, @pdmullen) make this prettier?
   for (int i=0; i<3; ++i) {
     for (int bl=0; bl<5; ++bl) {
-      for (int k=0; k<nlev; ++k) {
-        blocks_n.h_view(bl,0,     k+1,     i) = blocks_n.h_view((bl+4)%5,k+1, 1,       i);
-        blocks_n.h_view(bl,0,     k+nlev+1,i) = blocks_n.h_view((bl+4)%5,nlev,k+1,     i);
-        blocks_n.h_view(bl,k+1,   2*nlev+1,i) = blocks_n.h_view((bl+4)%5,nlev,k+nlev+1,i);
-        blocks_n.h_view(bl,k+2,   0,       i) = blocks_n.h_view((bl+1)%5,1,   k+1,     i);
-        blocks_n.h_view(bl,nlev+1,k+1,     i) = blocks_n.h_view((bl+1)%5,1,   k+nlev+1,i);
-        blocks_n.h_view(bl,nlev+1,k+nlev+1,i) = blocks_n.h_view((bl+1)%5,k+2, 2*nlev,  i);
+      for (int k=0; k<nlvl; ++k) {
+        anorm.h_view(bl,0,     k+1,     i) = anorm.h_view((bl+4)%5,k+1, 1,       i);
+        anorm.h_view(bl,0,     k+nlvl+1,i) = anorm.h_view((bl+4)%5,nlvl,k+1,     i);
+        anorm.h_view(bl,k+1,   2*nlvl+1,i) = anorm.h_view((bl+4)%5,nlvl,k+nlvl+1,i);
+        anorm.h_view(bl,k+2,   0,       i) = anorm.h_view((bl+1)%5,1,   k+1,     i);
+        anorm.h_view(bl,nlvl+1,k+1,     i) = anorm.h_view((bl+1)%5,1,   k+nlvl+1,i);
+        anorm.h_view(bl,nlvl+1,k+nlvl+1,i) = anorm.h_view((bl+1)%5,k+2, 2*nlvl,  i);
       }
-      blocks_n.h_view(bl,1,     0,       i) = ameshp_normals_.h_view(0,i);
-      blocks_n.h_view(bl,nlev+1,2*nlev,  i) = ameshp_normals_.h_view(1,i);
-      blocks_n.h_view(bl,0,     2*nlev+1,i) = blocks_n.h_view(bl,0,2*nlev,i);
+      anorm.h_view(bl,1,     0,       i) = apnorm.h_view(0,i);
+      anorm.h_view(bl,nlvl+1,2*nlvl,  i) = apnorm.h_view(1,i);
+      anorm.h_view(bl,0,     2*nlvl+1,i) = anorm.h_view(bl,0,2*nlvl,i);
     }
   }
 }
 
-Real Radiation::ArcLength(int ic1, int ic2) const {
-  Real x1, y1, z1;
-  GetGridCartPosition(ic1,&x1,&y1,&z1);
-  Real x2, y2, z2;
-  GetGridCartPosition(ic2,&x2,&y2,&z2);
+// inline function to find arc length between two face centers
+KOKKOS_INLINE_FUNCTION
+Real ArcLength(int ic1, int ic2, int nlvl,
+               DualArray4D<Real> anorm, DualArray2D<Real> apnorm) {
+  Real x1, y1, z1, x2, y2, z2;
+  GridCartPosition(ic1,nlvl,anorm,apnorm,&x1,&y1,&z1);
+  GridCartPosition(ic2,nlvl,anorm,apnorm,&x2,&y2,&z2);
   return acos(x1*x2+y1*y2+z1*z2);
 }
 
-void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
-                                       Real y1, Real y2, Real y3,
-                                       Real z1, Real z2, Real z3,
-                                       Real *x, Real *y, Real *z) const {
+// inline function to find circumcenter of face
+KOKKOS_INLINE_FUNCTION
+void CircumcenterNormalized(Real x1, Real x2, Real x3,
+                            Real y1, Real y2, Real y3,
+                            Real z1, Real z2, Real z3,
+                            Real *x, Real *y, Real *z) {
   Real a = sqrt((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)+(z3-z2)*(z3-z2));
   Real b = sqrt((x1-x3)*(x1-x3)+(y1-y3)*(y1-y3)+(z1-z3)*(z1-z3));
   Real c = sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)+(z2-z1)*(z2-z1));
@@ -814,73 +875,7 @@ void Radiation::CircumcenterNormalized(Real x1, Real x2, Real x3,
   *z = z_c/norm_c;
 }
 
-KOKKOS_INLINE_FUNCTION
-void UnitFluxDir(int ic1, int ic2, int nlvl,
-                 DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                 Real *dtheta, Real *dphi) {
-  Real x, y, z;
-  DeviceGetGridCartPosition(ic1,nlvl,ah_norm,ap_norm,&x,&y,&z);
-  Real zeta1 = acos(z);
-  Real psi1 = atan2(y,x);
-
-  Real xm, ym, zm;
-  DeviceGetGridCartPositionMid(ic1,ic2,nlvl,ah_norm,ap_norm,&xm,&ym,&zm);
-  Real zetam = acos(zm);
-  Real psim = atan2(ym,xm);
-
-  if (fabs(psim-psi1) < 1.0e-10 ||
-      fabs(fabs(zm)-1) < 1.0e-10 ||
-      fabs(fabs(cos(zeta1))-1) < 1.0e-10) {
-    *dtheta = copysign(1.0,zetam-zeta1);
-    *dphi = 0.0;
-  } else {
-    Real a_par, p_par;
-    GreatCircleParam(zeta1,zetam,psi1,psim,&a_par,&p_par);
-    Real zeta_deriv = (a_par*sin(psim-p_par)
-                       / (1.0+a_par*a_par*cos(psim-p_par)*cos(psim-p_par)));
-    Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetam)*sin(zetam));
-    Real signfactor = copysign(1.0,psim-psi1)*copysign(1.0,M_PI-fabs(psim-psi1));
-    *dtheta = signfactor*zeta_deriv*denom;
-    *dphi   = signfactor*denom;
-  }
-}
-
-KOKKOS_INLINE_FUNCTION
-void DeviceGetGridCartPosition(int n, int nlvl,
-                               DualArray4D<Real> ah_norm, DualArray2D<Real> ap_norm,
-                               Real *x, Real *y, Real *z) {
-  int ibl0 = (n / (2*nlvl*nlvl));
-  int ibl1 = (n % (2*nlvl*nlvl)) / (2*nlvl);
-  int ibl2 = (n % (2*nlvl*nlvl)) % (2*nlvl);
-  if (ibl0 == 5) {
-    *x = ap_norm.d_view(ibl2, 0);
-    *y = ap_norm.d_view(ibl2, 1);
-    *z = ap_norm.d_view(ibl2, 2);
-  } else {
-    *x = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,0);
-    *y = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,1);
-    *z = ah_norm.d_view(ibl0,ibl1+1,ibl2+1,2);
-  }
-}
-
-KOKKOS_INLINE_FUNCTION
-void DeviceGetGridCartPositionMid(int n, int nb, int nlvl,
-                                  DualArray4D<Real> ah_norm,
-                                  DualArray2D<Real> ap_norm,
-                                  Real *x, Real *y, Real *z) {
-  Real x1, y1, z1;
-  Real x2, y2, z2;
-  DeviceGetGridCartPosition(n, nlvl,ah_norm,ap_norm,&x1,&y1,&z1);
-  DeviceGetGridCartPosition(nb,nlvl,ah_norm,ap_norm,&x2,&y2,&z2);
-  Real xm = 0.5*(x1+x2);
-  Real ym = 0.5*(y1+y2);
-  Real zm = 0.5*(z1+z2);
-  Real norm = sqrt(SQR(xm)+SQR(ym)+SQR(zm));
-  *x = xm/norm;
-  *y = ym/norm;
-  *z = zm/norm;
-}
-
+// inline function to find the parameters describing a great circle connecting two angles
 KOKKOS_INLINE_FUNCTION
 void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
                       Real *apar, Real *psi0) {

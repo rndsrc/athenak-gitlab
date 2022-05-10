@@ -30,8 +30,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     iaflx("ciaflx",1,1,1,1,1,1),
     nh_c("nh_c",1,1),
     nh_f("nh_f",1,1,1),
-    xi_mn("xi_mn",1,1),
-    eta_mn("eta_mn",1,1),
     arc_lengths("arclen",1,1),
     solid_angle("solidang",1),
     amesh_normals("ameshnorm",1,1,1,1),
@@ -112,8 +110,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(arc_lengths, nangles, 6);
   Kokkos::realloc(nh_c, nangles, 4);
   Kokkos::realloc(nh_f, nangles, 6, 4);
-  Kokkos::realloc(xi_mn, nangles, 6);
-  Kokkos::realloc(eta_mn, nangles, 6);
   Kokkos::realloc(nmu, nmb, nangles, ncells3, ncells2, ncells1, 4);
   Kokkos::realloc(n_mu, nmb, nangles, ncells3, ncells2, ncells1, 4);
   Kokkos::realloc(n1_n_0, nmb, nangles, ncells3, ncells2, ncells1+1);
@@ -123,7 +119,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(norm_to_tet, nmb, 4, 4, ncells3, ncells2, ncells1);
   }
   InitAngularMesh();
-  InitRadiationFrame();
+  SetOrthonormalTetrad();
 
   // (3) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
