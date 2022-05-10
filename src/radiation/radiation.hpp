@@ -13,8 +13,6 @@
 #include "tasklist/task_list.hpp"
 #include "bvals/bvals.hpp"
 
-#define HUGE_NUMBER 1.0e+36
-
 // forward declarations
 class EquationOfState;
 class Coordinates;
@@ -122,13 +120,16 @@ class Radiation {
   DualArray1D<Real> solid_angle;      // solid angles
   DualArray2D<Real> nh_c;             // normal vector computed at face center
   DualArray3D<Real> nh_f;             // normal vector computed at face edges
-  DvceArray6D<Real> nmu;              // n^mu
-  DvceArray6D<Real> n_mu;             // n_mu
-  DvceArray5D<Real> n1_n_0;           // n^1*n_0
-  DvceArray5D<Real> n2_n_0;           // n^2*n_0
-  DvceArray5D<Real> n3_n_0;           // n^3*n_0
-  DvceArray6D<Real> na_n_0;           // n^a*n_0
+  DvceArray6D<Real> na;               // n^a*n_0
   DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
+  DvceArray6D<Real> tet_c;            // tetrad components at cell centers
+  DvceArray6D<Real> tetcov_c;         // covariant tetrad components at cell centers
+  DvceArray5D<Real> tet_d1_x1f;       // tetrad components (subset) at x1f
+  DvceArray5D<Real> tetcov_d0_x1f;;   // covariant tetrad components (subset) at x1f
+  DvceArray5D<Real> tet_d2_x2f;       // tetrad components (subset) at x2f
+  DvceArray5D<Real> tetcov_d0_x2f;    // covariant tetrad components (subset) at x2f
+  DvceArray5D<Real> tet_d3_x3f;       // tetrad components (subset) at x3f
+  DvceArray5D<Real> tetcov_d0_x3f;    // covariant tetrad components (subset) at x3f
   void InitAngularMesh();
   void SetOrthonormalTetrad();
 

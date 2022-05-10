@@ -48,8 +48,9 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto flx3 = iflx.x3f;
   auto flxa = iaflx;
 
-  auto nmu_ = nmu;
-  auto n_mu_ = n_mu;
+  auto &nh_c_ = nh_c;
+  auto &tet_c_ = tet_c;
+  auto &tetcov_c_ = tetcov_c;
 
   auto &angular_fluxes_ = angular_fluxes;
   auto &num_neighbors_ = num_neighbors;
@@ -61,8 +62,12 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
 
   par_for("r_update",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
-    // coordinate unit normal components n^0 n_0
-    Real n0_n_0 = nmu_(m,n,k,j,i,0)*n_mu_(m,n,k,j,i,0);
+    // coordinate unit normal components n^0 and n_0
+    Real n0 = 0.0; Real n_0 = 0.0;
+    for (int d=0; d<4; ++d) {
+      n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(n,d);
+      n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d);
+    }
 
     // spatial fluxes
     Real divf_s = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
@@ -72,7 +77,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
     if (three_d) {
       divf_s += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
     }
-    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/n0_n_0;
+    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/(n0*n_0);
 
     // angular fluxes
     if (angular_fluxes_) {
@@ -80,7 +85,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
       for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
         divf_a += arc_lengths_.d_view(n,nb)*flxa(m,n,k,j,i,nb)/solid_angle_.d_view(n);
       }
-      i0_(m,n,k,j,i) -= beta_dt*divf_a/n0_n_0;
+      i0_(m,n,k,j,i) -= beta_dt*divf_a/(n0*n_0);
     }
 
     // zero intensity if negative

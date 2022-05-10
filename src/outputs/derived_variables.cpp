@@ -117,9 +117,11 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // radiation moments evaluated in the coordinate frame
   if (name.compare("rad_coord") == 0) {
     auto dv = derived_var;
-    auto i0_ = pm->pmb_pack->prad->i0;
     int nangles_ = pm->pmb_pack->prad->nangles;
-    auto nmu_ = pm->pmb_pack->prad->nmu;
+    auto nh_c_ = pm->pmb_pack->prad->nh_c;
+    auto tet_c_ = pm->pmb_pack->prad->tet_c;
+    auto tetcov_c_ = pm->pmb_pack->prad->tetcov_c;
+    auto i0_ = pm->pmb_pack->prad->i0;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     par_for("moments_coord",DevExeSpace(),0,(nmb-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -127,8 +129,13 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
         for (int n2=n1; n2<4; ++n2, ++n12) {
           dv(m,n12,k,j,i) = 0.0;
           for (int n=0; n<nangles_; ++n) {
-            dv(m,n12,k,j,i) += (nmu_(m,n,k,j,i,n1)*nmu_(m,n,k,j,i,n2)
-                                *i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+            Real nmu_n1 = 0.0; Real nmu_n2 = 0.0; Real n_0 = 0.0;
+            for (int d=0; d<4; ++d) {
+              nmu_n1  += tet_c_   (m,d,n1,k,j,i)*nh_c_.d_view(n,d);
+              nmu_n2  += tet_c_   (m,d,n2,k,j,i)*nh_c_.d_view(n,d);
+              n_0     += tetcov_c_(m,d,0, k,j,i)*nh_c_.d_view(n,d);
+            }
+            dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
           }
         }
       }
@@ -139,7 +146,9 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   if (name.compare("rad_fluid") == 0) {
     auto dv = derived_var;
     int nangles_ = pm->pmb_pack->prad->nangles;
-    auto nmu_ = pm->pmb_pack->prad->nmu;
+    auto nh_c_ = pm->pmb_pack->prad->nh_c;
+    auto tet_c_ = pm->pmb_pack->prad->tet_c;
+    auto tetcov_c_ = pm->pmb_pack->prad->tetcov_c;
     auto solid_angle_ = pm->pmb_pack->prad->solid_angle;
     auto &coord = pm->pmb_pack->pcoord->coord_data;
 
@@ -203,8 +212,13 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
         for (int n2=n1; n2<4; ++n2, ++n12) {
           dv(m,n12,k,j,i) = 0.0;
           for (int n=0; n<nangles_; ++n) {
-            dv(m,n12,k,j,i) += (nmu_(m,n,k,j,i,n1)*nmu_(m,n,k,j,i,n2)
-                                *i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+            Real nmu_n1 = 0.0; Real nmu_n2 = 0.0; Real n_0 = 0.0;
+            for (int d=0; d<4; ++d) {
+              nmu_n1  += tet_c_   (m,d,n1,k,j,i)*nh_c_.d_view(n,d);
+              nmu_n2  += tet_c_   (m,d,n2,k,j,i)*nh_c_.d_view(n,d);
+              n_0     += tetcov_c_(m,d,0, k,j,i)*nh_c_.d_view(n,d);
+            }
+            dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
           }
         }
       }

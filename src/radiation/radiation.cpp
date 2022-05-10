@@ -38,13 +38,16 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     ameshp_indices("ameshpind",1),
     num_neighbors("numneigh",1),
     ind_neighbors("indneigh",1,1),
-    nmu("nmu",1,1,1,1,1,1),
-    n_mu("n_mu",1,1,1,1,1,1),
-    n1_n_0("n1_n_0",1,1,1,1,1),
-    n2_n_0("n2_n_0",1,1,1,1,1),
-    n3_n_0("n3_n_0",1,1,1,1,1),
-    na_n_0("na_n_0",1,1,1,1,1,1),
-    norm_to_tet("norm_to_tet",1,1,1,1,1,1) {
+    na("na",1,1,1,1,1,1),
+    norm_to_tet("norm_to_tet",1,1,1,1,1,1),
+    tet_c("tet_c",1,1,1,1,1,1),
+    tetcov_c("tetcov_c",1,1,1,1,1,1),
+    tet_d1_x1f("tet_d1_x1f",1,1,1,1,1),
+    tetcov_d0_x1f("tetcov_d0_x1f",1,1,1,1,1),
+    tet_d2_x2f("tet_d2_x2f",1,1,1,1,1),
+    tetcov_d0_x2f("tetcov_d0_x2f",1,1,1,1,1),
+    tet_d3_x3f("tet_d3_x3f",1,1,1,1,1),
+    tetcov_d0_x3f("tetcov_d0_x3f",1,1,1,1,1) {
   // Check for general relativity
   if (!(pmy_pack->pcoord->is_general_relativistic)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
@@ -110,13 +113,16 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(arc_lengths, nangles, 6);
   Kokkos::realloc(nh_c, nangles, 4);
   Kokkos::realloc(nh_f, nangles, 6, 4);
-  Kokkos::realloc(nmu, nmb, nangles, ncells3, ncells2, ncells1, 4);
-  Kokkos::realloc(n_mu, nmb, nangles, ncells3, ncells2, ncells1, 4);
-  Kokkos::realloc(n1_n_0, nmb, nangles, ncells3, ncells2, ncells1+1);
-  Kokkos::realloc(n2_n_0, nmb, nangles, ncells3, ncells2+1, ncells1);
-  Kokkos::realloc(n3_n_0, nmb, nangles, ncells3+1, ncells2, ncells1);
-  Kokkos::realloc(na_n_0, nmb, nangles, ncells3, ncells2, ncells1, 6);
+  Kokkos::realloc(na, nmb, nangles, ncells3, ncells2, ncells1, 6);
   Kokkos::realloc(norm_to_tet, nmb, 4, 4, ncells3, ncells2, ncells1);
+  Kokkos::realloc(tet_c,nmb,4,4,ncells3,ncells2,ncells1);
+  Kokkos::realloc(tetcov_c,nmb,4,4,ncells3,ncells2,ncells1);
+  Kokkos::realloc(tet_d1_x1f,nmb,4,ncells3,ncells2,ncells1+1);
+  Kokkos::realloc(tetcov_d0_x1f,nmb,4,ncells3,ncells2,ncells1+1);
+  Kokkos::realloc(tet_d2_x2f,nmb,4,ncells3,ncells2+1,ncells1);
+  Kokkos::realloc(tetcov_d0_x2f,nmb,4,ncells3,ncells2+1,ncells1);
+  Kokkos::realloc(tet_d3_x3f,nmb,4,ncells3+1,ncells2,ncells1);
+  Kokkos::realloc(tetcov_d0_x3f,nmb,4,ncells3+1,ncells2,ncells1);
   }
   InitAngularMesh();
   SetOrthonormalTetrad();
