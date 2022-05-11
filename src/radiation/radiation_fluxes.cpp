@@ -44,7 +44,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
   // i-direction
 
   auto &tet_d1_x1f_ = tet_d1_x1f;
-  auto &tetcov_d0_x1f_ = tetcov_d0_x1f;
   auto flx1 = iflx.x1f;
   par_for("rflux_x1",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie+1,
   KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
@@ -74,16 +73,12 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
       default:
         break;
     }
-    Real n1 = 0.0; Real n_0 = 0.0;
-    for (int d=0; d<4; ++d) {
-      n1  += tet_d1_x1f_   (m,d,k,j,i)*nh_c_.d_view(n,d);
-      n_0 += tetcov_d0_x1f_(m,d,k,j,i)*nh_c_.d_view(n,d);
-    }
-    flx1(m,n,k,j,i) = ((n1*n_0)*((n1*n_0) < 0.0 ? iil : iir));
+    Real n1 = 0.0;
+    for (int d=0; d<4; ++d) { n1 += tet_d1_x1f_(m,d,k,j,i)*nh_c_.d_view(n,d); }
+    flx1(m,n,k,j,i) = (n1 * ((n1 > 0.0) ? iil : iir));
     if (coord.bh_excise) {
       if (fc_mask_.x1f(m,k,j,i)) {
-        flx1(m,n,k,j,i) = ((n1*n_0) *
-                          ((n1*n_0) < 0.0 ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
+        flx1(m,n,k,j,i) = (n1 * ((n1 > 0.0) ? i0_(m,n,k,j,i-1) : i0_(m,n,k,j,i)));
       }
     }
   });
@@ -93,7 +88,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
 
   if (pmy_pack->pmesh->multi_d) {
     auto &tet_d2_x2f_ = tet_d2_x2f;
-    auto &tetcov_d0_x2f_ = tetcov_d0_x2f;
     auto flx2 = iflx.x2f;
     par_for("rflux_x2",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je+1,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
@@ -123,16 +117,12 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
         default:
           break;
       }
-      Real n2 = 0.0; Real n_0 = 0.0;
-      for (int d=0; d<4; ++d) {
-        n2  += tet_d2_x2f_   (m,d,k,j,i)*nh_c_.d_view(n,d);
-        n_0 += tetcov_d0_x2f_(m,d,k,j,i)*nh_c_.d_view(n,d);
-      }
-      flx2(m,n,k,j,i) = ((n2*n_0)*((n2*n_0) < 0.0 ? iil : iir));
+      Real n2 = 0.0;
+      for (int d=0; d<4; ++d) { n2 += tet_d2_x2f_(m,d,k,j,i)*nh_c_.d_view(n,d); }
+      flx2(m,n,k,j,i) = (n2 * ((n2 > 0.0) ? iil : iir));
       if (coord.bh_excise) {
         if (fc_mask_.x2f(m,k,j,i)) {
-          flx2(m,n,k,j,i) = ((n2*n_0) *
-                            ((n2*n_0)<0.0 ? i0_(m,n,k,j-1,i) : i0_(m,n,k,j,i)));
+          flx2(m,n,k,j,i) = (n2 * ((n2 > 0.0) ? i0_(m,n,k,j-1,i) : i0_(m,n,k,j,i)));
         }
       }
     });
@@ -143,7 +133,6 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
 
   if (pmy_pack->pmesh->three_d) {
     auto &tet_d3_x3f_ = tet_d3_x3f;
-    auto &tetcov_d0_x3f_ = tetcov_d0_x3f;
     auto flx3 = iflx.x3f;
     par_for("rflux_x3",DevExeSpace(),0,nmb1,0,nang1,ks,ke+1,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
@@ -173,16 +162,12 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
         default:
           break;
       }
-      Real n3 = 0.0; Real n_0 = 0.0;
-      for (int d=0; d<4; ++d) {
-        n3  += tet_d3_x3f_   (m,d,k,j,i)*nh_c_.d_view(n,d);
-        n_0 += tetcov_d0_x3f_(m,d,k,j,i)*nh_c_.d_view(n,d);
-      }
-      flx3(m,n,k,j,i) = ((n3*n_0)*((n3*n_0) < 0.0 ? iil : iir));
+      Real n3 = 0.0;
+      for (int d=0; d<4; ++d) { n3 += tet_d3_x3f_(m,d,k,j,i)*nh_c_.d_view(n,d); }
+      flx3(m,n,k,j,i) = (n3 * ((n3 > 0.0) ? iil : iir));
       if (coord.bh_excise) {
         if (fc_mask_.x3f(m,k,j,i)) {
-          flx3(m,n,k,j,i) = ((n3*n_0) *
-                            ((n3*n_0)<0.0 ? i0_(m,n,k-1,j,i) : i0_(m,n,k,j,i)));
+          flx3(m,n,k,j,i) = (n3 * ((n3 > 0.0) ? i0_(m,n,k-1,j,i) : i0_(m,n,k,j,i)));
         }
       }
     });
@@ -190,19 +175,20 @@ TaskStatus Radiation::CalcFluxes(Driver *pdriver, int stage) {
 
   //--------------------------------------------------------------------------------------
   // Angular Fluxes
+
   if (angular_fluxes) {
     auto num_neighbors_ = num_neighbors;
     auto indn_ = ind_neighbors;
-    auto &nh_f_ = nh_f;
-    auto &tetcov_c_ = tetcov_c;
-    auto flxa_ = iaflx;
+    auto arc_lengths_ = arc_lengths;
+    auto solid_angle_ = solid_angle;
+    auto divfa_ = divfa;
     par_for("rflux_a",DevExeSpace(),0,nmb1,0,nang1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
+      divfa_(m,n,k,j,i) = 0.0;
       for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-        Real n_0 = 0.0;
-        for (int d=0; d<4; ++d) { n_0 += tetcov_c_(m,d,0,k,j,i)*nh_f_.d_view(n,nb,d); }
-        flxa_(m,n,k,j,i,nb) = ((na_(m,n,k,j,i,nb)*n_0) *
-      ((na_(m,n,k,j,i,nb)*n_0) > 0.0 ? i0_(m,indn_.d_view(n,nb),k,j,i) : i0_(m,n,k,j,i)));
+        Real flx_edge = (na_(m,n,k,j,i,nb) *
+          ((na_(m,n,k,j,i,nb) < 0.0) ? i0_(m,indn_.d_view(n,nb),k,j,i) : i0_(m,n,k,j,i)));
+        divfa_(m,n,k,j,i) += (arc_lengths_.d_view(n,nb)*flx_edge/solid_angle_.d_view(n));
       }
     });
   }

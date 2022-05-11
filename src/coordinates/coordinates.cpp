@@ -54,10 +54,13 @@ Coordinates::Coordinates(ParameterInput *pin, MeshBlockPack *ppack) :
       int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
       int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
       Kokkos::realloc(cc_mask, nmb, ncells3, ncells2, ncells1);
-      Kokkos::realloc(cc_rad_mask, nmb, ncells3, ncells2, ncells1);
       Kokkos::realloc(fc_mask.x1f, nmb, ncells3, ncells2, ncells1+1);
       Kokkos::realloc(fc_mask.x2f, nmb, ncells3, ncells2+1, ncells1);
       Kokkos::realloc(fc_mask.x3f, nmb, ncells3+1, ncells2, ncells1);
+      if (pin->DoesBlockExist("radiation")) {
+        coord_data.excise_rad = true;
+        Kokkos::realloc(cc_rad_mask, nmb, ncells3, ncells2, ncells1);
+      }
     }
   }
 }

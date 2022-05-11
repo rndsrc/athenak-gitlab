@@ -20,7 +20,7 @@ void ComputeTetrad(Real x, Real y, Real z, bool minkowski, Real a,
   // calculate coordinate quantities
   Real rad = sqrt(SQR(x) + SQR(y) + SQR(z));
   Real r = sqrt((SQR(rad)-SQR(a)+sqrt(SQR(SQR(rad)-SQR(a))+4.0*SQR(a)*SQR(z)))/2.0);
-  // r = fmax(r, 1.0);  // floor r_ks to 0.5*(r_inner + r_outer)
+  r = fmax(r, 1.0);  // floor r_ks to 0.5*(r_inner + r_outer)
 
   Real f = 2.0 * SQR(r)*r / (SQR(SQR(r)) + SQR(a)*SQR(z));
   if (minkowski) {f=0.0;}

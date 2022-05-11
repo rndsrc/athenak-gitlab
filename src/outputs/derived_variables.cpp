@@ -135,7 +135,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
               nmu_n2  += tet_c_   (m,d,n2,k,j,i)*nh_c_.d_view(n,d);
               n_0     += tetcov_c_(m,d,0, k,j,i)*nh_c_.d_view(n,d);
             }
-            dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+            dv(m,n12,k,j,i) += (nmu_n1*nmu_n2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
           }
         }
       }

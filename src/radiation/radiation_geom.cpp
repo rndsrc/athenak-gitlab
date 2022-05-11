@@ -365,6 +365,7 @@ void Radiation::SetOrthonormalTetrad() {
   // set tetrad components
   auto tet_c_ = tet_c;
   auto tetcov_c_ = tetcov_c;
+  auto norm_to_tet_ = norm_to_tet;
   par_for("tet_c",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real &x1min = size.d_view(m).x1min;
@@ -389,168 +390,8 @@ void Radiation::SetOrthonormalTetrad() {
         tetcov_c_(m,d1,d2,k,j,i) = e_cov[d1][d2];
       }
     }
-  });
 
-  // set tetrad components (subset) at x1f
-  auto tet_d1_x1f_ = tet_d1_x1f;
-  auto tetcov_d0_x1f_ = tetcov_d0_x1f;
-  par_for("tet_x1f",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,n1,
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
-    Real &x1min = size.d_view(m).x1min;
-    Real &x1max = size.d_view(m).x1max;
-    Real x1f = LeftEdgeX(i-is, indcs.nx1, x1min, x1max);
-
-    Real &x2min = size.d_view(m).x2min;
-    Real &x2max = size.d_view(m).x2max;
-    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-    Real &x3min = size.d_view(m).x3min;
-    Real &x3max = size.d_view(m).x3max;
-    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-    ComputeTetrad(x1f, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-    for (int d=0; d<4; ++d) {
-      tet_d1_x1f_(m,d,k,j,i) = e[d][1];
-      tetcov_d0_x1f_(m,d,k,j,i) = e_cov[d][0];
-    }
-  });
-
-  // set tetrad components (subset) at x2f
-  auto tet_d2_x2f_ = tet_d2_x2f;
-  auto tetcov_d0_x2f_ = tetcov_d0_x2f;
-  par_for("tet_x2f",DevExeSpace(),0,(nmb-1),0,(n3-1),0,n2,0,(n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
-    Real &x1min = size.d_view(m).x1min;
-    Real &x1max = size.d_view(m).x1max;
-    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-    Real &x2min = size.d_view(m).x2min;
-    Real &x2max = size.d_view(m).x2max;
-    Real x2f = LeftEdgeX(j-js, indcs.nx2, x2min, x2max);
-
-    Real &x3min = size.d_view(m).x3min;
-    Real &x3max = size.d_view(m).x3max;
-    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-    ComputeTetrad(x1v, x2f, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-    for (int d=0; d<4; ++d) {
-      tet_d2_x2f_(m,d,k,j,i) = e[d][2];
-      tetcov_d0_x2f_(m,d,k,j,i) = e_cov[d][0];
-    }
-  });
-
-  // set tetrad components (subset) at x3f
-  auto tet_d3_x3f_ = tet_d3_x3f;
-  auto tetcov_d0_x3f_ = tetcov_d0_x3f;
-  par_for("tet_x3f",DevExeSpace(),0,(nmb-1),0,n3,0,(n2-1),0,(n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
-    Real &x1min = size.d_view(m).x1min;
-    Real &x1max = size.d_view(m).x1max;
-    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-    Real &x2min = size.d_view(m).x2min;
-    Real &x2max = size.d_view(m).x2max;
-    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-    Real &x3min = size.d_view(m).x3min;
-    Real &x3max = size.d_view(m).x3max;
-    Real x3f = LeftEdgeX(k-ks, indcs.nx3, x3min, x3max);
-
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-    ComputeTetrad(x1v, x2v, x3f, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-    for (int d=0; d<4; ++d) {
-      tet_d3_x3f_(m,d,k,j,i) = e[d][3];
-      tetcov_d0_x3f_(m,d,k,j,i) = e_cov[d][0];
-    }
-  });
-
-  // Calculate n^angle
-  auto na_ = na;
-  if (nlev_ != 0) {  // do not compute na if nlevel=0
-    par_for("rad_na_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-    KOKKOS_LAMBDA(int m, int k, int j, int i) {
-      Real &x1min = size.d_view(m).x1min;
-      Real &x1max = size.d_view(m).x1max;
-      Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-      Real &x2min = size.d_view(m).x2min;
-      Real &x2max = size.d_view(m).x2max;
-      Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-      Real &x3min = size.d_view(m).x3min;
-      Real &x3max = size.d_view(m).x3max;
-      Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-      ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-      for (int n=0; n<nangles_; ++n) {
-        Real zetav = acos(nh_c_.d_view(n,3));
-        Real psiv  = atan2(nh_c_.d_view(n,2), nh_c_.d_view(n,1));
-        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          Real zetaf = acos(nh_f_.d_view(n,nb,3));
-          Real psif  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
-          Real na1 = 0.0;
-          Real na2 = 0.0;
-          for (int q=0; q<4; ++q) {
-            for (int p=0; p<4; ++p) {
-              na1 += (1.0/sin(zetaf)*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
-                      * (nh_f_.d_view(n,nb,0)*omega[3][q][p]
-                      -  nh_f_.d_view(n,nb,3)*omega[0][q][p]));
-              na2 += (1.0/SQR(sin(zetaf))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
-                      * (nh_f_.d_view(n,nb,2)*omega[1][q][p]
-                      -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
-            }
-          }
-          Real unit_zeta, unit_psi;
-          UnitFluxDir(zetav,psiv,zetaf,psif,&unit_zeta,&unit_psi);
-          na_(m,n,k,j,i,nb) = na1*unit_zeta + SQR(sin(zetaf))*na2*unit_psi;
-        }
-      }
-
-      // Guarantee that na_n_0 at shared faces are identical
-      for (int n=0; n<nangles_; ++n) {
-        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          Real this_na = na_(m,n,k,j,i,nb);
-          for (int nnb=0; nnb<num_neighbors_.d_view(ind_neighbors_.d_view(n,nb)); ++nnb) {
-            Real neigh_na = na_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb);
-            if (nh_f_.d_view(n,nb,1) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,1) &&
-                nh_f_.d_view(n,nb,2) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,2) &&
-                nh_f_.d_view(n,nb,3) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,3)) {
-              Real na_avg = 0.5*(fabs(this_na)+fabs(neigh_na));
-              na_(m,n,k,j,i,nb) = copysign(na_avg, this_na);
-              na_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb) = copysign(na_avg,
-                                                                      neigh_na);
-            }
-          }
-        }
-      }
-    });
-  }
-
-  // Calculate norm_to_tet
-  auto norm_to_tet_ = norm_to_tet;
-  par_for("rad_norm_to_tet", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
-    Real &x1min = size.d_view(m).x1min;
-    Real &x1max = size.d_view(m).x1max;
-    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-    Real &x2min = size.d_view(m).x2min;
-    Real &x2max = size.d_view(m).x2max;
-    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-    Real &x3min = size.d_view(m).x3min;
-    Real &x3max = size.d_view(m).x3max;
-    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-    Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
-    ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
-
-    // Set Minkowski metric
+    // norm_to_tet_
     Real eta[4][4] = {0.0};
     eta[0][0] = -1.0;
     eta[1][1] = 1.0;
@@ -579,6 +420,130 @@ void Radiation::SetOrthonormalTetrad() {
       }
     }
   });
+
+  // set tetrad components (subset) at x1f
+  auto tet_d1_x1f_ = tet_d1_x1f;
+  par_for("tet_x1f",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,n1,
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    Real x1f = LeftEdgeX(i-is, indcs.nx1, x1min, x1max);
+
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+
+    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    ComputeTetrad(x1f, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+    for (int d=0; d<4; ++d) { tet_d1_x1f_   (m,d,k,j,i) = e[d][1]; }
+  });
+
+  // set tetrad components (subset) at x2f
+  auto tet_d2_x2f_ = tet_d2_x2f;
+  par_for("tet_x2f",DevExeSpace(),0,(nmb-1),0,(n3-1),0,n2,0,(n1-1),
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    Real x2f = LeftEdgeX(j-js, indcs.nx2, x2min, x2max);
+
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+
+    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    ComputeTetrad(x1v, x2f, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+    for (int d=0; d<4; ++d) { tet_d2_x2f_(m,d,k,j,i) = e[d][2]; }
+  });
+
+  // set tetrad components (subset) at x3f
+  auto tet_d3_x3f_ = tet_d3_x3f;
+  par_for("tet_x3f",DevExeSpace(),0,(nmb-1),0,n3,0,(n2-1),0,(n1-1),
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    Real x3f = LeftEdgeX(k-ks, indcs.nx3, x3min, x3max);
+
+    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    ComputeTetrad(x1v, x2v, x3f, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+    for (int d=0; d<4; ++d) { tet_d3_x3f_   (m,d,k,j,i) = e[d][3]; }
+  });
+
+  // Calculate n^angle
+  auto na_ = na;
+  if (nlev_ != 0) {  // do not compute na if nlevel=0
+    par_for("rad_na_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+      Real &x1min = size.d_view(m).x1min;
+      Real &x1max = size.d_view(m).x1max;
+      Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+
+      Real &x2min = size.d_view(m).x2min;
+      Real &x2max = size.d_view(m).x2max;
+      Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+
+      Real &x3min = size.d_view(m).x3min;
+      Real &x3max = size.d_view(m).x3max;
+      Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+
+      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+      for (int n=0; n<nangles_; ++n) {
+        Real zetav = acos(nh_c_.d_view(n,3));
+        Real psiv  = atan2(nh_c_.d_view(n,2), nh_c_.d_view(n,1));
+        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
+          Real zetaf = acos(nh_f_.d_view(n,nb,3));
+          Real psif  = atan2(nh_f_.d_view(n,nb,2), nh_f_.d_view(n,nb,1));
+          Real na1 = 0.0; Real na2 = 0.0;
+          for (int q=0; q<4; ++q) {
+            for (int p=0; p<4; ++p) {
+              na1 += (1.0/sin(zetaf)*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
+                      * (nh_f_.d_view(n,nb,0)*omega[3][q][p]
+                      -  nh_f_.d_view(n,nb,3)*omega[0][q][p]));
+              na2 += (1.0/SQR(sin(zetaf))*nh_f_.d_view(n,nb,q)*nh_f_.d_view(n,nb,p)
+                      * (nh_f_.d_view(n,nb,2)*omega[1][q][p]
+                      -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
+            }
+          }
+          Real unit_zeta, unit_psi;
+          UnitFluxDir(zetav,psiv,zetaf,psif,&unit_zeta,&unit_psi);
+          na_(m,n,k,j,i,nb) = na1*unit_zeta + SQR(sin(zetaf))*na2*unit_psi;
+        }
+      }
+
+      // Guarantee that na_n_0 at shared faces are identical
+      for (int n=0; n<nangles_; ++n) {
+        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
+          Real this_na = na_(m,n,k,j,i,nb);
+          for (int nnb=0; nnb<num_neighbors_.d_view(ind_neighbors_.d_view(n,nb)); ++nnb) {
+            Real neigh_na = na_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb);
+            if (nh_f_.d_view(n,nb,1) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,1) &&
+                nh_f_.d_view(n,nb,2) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,2) &&
+                nh_f_.d_view(n,nb,3) == nh_f_.d_view(ind_neighbors_.d_view(n,nb),nnb,3)) {
+              Real na_avg = 0.5*(fabs(this_na)+fabs(neigh_na));
+              na_(m,n,k,j,i,nb) = copysign(na_avg, this_na);
+              na_(m,ind_neighbors_.d_view(n,nb),k,j,i,nnb) = copysign(na_avg, neigh_na);
+            }
+          }
+        }
+      }
+    });
+  }
 
   return;
 }

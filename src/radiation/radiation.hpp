@@ -125,11 +125,8 @@ class Radiation {
   DvceArray6D<Real> tet_c;            // tetrad components at cell centers
   DvceArray6D<Real> tetcov_c;         // covariant tetrad components at cell centers
   DvceArray5D<Real> tet_d1_x1f;       // tetrad components (subset) at x1f
-  DvceArray5D<Real> tetcov_d0_x1f;;   // covariant tetrad components (subset) at x1f
   DvceArray5D<Real> tet_d2_x2f;       // tetrad components (subset) at x2f
-  DvceArray5D<Real> tetcov_d0_x2f;    // covariant tetrad components (subset) at x2f
   DvceArray5D<Real> tet_d3_x3f;       // tetrad components (subset) at x3f
-  DvceArray5D<Real> tetcov_d0_x3f;    // covariant tetrad components (subset) at x3f
   void InitAngularMesh();
   void SetOrthonormalTetrad();
 
@@ -143,7 +140,7 @@ class Radiation {
   // following only used for time-evolving flow
   DvceArray5D<Real> i1;       // intensity at intermediate step
   DvceFaceFld5D<Real> iflx;   // spatial fluxes on zone faces
-  DvceArray6D<Real> iaflx;    // angular fluxes on face edges
+  DvceArray5D<Real> divfa;    // angular flux divergence
   Real dtnew;
 
   // reconstruction method

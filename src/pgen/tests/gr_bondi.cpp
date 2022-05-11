@@ -180,18 +180,11 @@ void ProblemGenerator::BondiAccretion(ParameterInput *pin, const bool restart) {
   }
 
   if (pmbp->prad != nullptr) {
-    auto &i0 = pmbp->prad->i0;
     int nang1 = (pmbp->prad->nangles-1);
-    auto &excise = pmbp->pcoord->coord_data.bh_excise;
-    auto &cc_rad_mask_ = pmbp->pcoord->cc_rad_mask;
+    auto &i0 = pmbp->prad->i0;
     par_for("rad_beam",DevExeSpace(),0,(nmb-1),0,nang1,0,(n3-1),0,(n2-1),0,(n1-1),
     KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
-      i0(m,n,k,j,i) = 1.0e-4;
-      if (excise) {
-        if (cc_rad_mask_(m,k,j,i)) {
-          i0(m,n,k,j,i) = 0.0;
-        }
-      }
+      i0(m,n,k,j,i) = 0.0;
     });
   }
 

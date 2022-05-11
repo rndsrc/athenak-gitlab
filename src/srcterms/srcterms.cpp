@@ -358,7 +358,11 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
                + nh_c_.d_view(n,2) * dtc2
                + nh_c_.d_view(n,3) * dtc3);
       if ((dx_sq < SQR(width_/2.0)) && (mu > mu_min)) {
-        i0(m,n,k,j,i) += dii_dt_*bdt;
+        Real n_0 = 0.0;
+        for (int d=0; d<4; ++d) {
+          n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d);
+        }
+        i0(m,n,k,j,i) += n_0*dii_dt_*bdt;
       }
     }
   });

@@ -46,16 +46,13 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   auto flx1 = iflx.x1f;
   auto flx2 = iflx.x2f;
   auto flx3 = iflx.x3f;
-  auto flxa = iaflx;
 
   auto &nh_c_ = nh_c;
   auto &tet_c_ = tet_c;
   auto &tetcov_c_ = tetcov_c;
 
   auto &angular_fluxes_ = angular_fluxes;
-  auto &num_neighbors_ = num_neighbors;
-  auto &arc_lengths_ = arc_lengths;
-  auto &solid_angle_ = solid_angle;
+  auto &divfa_ = divfa;
 
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
@@ -77,19 +74,15 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
     if (three_d) {
       divf_s += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
     }
-    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/(n0*n_0);
+    i0_(m,n,k,j,i) = gam0*i0_(m,n,k,j,i)+gam1*i1_(m,n,k,j,i)-beta_dt*divf_s/n0;
 
     // angular fluxes
     if (angular_fluxes_) {
-      Real divf_a = 0.0;
-      for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-        divf_a += arc_lengths_.d_view(n,nb)*flxa(m,n,k,j,i,nb)/solid_angle_.d_view(n);
-      }
-      i0_(m,n,k,j,i) -= beta_dt*divf_a/(n0*n_0);
+      i0_(m,n,k,j,i) -= beta_dt*divfa_(m,n,k,j,i)/n0;
     }
 
     // zero intensity if negative
-    i0_(m,n,k,j,i) = fmax(i0_(m,n,k,j,i), 0.0);
+    i0_(m,n,k,j,i) = n_0*fmax((i0_(m,n,k,j,i)/n_0), 0.0);
 
     // if excising, handle r_ks <= r_outer
     if (excise) {

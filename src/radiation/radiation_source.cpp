@@ -170,14 +170,17 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     Real suma1 = 0.0;
     Real suma2 = 0.0;
     for (int n=0; n<=nang1; ++n) {
-      Real n0 = 0.0;
-      for (int d=0; d<4; ++d) { n0 += tet_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d); }
+      Real n0 = 0.0; Real n_0 = 0.0;
+      for (int d=0; d<4; ++d) {
+        n0  += tet_c_   (m,d,0,k,j,i)*nh_c_.d_view(n,d);
+        n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d);
+      }
       Real un_tet   = (u_tet[1]*nh_c_.d_view(n,1) +
                        u_tet[2]*nh_c_.d_view(n,2) +
                        u_tet[3]*nh_c_.d_view(n,3));
       Real n0_cm    = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
       Real omega_cm = solid_angle_.d_view(n)/SQR(n0_cm);
-      Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
+      Real intensity_cm = 4.0*M_PI*(i0_(m,n,k,j,i)/n_0)*SQR(SQR(n0_cm));
       Real vncsigma = 1.0/(n0 + (dtcsigmaa + dtcsigmas)*n0_cm);
       Real vncsigma2 = n0_cm*vncsigma;
       Real ir_weight = intensity_cm*omega_cm;
@@ -227,23 +230,24 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         }
 
         // compute moments before coupling
-        m_old[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_old[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_old[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_old[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+        m_old[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_old[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_old[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_old[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
 
         // update intensity
         Real un_tet   = (u_tet[1]*nh_c_.d_view(n,1) +
                          u_tet[2]*nh_c_.d_view(n,2) +
                          u_tet[3]*nh_c_.d_view(n,3));
         Real n0_cm    = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
-        Real intensity_cm = 4.0*M_PI*i0_(m,n,k,j,i)*SQR(SQR(n0_cm));
+        Real intensity_cm = 4.0*M_PI*(i0_(m,n,k,j,i)/n_0)*SQR(SQR(n0_cm));
         Real vncsigma = 1.0/(n0 + (dtcsigmaa + dtcsigmas)*n0_cm);
         Real vncsigma2 = n0_cm*vncsigma;
         Real di_cm = ( ((dtcsigmas-dtcsigmap)*jr_cm
                       + (dtcsigmaa+dtcsigmap)*emission
                       - (dtcsigmas+dtcsigmaa)*intensity_cm)*vncsigma2);
-        i0_(m,n,k,j,i) = fmax((i0_(m,n,k,j,i)+(di_cm/(4.0*M_PI*SQR(SQR(n0_cm))))), 0.0);
+        i0_(m,n,k,j,i) = n_0*fmax(((i0_(m,n,k,j,i)/n_0)
+                                   +(di_cm/(4.0*M_PI*SQR(SQR(n0_cm))))), 0.0);
         if (excise) {
           if (cc_rad_mask_(m,k,j,i)) {
             i0_(m,n,k,j,i) = 0.0;
@@ -251,10 +255,10 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         }
 
         // compute moments after coupling
-        m_new[0] += (n0*n_0*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_new[1] += (n0*n_1*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_new[2] += (n0*n_2*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
-        m_new[3] += (n0*n_3*i0_(m,n,k,j,i)*solid_angle_.d_view(n));
+        m_new[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_new[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_new[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_new[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
       }
     }
 
