@@ -95,7 +95,9 @@ void Coordinates::SetExcisionMasks() {
     x3 = x3v;
     cc_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
     if (is_radiation_enabled_) {
-      cc_rad_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
+      // cc_rad_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0+sqrt(1.-a2)) ? true : false;
+      Real r_out_ergo = 1.0 + sqrt(1.0 - a2*SQR(x3)/SQR(KSRX(x1,x2,x3,spin)));
+      cc_rad_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= r_out_ergo) ? true : false;
     }
 
     // Set fc_mask.x1f
