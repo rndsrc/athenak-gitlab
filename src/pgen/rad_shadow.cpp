@@ -95,7 +95,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   u_in.h_view(IEN,BoundaryFace::inner_x1) = -1.0;
   for (int n=0; n<=nang1; ++n) {
     if (n==2 || n==5) {
-      i_in.h_view(n,BoundaryFace::inner_x1) = 100.0;
+      i_in.h_view(n,BoundaryFace::inner_x1) = -100.0;
     } else {
       i_in.h_view(n,BoundaryFace::inner_x1) = 0.0;
     }

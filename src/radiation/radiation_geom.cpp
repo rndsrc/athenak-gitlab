@@ -42,7 +42,7 @@ Real ComputeWeightAndDualEdges(int n, int nlvl, DualArray4D<Real> anorm,
 
 KOKKOS_INLINE_FUNCTION
 void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
-                 Real *dtheta, Real *dphi);
+                 Real *dzeta, Real *dpsi);
 
 KOKKOS_INLINE_FUNCTION
 int Neighbors(int n, int nlvl, DualArray3D<Real> aind, int neighbors[6]);
@@ -382,7 +382,7 @@ void Radiation::SetOrthonormalTetrad() {
 
     Real g_[NMETRIC], gi_[NMETRIC];
     ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
     ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
     for (int d1=0; d1<4; ++d1) {
       for (int d2=0; d2<4; ++d2) {
@@ -437,7 +437,7 @@ void Radiation::SetOrthonormalTetrad() {
     Real &x3max = size.d_view(m).x3max;
     Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
     ComputeTetrad(x1f, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
     for (int d=0; d<4; ++d) { tet_d1_x1f_   (m,d,k,j,i) = e[d][1]; }
   });
@@ -479,7 +479,7 @@ void Radiation::SetOrthonormalTetrad() {
     Real &x3max = size.d_view(m).x3max;
     Real x3f = LeftEdgeX(k-ks, indcs.nx3, x3min, x3max);
 
-    Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+    Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
     ComputeTetrad(x1v, x2v, x3f, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
     for (int d=0; d<4; ++d) { tet_d3_x3f_   (m,d,k,j,i) = e[d][3]; }
   });
@@ -501,7 +501,7 @@ void Radiation::SetOrthonormalTetrad() {
       Real &x3max = size.d_view(m).x3max;
       Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-      Real e[4][4]; Real e_cov[4][4]; Real omega[4][4][4];
+      Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
       ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
       for (int n=0; n<nangles_; ++n) {
         Real zetav = acos(nh_c_.d_view(n,3));
@@ -625,11 +625,11 @@ Real ComputeWeightAndDualEdges(int n, int nlvl, DualArray4D<Real> anorm,
 // inline function to find unit vector at face edge
 KOKKOS_INLINE_FUNCTION
 void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
-                 Real *dtheta, Real *dphi) {
+                 Real *dzeta, Real *dpsi) {
   if (fabs(psif-psiv) < 1.0e-10 ||
       fabs(fabs(cos(zetav))-1) < 1.0e-10) {
-    *dtheta = (FLT_MAX);
-    *dphi = (FLT_MAX);
+    *dzeta = (FLT_MAX);
+    *dpsi = (FLT_MAX);
   } else {
     Real a_par, p_par;
     GreatCircleParam(zetav,zetaf,psiv,psif,&a_par,&p_par);
@@ -637,8 +637,8 @@ void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
                        / (1.0+a_par*a_par*cos(psif-p_par)*cos(psif-p_par)));
     Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetaf)*sin(zetaf));
     Real signfactor = copysign(1.0,psif-psiv)*copysign(1.0,M_PI-fabs(psif-psiv));
-    *dtheta = signfactor*zeta_deriv*denom;
-    *dphi   = signfactor*denom;
+    *dzeta = signfactor*zeta_deriv*denom;
+    *dpsi   = signfactor*denom;
   }
 }
 

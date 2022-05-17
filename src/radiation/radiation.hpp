@@ -102,7 +102,8 @@ class Radiation {
   bool constant_opacity;      // flag to enable opacity with fixed kappa
   bool power_opacity;         // flag to enable opacity that is powerlaw of rho and temp
 
-  // Object(s) for extra physics (i.e., other srcterms)
+  // Extra physics (i.e., other srcterms)
+  bool beam_source;
   SourceTerms *psrc = nullptr;
 
   // Angular mesh parameters and functions
@@ -138,9 +139,10 @@ class Radiation {
   BoundaryValuesCC *pbval_i;
 
   // following only used for time-evolving flow
-  DvceArray5D<Real> i1;       // intensity at intermediate step
-  DvceFaceFld5D<Real> iflx;   // spatial fluxes on zone faces
-  DvceArray5D<Real> divfa;    // angular flux divergence
+  DvceArray5D<Real> i1;         // intensity at intermediate step
+  DvceFaceFld5D<Real> iflx;     // spatial fluxes on zone faces
+  DvceArray5D<Real> divfa;      // angular flux divergence
+  DvceArray5D<bool> beam_mask;  // boolean mask used for beam source term
   Real dtnew;
 
   // reconstruction method

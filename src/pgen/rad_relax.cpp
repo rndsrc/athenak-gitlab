@@ -79,6 +79,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   auto norm_to_tet_ = pmbp->prad->norm_to_tet;
   auto nh_c_ = pmbp->prad->nh_c;
+  auto tetcov_c_ = pmbp->prad->tetcov_c;
 
   auto &i0 = pmbp->prad->i0;
   par_for("rad_relax",DevExeSpace(),0,nmb1,0,(n3-1),0,(n2-1),0,(n1-1),
@@ -123,8 +124,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     u_tet_[3] = (norm_to_tet_(m,3,0,k,j,i)*uu0 + norm_to_tet_(m,3,1,k,j,i)*uu1 +
                  norm_to_tet_(m,3,2,k,j,i)*uu2 + norm_to_tet_(m,3,3,k,j,i)*uu3);
 
-    std::cout << u_tet_[0] << " " << u_tet_[1] << std::endl;
-
     // Go through each angle
     for (int n=0; n<=nang1; ++n) {
       // Calculate direction in fluid frame
@@ -143,6 +142,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       Real ii_f =  ee_f/(4.0*M_PI);
 
       // Calculate intensity in tetrad frame
+      Real n_0 = 0.0;
+      for (int d=0; d<4; ++d) {  n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d);  }
       i0(m,n,k,j,i) = ii_f/SQR(SQR(n0_f));
     }
   });

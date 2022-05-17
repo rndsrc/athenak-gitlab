@@ -54,10 +54,6 @@ class SourceTerms {
   Real hrate;
 
   // beam source
-  Real pos_1, pos_2, pos_3;
-  Real dir_1, dir_2, dir_3;
-  Real width;
-  Real spread;
   Real dii_dt;
 
   // functions

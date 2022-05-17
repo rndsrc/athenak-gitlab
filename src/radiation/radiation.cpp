@@ -28,6 +28,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     i1("i1",1,1,1,1,1),
     iflx("iflx",1,1,1,1,1),
     divfa("divfa",1,1,1,1,1),
+    beam_mask("beam_mask",1,1,1,1,1),
     nh_c("nh_c",1,1),
     nh_f("nh_f",1,1,1),
     arc_lengths("arclen",1,1),
@@ -87,6 +88,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   }
 
   // Other rad source terms (constructor parses input file to init only srcterms needed)
+  beam_source = pin->GetOrAddBoolean("radiation","beam_source",true);
   psrc = new SourceTerms("radiation", ppack, pin);
 
   // Setup angular mesh and radiation frame data
@@ -180,7 +182,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     }
     }
 
-    // allocate second registers, fluxes, moments
+    // allocate second registers, fluxes, masks
     int ncells1 = indcs.nx1 + 2*(indcs.ng);
     int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
     int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
@@ -190,6 +192,9 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     Kokkos::realloc(iflx.x3f,nmb,nangles,ncells3,ncells2,ncells1);
     if (angular_fluxes) {
       Kokkos::realloc(divfa,nmb,nangles,ncells3,ncells2,ncells1);
+    }
+    if (beam_source) {
+      Kokkos::realloc(beam_mask,nmb,nangles,ncells3,ncells2,ncells1);
     }
   }
 }
