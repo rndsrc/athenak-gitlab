@@ -62,8 +62,8 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
   }
 
   // (4) beam source (radiation)
-  beam_source = pin->GetOrAddBoolean(block,"beam_source",false);
-  if (beam_source) {
+  beam = pin->GetOrAddBoolean(block,"beam_source",false);
+  if (beam) {
     source_terms_enabled = true;
     dii_dt = pin->GetReal(block, "dii_dt");
   }

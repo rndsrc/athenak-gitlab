@@ -94,7 +94,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
 
   // add beam source term, if any
   if (psrc->source_terms_enabled) {
-    if (psrc->beam_source)  psrc->AddBeamSource(i0_, beta_dt);
+    if (psrc->beam)  psrc->AddBeamSource(i0_, beta_dt);
   }
 
   return TaskStatus::complete;

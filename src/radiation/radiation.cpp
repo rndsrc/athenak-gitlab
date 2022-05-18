@@ -88,7 +88,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   }
 
   // Other rad source terms (constructor parses input file to init only srcterms needed)
-  beam_source = pin->GetOrAddBoolean("radiation","beam_source",true);
+  beam_source = pin->GetOrAddBoolean("radiation","beam_source",false);
   psrc = new SourceTerms("radiation", ppack, pin);
 
   // Setup angular mesh and radiation frame data

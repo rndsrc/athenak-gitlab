@@ -38,7 +38,7 @@ class SourceTerms {
   bool const_accel;
   bool shearing_box;
   bool ism_cooling;
-  bool beam_source;
+  bool beam;
 
   // new timestep
   Real dtnew;
