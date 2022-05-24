@@ -487,7 +487,7 @@ void Radiation::SetOrthonormalTetrad() {
   // Calculate n^angle
   auto na_ = na;
   if (nlev_ != 0) {  // do not compute na if nlevel=0
-    par_for("rad_na_n_0", DevExeSpace(), 0, (nmb-1), 0, (n3-1), 0, (n2-1), 0, (n1-1),
+    par_for("rad_na_n_0",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real &x1min = size.d_view(m).x1min;
       Real &x1max = size.d_view(m).x1max;
@@ -544,7 +544,6 @@ void Radiation::SetOrthonormalTetrad() {
       }
     });
   }
-
   return;
 }
 
@@ -565,6 +564,7 @@ void GridCartPosition(int n, int nlvl,
     *y = anorm.h_view(ibl0,ibl1+1,ibl2+1,1);
     *z = anorm.h_view(ibl0,ibl1+1,ibl2+1,2);
   }
+  return;
 }
 
 // find mid position between two face centers
@@ -582,6 +582,7 @@ void GridCartPositionMid(int n, int nb, int nlvl,
   *x = xm/norm;
   *y = ym/norm;
   *z = zm/norm;
+  return;
 }
 
 // inline function to retrieve weights (solid angles) and edge lengths
@@ -640,6 +641,7 @@ void UnitFluxDir(Real zetav, Real psiv, Real zetaf, Real psif,
     *dzeta = signfactor*zeta_deriv*denom;
     *dpsi   = signfactor*denom;
   }
+  return;
 }
 
 // inline function to retrieve neighbors (and number of neighbors)
@@ -719,6 +721,7 @@ void OptimalAngles(int nangles, int nlvl,
       }
     }
   }
+  return;
 }
 
 // inline function to rotate the geodesic mesh
@@ -769,6 +772,7 @@ void RotateGrid(int nlvl, Real zeta, Real psi,
       anorm.h_view(bl,0,     2*nlvl+1,i) = anorm.h_view(bl,0,2*nlvl,i);
     }
   }
+  return;
 }
 
 // inline function to find arc length between two face centers
@@ -801,6 +805,7 @@ void CircumcenterNormalized(Real x1, Real x2, Real x3,
   *x = x_c/norm_c;
   *y = y_c/norm_c;
   *z = z_c/norm_c;
+  return;
 }
 
 // inline function to find the parameters describing a great circle connecting two angles
@@ -811,6 +816,7 @@ void GreatCircleParam(Real zeta1, Real zeta2, Real psi1, Real psi2,
   Real btilde = (cos(psi2)/tan(zeta1)-cos(psi1)/tan(zeta2))/sin(psi1-psi2);
   *psi0 = atan2(btilde, atilde);
   *apar = sqrt(atilde*atilde+btilde*btilde);
+  return;
 }
 
 } // namespace radiation
