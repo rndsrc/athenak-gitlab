@@ -124,7 +124,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   torus.r_edge = pin->GetReal("problem", "r_edge");
   torus.r_peak = pin->GetReal("problem", "r_peak");
 
-  torus.b_norm = pin->GetReal("problem", "b_norm");
+  torus.b_norm = pin->GetOrAddReal("problem", "b_norm", 0.0);
 
   // local parameters
   Real pert_amp = pin->GetOrAddReal("problem", "pert_amp", 0.0);
