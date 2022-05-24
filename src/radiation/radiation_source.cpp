@@ -37,7 +37,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     return TaskStatus::complete;
   }
 
-  // extract indices and size/coord data
+  // extract indices, size/coord data, hydro/mhd flags
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
@@ -46,10 +46,18 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   int nang1 = nangles - 1;
   auto &size = pmy_pack->pmb->mb_size;
   auto &coord = pmy_pack->pcoord->coord_data;
+  bool is_hydro_enabled_ = is_hydro_enabled;
+  bool is_mhd_enabled_ = is_mhd_enabled;
 
   // extract gas and radiation constants
-  Real gamma_ = pmy_pack->phydro->peos->eos_data.gamma;
-  Real gm1_ = pmy_pack->phydro->peos->eos_data.gamma - 1.0;
+  Real gamma_, gm1_;
+  if (is_hydro_enabled_) {
+    gamma_ = pmy_pack->phydro->peos->eos_data.gamma;
+    gm1_ = pmy_pack->phydro->peos->eos_data.gamma - 1.0;
+  } else if (is_mhd_enabled_) {
+    gamma_ = pmy_pack->pmhd->peos->eos_data.gamma;
+    gm1_ = pmy_pack->pmhd->peos->eos_data.gamma - 1.0;
+  }
   Real gammap_ = gamma_/gm1_;
   auto arad_ = arad;
 
@@ -61,8 +69,6 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   auto norm_to_tet_ = norm_to_tet;
 
   // extract coupling flags
-  bool is_hydro_enabled_ = is_hydro_enabled;
-  bool is_mhd_enabled_ = is_mhd_enabled;
   bool fixed_fluid_ = fixed_fluid;
   bool affect_fluid_ = affect_fluid;
   bool zero_radiation_force_ = zero_radiation_force;
