@@ -8,7 +8,7 @@ reference = Fishbone & Moncrief 1976, ApJ 207 962
 basename  = torus
 
 <mesh>
-nghost = 3        # Number of ghost cells
+nghost = 2        # Number of ghost cells
 nx1    = 256      # number of cells in x1-direction
 x1min  = -50.0    # minimum x1
 x1max  = 50.0     # maximum x1
@@ -50,7 +50,7 @@ pexcise     = 0.333e-12  # pressure inside excision
 
 <hydro>
 eos         = ideal    # EOS type
-reconstruct = ppm      # spatial reconstruction method
+reconstruct = plm      # spatial reconstruction method
 rsolver     = hlle     # Riemann-solver to be used
 dfloor      = 1.0e-10    # floor on density rho
 pfloor      = 0.333e-12  # floor on gas pressure p_gas
