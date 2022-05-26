@@ -122,7 +122,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   // set EOS data
   Real gm1 = pmbp->phydro->peos->eos_data.gamma - 1.0;
-  bool use_e = pmbp->phydro->peos->eos_data.use_e;
 
   // Set eigensystem
   Real omega_real = pin->GetReal("problem", "omega_real");
@@ -159,19 +158,21 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real dfzrad_imag = pin->GetReal("problem", "dfzrad_imag");
 
   Real tlim = pin->GetReal("time", "tlim");
-  pin->SetReal("time", "tlim", tlim*(2.0*M_PI)/fabs(omega_imag));
+  pin->SetReal("time", "tlim", tlim*log(2.0)/fabs(omega_imag));
 
   // capture variables for kernel
   auto &indcs = pmy_mesh_->mb_indcs;
-  int &is = indcs.is; int &ie = indcs.ie;
-  int &js = indcs.js; int &je = indcs.je;
-  int &ks = indcs.ks; int &ke = indcs.ke;
+  int &ng = indcs.ng;
+  int n1 = indcs.nx1 + 2*ng;
+  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
+  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
+  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   auto &size = pmbp->pmb->mb_size;
   int nangles_ = pmbp->prad->nangles;
   auto &coord = pmbp->pcoord->coord_data;
 
   auto &w0 = pmbp->phydro->w0;
-  par_for("pgen_linwave",DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
+  par_for("rad_wave",DevExeSpace(),0,(pmbp->nmb_thispack-1),0,(n3-1),0,(n2-1),0,(n1-1),
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;
@@ -206,14 +207,14 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   // Convert primitives to conserved
   auto &u0 = pmbp->phydro->u0;
-  pmbp->phydro->peos->PrimToCons(w0, u0);
+  pmbp->phydro->peos->PrimToCons(w0, u0, 0, (n1-1), 0, (n2-1), 0, (n3-1));
 
   auto nh_c_ = pmbp->prad->nh_c;
   auto norm_to_tet_ = pmbp->prad->norm_to_tet;
   auto tetcov_c_ = pmbp->prad->tetcov_c;
 
   auto &i0 = pmbp->prad->i0;
-  par_for("pgen_linwave2",DevExeSpace(),0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
+  par_for("rad_wave2",DevExeSpace(),0,(pmbp->nmb_thispack-1),0,(n3-1),0,(n2-1),0,(n1-1),
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;

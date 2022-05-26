@@ -91,11 +91,12 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   beam_source = pin->GetOrAddBoolean("radiation","beam_source",false);
   psrc = new SourceTerms("radiation", ppack, pin);
 
-  // Setup angular mesh and radiation frame data
+  // Setup angular mesh and radiation geometry data
   nlevel = pin->GetInteger("radiation", "nlevel");
   nangles = (nlevel > 0) ? (5*2*SQR(nlevel) + 2) : 8;
   rotate_geo = pin->GetOrAddBoolean("radiation","rotate_geo",true);
   angular_fluxes = pin->GetOrAddBoolean("radiation","angular_fluxes",true);
+  if (nlevel==0) angular_fluxes=false;
   int nmb = ppack->nmb_thispack;
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   {
