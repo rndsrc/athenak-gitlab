@@ -117,8 +117,8 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   Real dt_ = (pdriver->beta[stage-1])*(pmy_pack->pmesh->dt);
 
   // compute implicit source term
-  par_for_outer("radiation_source",DevExeSpace(),0,0,0,nmb1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+  par_for("radiation_source",DevExeSpace(),0,nmb1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;
     Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
