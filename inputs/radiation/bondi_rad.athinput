@@ -80,4 +80,3 @@ dt         = 1.0      # time increment between outputs
 file_type  = vtk        # Binary data dump
 variable   = rad_coord  # variables to be output
 dt         = 1.0        # time increment between outputs
-
