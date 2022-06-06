@@ -78,6 +78,14 @@ class Hydro {
 
   // following only used for time-evolving flow
   DvceArray5D<Real> u1;       // conserved variables at intermediate step
+  DvceArray5D<Real> u2;       // conserved variables at second intermediate step
+
+  DvceArray5D<Real> u00;       // for 4th order conversion
+  DvceArray5D<Real> w00;       // for 4th order conversion
+
+  DvceArray5D<Real> wl3d;       // primitive variables
+  DvceArray5D<Real> wr3d;       // primitive variables
+
   DvceFaceFld5D<Real> uflx;   // fluxes of conserved quantities on cell faces
   Real dtnew;
 
@@ -96,6 +104,7 @@ class Hydro {
   TaskStatus RecvFlux(Driver *d, int stage);
   TaskStatus RestrictU(Driver *d, int stage);
   TaskStatus ConToPrim(Driver *d, int stage);
+  TaskStatus ConToPrim4thOrder(Driver *d, int stage);
   TaskStatus ExpRKUpdate(Driver *d, int stage);
   TaskStatus NewTimeStep(Driver *d, int stage);
   TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage);  // file in hydro/bvals dir

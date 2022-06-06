@@ -99,6 +99,7 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
       nimp_stages = 0;
       nexp_stages = 3;
       cfl_limit = 1.0;  // c_eff = c/nstages = 1/3 (Gottlieb (2009), pg 271)
+
       gam0[0] = 0.0;
       gam1[0] = 1.0;
       beta[0] = 1.0;
@@ -110,7 +111,81 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
       gam0[2] = 2.0/3.0;
       gam1[2] = 1.0/3.0;
       beta[2] = 2.0/3.0;
-    } else if (integrator == "imex2") {
+    } else if (integrator == "rk4") {
+      //! - RK4()4[2S] from Table 2 of Ketcheson (2010)
+      //! - Non-SSP, explicit four-stage, fourth-order RK
+      //! - Stability properties are similar to classical (non-SSP) RK4
+      //!   (but ~2x L2 principal error norm).
+      //! - Refer to Colella (2011) for linear stability analysis of constant
+      //!   coeff. advection of classical RK4 + 4th or 1st order (limiter engaged) fluxes
+
+      nimp_stages = 0;
+      nexp_stages = 4;
+      cfl_limit = 1.3925;  // Colella (2011) eq 101; 1st order flux is most severe constraint
+
+      gam0[0] = 0.0;
+      gam1[0] = 1.0;
+      beta[0] = 1.193743905974738;
+
+      gam0[1] = 0.121098479554482;
+      gam1[1] = 0.721781678111411;
+      beta[1] = 0.099279895495783;
+
+      gam0[2] = -3.843833699660025;
+      gam1[2] = 2.121209265338722;
+      beta[2] = 1.131678018054042;
+
+      gam0[3] = 0.546370891121863;
+      gam1[3] = 0.198653035682705;
+      beta[3] = 0.310665766509336;
+      
+      delta[0] = 1.0;
+      delta[1] = 0.217683334308543;
+      delta[2] = 1.065841341361089;
+      delta[3] = 0.0;
+
+
+    } else if (integrator == "ssprk4") {
+      //! - RK4(3)5[3S*] from Table 2 of Ketcheson (2010)
+      //! - SSP, explicit five-stage, fourth-order RK
+      // local error estimate not implemented
+
+      nimp_stages = 0;
+      nexp_stages = 5;
+      cfl_limit = 1.5;  // Colella (2011) eq 101; 1st order flux is most severe constraint
+
+      gam0[0] = 0.0;
+      gam1[0] = 1.0;
+      gam2[0] = 0.0;
+      beta[0] = 0.075152045700771;
+      delta[0] = 1.0;
+
+
+      gam0[1] = -0.497531095840104 ;
+      gam1[1] = 1.384996869124138;
+      gam2[1] = 0.000000000000000;
+      beta[1] =  0.211361016946069;
+      delta[1] =  0.081252332929194;
+
+      gam0[2] = 1.010070514199942;
+      gam1[2] = 3.878155713328178;
+      gam2[2] = 0.0;
+      beta[2] =  1.100713347634329;
+      delta[2] = -1.083849060586449;
+
+      gam0[3] = -3.196559004608766 ;
+      gam1[3] = -2.324512951813145 ;
+      gam2[3] =  1.642598936063715;
+      beta[3] =  0.728537814675568;
+      delta[3] = -1.096110881845602;
+
+      gam0[4] = 1.717835630267259;
+      gam1[4] = -0.514633322274467 ;
+      gam2[4] = 0.188295940828347;
+      beta[4] = 0.393172889823198;
+      delta[4] =  2.859440022030827;
+
+    }  else if (integrator == "imex2") {
       // IMEX-SSP2(3,2,2): Pareschi & Russo (2005) Table III.
       // two-stage explicit, three-stage implicit, second-order ImEx
       // Note explicit steps identical to RK2

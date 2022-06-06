@@ -12,6 +12,7 @@
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
 #include "driver/driver.hpp"
+#include "parameter_input.hpp"
 #include "coordinates/coordinates.hpp"
 #include "eos/eos.hpp"
 #include "srcterms/srcterms.hpp"
@@ -21,8 +22,12 @@ namespace hydro {
 //----------------------------------------------------------------------------------------
 //! \fn  void Hydro::Update
 //  \brief Explicit RK update of flux divergence and physical source terms
+// also need to change the constoprim function to 4th order
+// this will become a inline function
+// write a wrapper function to call the ConsToPrim pointwise, and apply Laplacian
 
 TaskStatus Hydro::ExpRKUpdate(Driver *pdriver, int stage) {
+  auto integrator = pdriver->integrator;
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
@@ -38,10 +43,13 @@ TaskStatus Hydro::ExpRKUpdate(Driver *pdriver, int stage) {
   int nvar = nhydro + nscalars;
   auto u0_ = u0;
   auto u1_ = u1;
+  //auto u2_ = u2;
+
   auto flx1 = uflx.x1f;
   auto flx2 = uflx.x2f;
   auto flx3 = uflx.x3f;
   auto &mbsize = pmy_pack->pmb->mb_size;
+
 
   // hierarchical parallel loop that updates conserved variables to intermediate step
   // using weights and fractional time step appropriate to stages of time-integrator.
@@ -49,38 +57,130 @@ TaskStatus Hydro::ExpRKUpdate(Driver *pdriver, int stage) {
   int scr_level = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1);
 
-  par_for_outer("h_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int j) {
-    ScrArray1D<Real> divf(member.team_scratch(scr_level), ncells1);
+  if(integrator=="rk4"){
+    Real &delta = pdriver->delta[stage-1];
+    
+    par_for_outer("h_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
+    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int j) {
+      ScrArray1D<Real> divf(member.team_scratch(scr_level), ncells1);
 
-    // compute dF1/dx1
-    par_for_inner(member, is, ie, [&](const int i) {
-      divf(i) = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
-    });
-    member.team_barrier();
-
-    // Add dF2/dx2
-    // Fluxes must be summed in pairs to symmetrize round-off error in each dir
-    if (multi_d) {
+      // compute dF1/dx1
       par_for_inner(member, is, ie, [&](const int i) {
-        divf(i) += (flx2(m,n,k,j+1,i) - flx2(m,n,k,j,i))/mbsize.d_view(m).dx2;
+        divf(i) = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
       });
       member.team_barrier();
-    }
 
-    // Add dF3/dx3
-    // Fluxes must be summed in pairs to symmetrize round-off error in each dir
-    if (three_d) {
+      // Add dF2/dx2
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (multi_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx2(m,n,k,j+1,i) - flx2(m,n,k,j,i))/mbsize.d_view(m).dx2;
+        });
+        member.team_barrier();
+      }
+
+      // Add dF3/dx3
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (three_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
+        });
+        member.team_barrier();
+      }
+
       par_for_inner(member, is, ie, [&](const int i) {
-        divf(i) += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
+        if (stage == 1){
+          u1_(m,n,k,j,i) = delta*u0_(m,n,k,j,i);
+        }else{
+          u1_(m,n,k,j,i) = u1_(m,n,k,j,i) + delta*u0_(m,n,k,j,i);
+        }
+        u0_(m,n,k,j,i) = gam0*u0_(m,n,k,j,i) + gam1*u1_(m,n,k,j,i) - beta_dt*divf(i);
+      });
+      
+    });
+    //u1_ old value, u0_ update, compare with athena++
+  } else if(integrator=="ssprk4"){
+    Real &gam2 = pdriver->gam2[stage-1];
+    Real &delta = pdriver->delta[stage-1];
+    auto u2_ = u2;
+
+    par_for_outer("h_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
+    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int j) {
+      ScrArray1D<Real> divf(member.team_scratch(scr_level), ncells1);
+
+      // compute dF1/dx1
+      par_for_inner(member, is, ie, [&](const int i) {
+        divf(i) = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
       });
       member.team_barrier();
-    }
 
-    par_for_inner(member, is, ie, [&](const int i) {
-      u0_(m,n,k,j,i) = gam0*u0_(m,n,k,j,i) + gam1*u1_(m,n,k,j,i) - beta_dt*divf(i);
+      // Add dF2/dx2
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (multi_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx2(m,n,k,j+1,i) - flx2(m,n,k,j,i))/mbsize.d_view(m).dx2;
+        });
+        member.team_barrier();
+      }
+
+      // Add dF3/dx3
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (three_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
+        });
+        member.team_barrier();
+      }
+
+      par_for_inner(member, is, ie, [&](const int i) {
+        if (stage == 1){
+          u2_(m,n,k,j,i) = u0_(m,n,k,j,i);
+          u1_(m,n,k,j,i) = delta*u0_(m,n,k,j,i);
+        }else{
+          u1_(m,n,k,j,i) = u1_(m,n,k,j,i) + delta*u0_(m,n,k,j,i);
+        }
+        u0_(m,n,k,j,i) = gam0*u0_(m,n,k,j,i) + gam1*u1_(m,n,k,j,i) + gam2*u2_(m,n,k,j,i) - beta_dt*divf(i);
+      });
+      
     });
-  });
+  } else{
+    par_for_outer("h_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,
+    KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int j) {
+      ScrArray1D<Real> divf(member.team_scratch(scr_level), ncells1);
+
+      // compute dF1/dx1
+      par_for_inner(member, is, ie, [&](const int i) {
+        divf(i) = (flx1(m,n,k,j,i+1) - flx1(m,n,k,j,i))/mbsize.d_view(m).dx1;
+      });
+      member.team_barrier();
+
+      // Add dF2/dx2
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (multi_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx2(m,n,k,j+1,i) - flx2(m,n,k,j,i))/mbsize.d_view(m).dx2;
+        });
+        member.team_barrier();
+      }
+
+      // Add dF3/dx3
+      // Fluxes must be summed in pairs to symmetrize round-off error in each dir
+      if (three_d) {
+        par_for_inner(member, is, ie, [&](const int i) {
+          divf(i) += (flx3(m,n,k+1,j,i) - flx3(m,n,k,j,i))/mbsize.d_view(m).dx3;
+        });
+        member.team_barrier();
+      }
+
+      par_for_inner(member, is, ie, [&](const int i) {
+        if (stage == 1){
+          u1_(m,n,k,j,i) = u0_(m,n,k,j,i);
+        } 
+        u0_(m,n,k,j,i) = gam0*u0_(m,n,k,j,i) + gam1*u1_(m,n,k,j,i) - beta_dt*divf(i);
+      });
+    });
+  }
+
 
   // Add physical source terms.
   // Note source terms must be computed using only primitives (w0), as the conserved

@@ -27,8 +27,13 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     pmy_pack(ppack),
     u0("cons",1,1,1,1,1),
     w0("prim",1,1,1,1,1),
+    u00("cons_centered",1,1,1,1,1),
+    w00("prim_centered",1,1,1,1,1), // for 4th order conversion
     coarse_u0("ccons",1,1,1,1,1),
     u1("cons1",1,1,1,1,1),
+    u2("cons1",1,1,1,1,1),
+    wl3d("cons1",1,1,1,1,1),
+    wr3d("cons1",1,1,1,1,1),
     uflx("uflx",1,1,1,1,1) {
   // (1) construct EOS object (no default)
   {std::string eqn_of_state = pin->GetString("hydro","eos");
@@ -235,9 +240,17 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
     int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
     Kokkos::realloc(u1,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(u2,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(u00,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(w00,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(wl3d,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(wr3d,       nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
     Kokkos::realloc(uflx.x1f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
     Kokkos::realloc(uflx.x2f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
     Kokkos::realloc(uflx.x3f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    //Kokkos::realloc(uflx.x1f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    //Kokkos::realloc(uflx.x2f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    //Kokkos::realloc(uflx.x3f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
   }
 }
 
