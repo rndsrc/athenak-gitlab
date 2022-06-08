@@ -60,7 +60,7 @@ class Hydro {
   ReconstructionMethod recon_method;
   Hydro_RSolver rsolver_method;
   EquationOfState *peos;  // chosen EOS
-
+  bool use_fourth_order;
   int nhydro;             // number of hydro variables (5/4 for ideal/isothermal EOS)
   int nscalars;           // number of passive scalars
   DvceArray5D<Real> u0;   // conserved variables
@@ -87,6 +87,8 @@ class Hydro {
   DvceArray5D<Real> wr3d;       // primitive variables
 
   DvceFaceFld5D<Real> uflx;   // fluxes of conserved quantities on cell faces
+  DvceFaceFld5D<Real> uflx_fc; // face-centered fluxes
+  
   Real dtnew;
 
   // container to hold names of TaskIDs
@@ -112,6 +114,9 @@ class Hydro {
   // CalculateFluxes function templated over Riemann Solvers
   template <Hydro_RSolver T>
   TaskStatus CalcFluxes(Driver *d, int stage);
+
+  template <Hydro_RSolver T>
+  TaskStatus CalcFluxesFourthOrder(Driver *d, int stage);
 
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro

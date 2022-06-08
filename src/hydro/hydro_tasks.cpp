@@ -23,12 +23,12 @@ namespace hydro {
 //! \fn  void Hydro::AssembleHydroTasks
 //  \brief Adds hydro tasks to stage start/run/end task lists
 //  Called by MeshBlockPack::AddPhysics() function directly after Hydro constrctr
-//
+//  
 //  Stage start tasks are those that must be cmpleted over all MeshBlocks before EACH
 //  stage can be run (such as posting MPI receives, setting BoundaryCommStatus flags, etc)
-//
+//  
 //  Stage run tasks are those performed in EACH stage
-//
+//  
 //  Stage end tasks are those that can only be cmpleted after all the stage run tasks are
 //  finished over all MeshBlocks for EACH stage, such as clearing all MPI non-blocking
 //  sends, etc.
@@ -40,29 +40,54 @@ void Hydro::AssembleHydroTasks(TaskList &start, TaskList &run, TaskList &end) {
   id.irecv = start.AddTask(&Hydro::InitRecv, this, none);
 
   // run task list
-  id.copyu = run.AddTask(&Hydro::CopyCons, this, none);
+  //id.copyu = run.AddTask(&Hydro::CopyCons, this, none);
   // select which calculate_flux function to add based on rsolver_method
-  if (rsolver_method == Hydro_RSolver::advect) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::advect>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::llf) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::hlle) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::hllc) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hllc>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::roe) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::roe>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::llf_sr) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf_sr>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::hlle_sr) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle_sr>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::hllc_sr) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hllc_sr>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::llf_gr) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf_gr>,this,id.copyu);
-  } else if (rsolver_method == Hydro_RSolver::hlle_gr) {
-    id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle_gr>,this,id.copyu);
+  if (use_fourth_order){
+    if (rsolver_method == Hydro_RSolver::advect) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::advect>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::llf>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::hlle>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hllc) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::hllc>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::roe) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::roe>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::llf_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::hlle_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hllc_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::hllc_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf_gr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::llf_gr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle_gr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxesFourthOrder<Hydro_RSolver::hlle_gr>,this,id.copyu);
+    }
+  } else{
+    if (rsolver_method == Hydro_RSolver::advect) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::advect>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hllc) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hllc>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::roe) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::roe>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hllc_sr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hllc_sr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::llf_gr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::llf_gr>,this,id.copyu);
+    } else if (rsolver_method == Hydro_RSolver::hlle_gr) {
+      id.flux = run.AddTask(&Hydro::CalcFluxes<Hydro_RSolver::hlle_gr>,this,id.copyu);
+    }
   }
+  // add in fourth order flux calculation here
   // now the rest of the Hydro run tasks
   id.sendf = run.AddTask(&Hydro::SendFlux, this, id.flux);
   id.recvf = run.AddTask(&Hydro::RecvFlux, this, id.sendf);
@@ -71,7 +96,12 @@ void Hydro::AssembleHydroTasks(TaskList &start, TaskList &run, TaskList &end) {
   id.sendu = run.AddTask(&Hydro::SendU, this, id.restu);
   id.recvu = run.AddTask(&Hydro::RecvU, this, id.sendu);
   id.bcs   = run.AddTask(&Hydro::ApplyPhysicalBCs, this, id.recvu);
-  id.c2p   = run.AddTask(&Hydro::ConToPrim, this, id.bcs);
+  if (use_fourth_order){
+    id.c2p   = run.AddTask(&Hydro::ConToPrim4thOrder, this, id.bcs);
+  } else{
+    id.c2p   = run.AddTask(&Hydro::ConToPrim, this, id.bcs);
+  }
+  //
   id.newdt = run.AddTask(&Hydro::NewTimeStep, this, id.c2p);
 
   // end task list
@@ -215,8 +245,18 @@ TaskStatus Hydro::ConToPrim(Driver *pdrive, int stage) {
   int &ng = indcs.ng;
   int n1m1 = indcs.nx1 + 2*ng - 1;
   int n2m1 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng - 1) : 0;
-  int n3m1 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng - 1) : 0;
+  int n3m1 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng - 1) : 0;  
   peos->ConsToPrim(u0, w0, 0, n1m1, 0, n2m1, 0, n3m1);
+  return TaskStatus::complete;
+}
+
+TaskStatus Hydro::ConToPrim4thOrder(Driver *pdrive, int stage) {
+  auto &indcs = pmy_pack->pmesh->mb_indcs;
+  int &ng = indcs.ng;
+  int n1m1 = indcs.nx1 + 2*ng - 1;
+  int n2m1 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng - 1) : 0;
+  int n3m1 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng - 1) : 0;
+  peos->ConsToPrim4thOrder(u0, u00, w0, 0, n1m1, 0, n2m1, 0, n3m1);
   return TaskStatus::complete;
 }
 

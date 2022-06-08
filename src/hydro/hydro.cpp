@@ -34,7 +34,10 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     u2("cons1",1,1,1,1,1),
     wl3d("cons1",1,1,1,1,1),
     wr3d("cons1",1,1,1,1,1),
-    uflx("uflx",1,1,1,1,1) {
+    uflx("uflx",1,1,1,1,1),
+    uflx_fc("uflx_fc",1,1,1,1,1) {
+  // fourth-order flag
+  use_fourth_order = pin->GetOrAddBoolean("hydro", "fourth_order", false);
   // (1) construct EOS object (no default)
   {std::string eqn_of_state = pin->GetString("hydro","eos");
   // ideal gas EOS
@@ -248,9 +251,9 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     Kokkos::realloc(uflx.x1f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
     Kokkos::realloc(uflx.x2f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
     Kokkos::realloc(uflx.x3f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
-    //Kokkos::realloc(uflx.x1f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
-    //Kokkos::realloc(uflx.x2f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
-    //Kokkos::realloc(uflx.x3f_fc, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(uflx_fc.x1f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(uflx_fc.x2f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
+    Kokkos::realloc(uflx_fc.x3f, nmb, (nhydro+nscalars), ncells3, ncells2, ncells1);
   }
 }
 

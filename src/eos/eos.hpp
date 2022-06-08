@@ -204,6 +204,11 @@ class EquationOfState {
   virtual void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
                           const int il, const int iu, const int jl, const int ju,
                           const int kl, const int ku);
+  virtual void ConsToPrim4thOrder(
+                          DvceArray5D<Real> &cons, DvceArray5D<Real> &cons_ctr, 
+                          DvceArray5D<Real> &prim, //DvceArray5D<Real> &prim_centered, 
+                          const int il, const int iu, const int jl, const int ju,
+                          const int kl, const int ku);
   virtual void ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
                           DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
                           const int il, const int iu, const int jl, const int ju,
