@@ -43,6 +43,7 @@ add_executable(
 
         hydro/hydro.cpp
         hydro/hydro_fluxes.cpp
+        hydro/hydro_fluxes_fourth_order.cpp
         hydro/hydro_newdt.cpp
         hydro/hydro_tasks.cpp
         hydro/hydro_update.cpp
