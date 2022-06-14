@@ -140,17 +140,17 @@ TaskStatus Hydro::CopyCons(Driver *pdrive, int stage) {
   // hierarchical parallel loop that updates conserved variables to intermediate step
   // using weights and fractional time step appropriate to stages of time-integrator.
   // Important to use vector inner loop for good performance on cpus
-  if (integrator == "rk4"){
+  if (integrator == "rk4") {
     Real &delta = pdrive->delta[stage-1];
     if (stage == 1) {
       Kokkos::deep_copy(DevExeSpace(), u1, u0);
-    } else{
+    } else {
       par_for("CopyCons", DevExeSpace(),0, nmb1, 0, nvar-1, ks, ke, js, je, is, ie,
       KOKKOS_LAMBDA(int m, int n, int k, int j, int i){
         u1(m,n,k,j,i) += delta*u0(m,n,k,j,i);
       });
     }
-  } else{
+  } else {
     if (stage == 1) {
       Kokkos::deep_copy(DevExeSpace(), u1, u0);
     }

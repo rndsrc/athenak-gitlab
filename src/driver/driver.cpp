@@ -120,7 +120,9 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
 
       nimp_stages = 0;
       nexp_stages = 4;
-      cfl_limit = 1.3925;  // Colella (2011) eq 101; 1st order flux is most severe constraint
+
+      // Colella (2011) eq 101; 1st order flux is most severe constraint
+      cfl_limit = 1.3925;
 
       gam0[0] = 0.0;
       gam1[0] = 1.0;
@@ -137,7 +139,7 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
       gam0[3] = 0.546370891121863;
       gam1[3] = 0.198653035682705;
       beta[3] = 0.310665766509336;
-      
+
       delta[0] = 1.0;
       delta[1] = 0.217683334308543;
       delta[2] = 1.065841341361089;
