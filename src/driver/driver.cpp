@@ -111,13 +111,11 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
       gam1[2] = 1.0/3.0;
       beta[2] = 2.0/3.0;
     } else if (integrator == "rk4") {
-      //! - RK4()4[2S] from Table 2 of Ketcheson (2010)
-      //! - Non-SSP, explicit four-stage, fourth-order RK
-      //! - Stability properties are similar to classical (non-SSP) RK4
-      //!   (but ~2x L2 principal error norm).
-      //! - Refer to Colella (2011) for linear stability analysis of constant
-      //!   coeff. advection of classical RK4 + 4th or 1st order (limiter engaged) fluxes
-
+      // RK4()4[2S] from Table 2 of Ketcheson (2010)
+      // Non-SSP, explicit four-stage, fourth-order RK
+      // Stability properties are similar to classical (non-SSP) RK4
+      // (but ~2x L2 principal error norm).
+      // Refer to Colella (2011) for linear stability analysis of constant coeff.
       nimp_stages = 0;
       nexp_stages = 4;
 
@@ -144,8 +142,6 @@ Driver::Driver(ParameterInput *pin, Mesh *pmesh) :
       delta[1] = 0.217683334308543;
       delta[2] = 1.065841341361089;
       delta[3] = 0.0;
-
-
     } else if (integrator == "imex2") {
       // IMEX-SSP2(3,2,2): Pareschi & Russo (2005) Table III.
       // two-stage explicit, three-stage implicit, second-order ImEx
