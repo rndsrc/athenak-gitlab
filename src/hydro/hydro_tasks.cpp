@@ -146,11 +146,11 @@ TaskStatus Hydro::CopyCons(Driver *pdrive, int stage) {
       auto &u1 = pmy_pack->phydro->u1;
       Real &delta = pdrive->delta[stage-1];
       par_for("rk4_copy_cons", DevExeSpace(),0, nmb1, 0, nvar-1, ks, ke, js, je, is, ie,
-      KOKKOS_LAMBDA(int m, int n, int k, int j, int i){
+      KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
         u1(m,n,k,j,i) += delta*u0(m,n,k,j,i);
       });
-      }
     }
+  }
   return TaskStatus::complete;
 }
 
