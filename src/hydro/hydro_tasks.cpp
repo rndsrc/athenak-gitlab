@@ -125,7 +125,7 @@ TaskStatus Hydro::ClearSend(Driver *pdrive, int stage) {
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Hydro::CopyCons
-//  \brief  copy u0 --> u1 each stages
+//  \brief  handle RK register logic at given stage
 
 TaskStatus Hydro::CopyCons(Driver *pdrive, int stage) {
   if (stage == 1) {
@@ -150,8 +150,6 @@ TaskStatus Hydro::CopyCons(Driver *pdrive, int stage) {
   }
   return TaskStatus::complete;
 }
-
-
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Hydro::SendU
