@@ -125,17 +125,14 @@ TaskStatus Hydro::ClearSend(Driver *pdrive, int stage) {
 
 //----------------------------------------------------------------------------------------
 //! \fn  void Hydro::CopyCons
-//  \brief  copy u0 --> u1 in first stage
+//  \brief  copy u0 --> u1 each stages
 
 TaskStatus Hydro::CopyCons(Driver *pdrive, int stage) {
-  auto integrator = pdrive->integrator;
-  // hierarchical parallel loop that updates conserved variables to intermediate step
-  // using weights and fractional time step appropriate to stages of time-integrator.
-  // Important to use vector inner loop for good performance on cpus
   if (stage == 1) {
     Kokkos::deep_copy(DevExeSpace(), u1, u0);
   } else {
-    if (integrator == "rk4") {
+    if (pdrive->integrator == "rk4") {
+      // parallel loop to update u1 with u0 at later stages, only for rk4
       auto &indcs = pmy_pack->pmesh->mb_indcs;
       int is = indcs.is, ie = indcs.ie;
       int js = indcs.js, je = indcs.je;
