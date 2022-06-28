@@ -25,11 +25,17 @@ class Conduction {
 
   // data
   Real dtnew;
-  Real kappa;  // isotropic thermal conductivity
+  Real kappa;         // thermal conductivity (-1 for temperature-dependent conductivity)
+  Real kappa_ceiling; // ceiling of thermal conductivity
+  bool sat_hflux;     // saturtion of heat flux
 
   // function to add heat fluxes to Hydro and/or MHD fluxes
-  void IsotropicHeatFlux(const DvceArray5D<Real> &w, const Real kappa,
-                         const EOS_Data &eos, DvceFaceFld5D<Real> &f);
+  void AddHeatFlux(const DvceArray5D<Real> &w, const EOS_Data &eos,
+                   DvceFaceFld5D<Real> &f);
+  void IsotropicHeatFlux(const DvceArray5D<Real> &w, const EOS_Data &eos,
+                         DvceFaceFld5D<Real> &f);
+  void TDpendentHeatFlux(const DvceArray5D<Real> &w, const EOS_Data &eos,
+                         DvceFaceFld5D<Real> &f);
   void NewTimeStep(const DvceArray5D<Real> &w, const EOS_Data &eos_data);
 
  private:
