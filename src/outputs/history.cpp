@@ -215,8 +215,8 @@ void HistoryOutput::LoadMHDHistoryData(HistoryData *pdata, Mesh *pm) {
     hvars.the_array[nmhd_+4] = vol*0.25*(SQR(bx2f(m,k,j+1,i)) + SQR(bx2f(m,k,j,i)));
     hvars.the_array[nmhd_+5] = vol*0.25*(SQR(bx3f(m,k+1,j,i)) + SQR(bx3f(m,k,j,i)));
 
-    // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
-    for (int n=nhist_; n<NHISTORY_VARIABLES; ++n) {
+    // fill rest of the_array with zeros, if nhist < NREDUCTION_VARIABLES
+    for (int n=nhist_; n<NREDUCTION_VARIABLES; ++n) {
       hvars.the_array[n] = 0.0;
     }
 
