@@ -13,6 +13,9 @@
 
 using ProblemFinalizeFnPtr = void (*)(ParameterInput *pin, Mesh *pm);
 using UserBoundaryFnPtr = void (*)(Mesh* pm);
+using UserSrctermFnPtr = void (*)(Mesh* pm, const Real bdt, DvceArray5D<Real> &u0,
+                                  const DvceArray5D<Real> &w0, const EOS_Data &eos_data);
+using UserHistoryFnPtr = void (*)(HistoryData *pdata, Mesh *pm);
 
 //----------------------------------------------------------------------------------------
 //! \class ProblemGenerator
@@ -28,11 +31,19 @@ class ProblemGenerator {
   // true if user BCs are specified on any face
   bool user_bcs;
 
+  // true if user srcterms are specified
+  bool user_srcs;
+
+  // true if user history outputs are specified
+  bool user_hist;
+
   // function pointer for final work after main loop (e.g. compute errors).  Called by
   // Driver::Finalize()
   ProblemFinalizeFnPtr pgen_final_func=nullptr;
   // function pointer for user-enrolled BCs.  Called in ApplyPhysicalBCs in task list
   UserBoundaryFnPtr user_bcs_func=nullptr;
+  UserSrctermFnPtr user_srcs_func=nullptr;
+  UserHistoryFnPtr user_hist_func=nullptr;
 
   // predefined problem generator functions (default test suite)
   void Advection(ParameterInput *pin, const bool restart);
