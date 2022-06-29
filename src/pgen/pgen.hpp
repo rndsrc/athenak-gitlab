@@ -14,7 +14,9 @@
 using ProblemFinalizeFnPtr = void (*)(ParameterInput *pin, Mesh *pm);
 using UserBoundaryFnPtr = void (*)(Mesh* pm);
 using UserSrctermFnPtr = void (*)(Mesh* pm, const Real bdt, DvceArray5D<Real> &u0,
-                                  const DvceArray5D<Real> &w0, const EOS_Data &eos_data);
+                                  const DvceArray5D<Real> &w0,
+                                  const DvceArray5D<Real> &bcc0,
+                                  const EOS_Data &eos_data);
 using UserHistoryFnPtr = void (*)(HistoryData *pdata, Mesh *pm);
 
 //----------------------------------------------------------------------------------------
