@@ -194,7 +194,7 @@ void PiecewiseParabolicX1(TeamMember_t const &member,
      const DvceArray5D<Real> &q, ScrArray2D<Real> &ql, ScrArray2D<Real> &qr) {
   int nvar = q.extent_int(1);
   const Real &dfloor_ = eos.dfloor;
-  // TODO: @jmstone ideal gas only for now
+  // TODO(jmstone): ideal gas only for now
   Real efloor_ = eos.pfloor/(eos.gamma - 1.0);
   for (int n=0; n<nvar; ++n) {
     if (extremum_preserving) {
@@ -240,7 +240,7 @@ void PiecewiseParabolicX2(TeamMember_t const &member,
      const DvceArray5D<Real> &q, ScrArray2D<Real> &ql_jp1, ScrArray2D<Real> &qr_j) {
   int nvar = q.extent_int(1);
   const Real &dfloor_ = eos.dfloor;
-  // TODO: @jmstone ideal gas only for now
+  // TODO(jmstone): ideal gas only for now
   Real efloor_ = eos.pfloor/(eos.gamma - 1.0);
   for (int n=0; n<nvar; ++n) {
     if (extremum_preserving) {
@@ -286,7 +286,7 @@ void PiecewiseParabolicX3(TeamMember_t const &member,
      const DvceArray5D<Real> &q, ScrArray2D<Real> &ql_kp1, ScrArray2D<Real> &qr_k) {
   int nvar = q.extent_int(1);
   const Real &dfloor_ = eos.dfloor;
-  // TODO: @jmstone ideal gas only for now
+  // TODO(jmstone): ideal gas only for now
   Real efloor_ = eos.pfloor/(eos.gamma - 1.0);
   for (int n=0; n<nvar; ++n) {
     if (extremum_preserving) {
