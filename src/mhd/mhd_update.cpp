@@ -98,8 +98,7 @@ TaskStatus MHD::ExpRKUpdate(Driver *pdriver, int stage) {
 
   // Add user source terms
   if (pmy_pack->pmesh->pgen->user_srcs) {
-    (pmy_pack->pmesh->pgen->user_srcs_func)(pmy_pack->pmesh, beta_dt, u0, w0, bcc0,
-                                            peos->eos_data);
+    (pmy_pack->pmesh->pgen->user_srcs_func)(pmy_pack->pmesh, beta_dt);
   }
   return TaskStatus::complete;
 }
