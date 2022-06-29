@@ -229,21 +229,21 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
                       /n_unit/n_unit;
   Real heating_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()/n_unit;
 
-  par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
+  par_for("ismcooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
   KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-    // temperature in cgs unit
+    Real &dens = w0(m,IDN,k,j,i);
     Real temp = 1.0;
     if (use_e) {
-      temp = temp_unit*w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
+      temp = w0(m,IEN,k,j,i)/dens*gm1;
     } else {
-      temp = temp_unit*w0(m,ITM,k,j,i);
+      temp = w0(m,ITM,k,j,i);
     }
 
-    Real lambda_cooling = ISMCoolFn(temp)/cooling_unit;
+    Real lambda_cooling = ISMCoolFn(temp*temp_unit)/cooling_unit;
     Real gamma_heating = heating_rate/heating_unit;
+    Real bde = dens*(gamma_heating - dens*lambda_cooling)*bdt;
 
-    u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) *
-                        (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating);
+    u0(m,IEN,k,j,i) += bde;
   });
   return;
 }

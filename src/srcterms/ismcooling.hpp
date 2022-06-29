@@ -33,6 +33,10 @@ Real ISMCoolFn(Real temp) {
       -22.5831, -22.5707, -22.5573, -22.5434, -22.5287, -22.5140, -22.4992, -22.4844,
       -22.4695, -22.4543, -22.4392, -22.4237, -22.4087, -22.3928};
 
+  if (temp<=0.0) {
+    return 0.0;
+  }
+
   Real logt = log10(temp);
 
   // for temperatures less than 10^4 K, use Koyama & Inutsuka (2002)
