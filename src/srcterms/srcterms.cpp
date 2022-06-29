@@ -219,8 +219,6 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
   int ks = indcs.ks, ke = indcs.ke;
   int nmb1 = pmy_pack->nmb_thispack - 1;
   Real use_e = eos_data.use_e;
-  Real dfloor = eos_data.dfloor;
-  Real tfloor = eos_data.tfloor;
   Real gamma = eos_data.gamma;
   Real gm1 = gamma - 1.0;
   Real heating_rate = hrate;
@@ -231,35 +229,19 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
                       /n_unit/n_unit;
   Real heating_unit = pmy_pack->punit->pressure_cgs()/pmy_pack->punit->time_cgs()/n_unit;
 
-  par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
+  par_for("ismcooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
   KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-    // temperature in code unit
-    Real w_dens = w0(m,IDN,k,j,i);
-    Real w_temp = 1.0;
-    Real w_eint = 1.0;
+    Real &dens = w0(m,IDN,k,j,i);
+    Real temp = 1.0;
     if (use_e) {
-      w_temp = w0(m,IEN,k,j,i)/w_dens*gm1;
-      w_eint = w0(m,IEN,k,j,i);
+      temp = w0(m,IEN,k,j,i)/dens*gm1;
     } else {
-      w_temp = w0(m,ITM,k,j,i);
-      w_eint = w0(m,ITM,k,j,i)*w_dens/gm1;
+      temp = w0(m,ITM,k,j,i);
     }
 
-    Real lambda_cooling = ISMCoolFn(w_temp*temp_unit)/cooling_unit;
+    Real lambda_cooling = ISMCoolFn(temp*temp_unit)/cooling_unit;
     Real gamma_heating = heating_rate/heating_unit;
-    Real bde = w_dens*(gamma_heating - w_dens*lambda_cooling)*bdt;
-
-    Real u_d = fmax(u0(m,IDN,k,j,i), dfloor);
-    Real e_k = 0.5*(SQR(u0(m,IM1,k,j,i))+SQR(u0(m,IM2,k,j,i))+SQR(u0(m,IM3,k,j,i)))/u_d;
-    Real u_eint = u0(m,IEN,k,j,i) - e_k;
-    Real u_temp = gm1*u_eint/u_d;
-
-    if (gm1*(u_eint+bde)/u_d < tfloor) {
-      bde = (u_d*tfloor/gm1-u_eint);
-    }
-    if (u_temp < tfloor) {
-      bde = 0.0;
-    }
+    Real bde = dens*(gamma_heating - dens*lambda_cooling)*bdt;
 
     u0(m,IEN,k,j,i) += bde;
   });
