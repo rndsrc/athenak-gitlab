@@ -74,8 +74,9 @@ Conduction::Conduction(std::string block, MeshBlockPack *pp, ParameterInput *pin
     }
   }
 
-  // Read thermal conductivity of isotropic thermal conduction
-  kappa = pin->GetReal(block,"conductivity");
+  // Read parameters for thermal conduction (if any)
+  kappa = pin->GetOrAddReal(block,"conductivity",0.0);
+  tdep_kappa = pin->GetOrAddBoolean(block,"tdep_conductivity",false);
   kappa_ceiling = pin->GetOrAddReal(block,"cond_ceiling",
                   static_cast<Real>(std::numeric_limits<float>::max()));
   sat_hflux = pin->GetOrAddBoolean(block,"sat_hflux",false);
@@ -95,10 +96,9 @@ void Conduction::AddHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &eos,
   DvceFaceFld5D<Real> &flx) {
   if (kappa > 0.0) {
     IsotropicHeatFlux(w0, eos, flx);
-  } else if (kappa == -1.0) {
-    TDpendentHeatFlux(w0, eos, flx);
-  } else {
-    return;
+  }
+  if (tdep_kappa) {
+    TempDependentHeatFlux(w0, eos, flx);
   }
   return;
 }
@@ -112,7 +112,6 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
-  int ncells1 = indcs.nx1 + 2*(indcs.ng);
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto size = pmy_pack->pmb->mb_size;
   const bool &use_e = eos.use_e;
@@ -122,85 +121,73 @@ void Conduction::IsotropicHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &
   //--------------------------------------------------------------------------------------
   // fluxes in x1-direction
 
-  int scr_level = 0;
-  size_t scr_size = (ScrArray1D<Real>::shmem_size(ncells1));
-  auto flx1 = flx.x1f;
+  auto &flx1 = flx.x1f;
 
-  par_for_outer("conduct1", DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx1(member.team_scratch(scr_level), ncells1);
-
+  par_for("conduct1", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie+1,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie+1, [&](const int i) {
-      if (use_e) {
-        hflx1(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                   w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)) / size.d_view(m).dx1;
-      } else {
-        hflx1(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j,i-1)) / size.d_view(m).dx1;
-      }
-      flx1(m,IEN,k,j,i) -= kappa_ * hflx1(i);
-    });
+    Real dtempdx = 0.0;
+    if (use_e) {
+      dtempdx = (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) - w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1))
+                * gm1 / size.d_view(m).dx1;
+    } else {
+      dtempdx = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j,i-1)) / size.d_view(m).dx1;
+    }
+    flx1(m,IEN,k,j,i) -= kappa_ * dtempdx;
   });
   if (pmy_pack->pmesh->one_d) {return;}
 
   //--------------------------------------------------------------------------------------
   // fluxes in x2-direction
 
-  auto flx2 = flx.x2f;
+  auto &flx2 = flx.x2f;
 
-  par_for_outer("conduct2",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je+1,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx2(member.team_scratch(scr_level), ncells1);
-
+  par_for("conduct2",DevExeSpace(), 0, nmb1, ks, ke, js, je+1, is, ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie, [&](const int i) {
-      if (use_e) {
-        hflx2(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                   w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)) / size.d_view(m).dx2;
-      } else {
-        hflx2(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j-1,i)) / size.d_view(m).dx2;
-      }
-      flx2(m,IEN,k,j,i) -= kappa_ * hflx2(i);
-    });
+    Real dtempdx = 0.0;
+    if (use_e) {
+      dtempdx = (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) - w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i))
+                * gm1 / size.d_view(m).dx2;
+    } else {
+      dtempdx = (w0(m,ITM,k,j,i) - w0(m,ITM,k,j-1,i)) / size.d_view(m).dx2;
+    }
+    flx2(m,IEN,k,j,i) -= kappa_ * dtempdx;
   });
   if (pmy_pack->pmesh->two_d) {return;}
 
   //--------------------------------------------------------------------------------------
   // fluxes in x3-direction
 
-  auto flx3 = flx.x3f;
+  auto &flx3 = flx.x3f;
 
-  par_for_outer("conduct3",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke+1, js, je,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx3(member.team_scratch(scr_level), ncells1);
-
+  par_for("conduct3",DevExeSpace(), 0, nmb1, ks, ke+1, js, je, is, ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie, [&](const int i) {
-      if (use_e) {
-        hflx3(i) = gm1 * (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) -
-                   w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)) / size.d_view(m).dx3;
-      } else {
-        hflx3(i) = (w0(m,ITM,k,j,i) - w0(m,ITM,k-1,j,i)) / size.d_view(m).dx3;
-      }
-      flx3(m,IEN,k,j,i) -= kappa_ * hflx3(i);
-    });
+    Real dtempdx = 0.0;
+    if (use_e) {
+      dtempdx = (w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i) - w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i))
+                * gm1 / size.d_view(m).dx3;
+    } else {
+      dtempdx = (w0(m,ITM,k,j,i) - w0(m,ITM,k-1,j,i)) / size.d_view(m).dx3;
+    }
+    flx3(m,IEN,k,j,i) -= kappa_ * dtempdx;
   });
 
   return;
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn void TDpendentHeatFlux()
+//! \fn void TempDependentHeatFlux()
 //! \brief Adds heat flux to face-centered fluxes of conserved variables with
 //! temperature-dependent conductivity
 
-void Conduction::TDpendentHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &eos,
+void Conduction::TempDependentHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &eos,
   DvceFaceFld5D<Real> &flx) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, ie = indcs.ie;
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
-  int ncells1 = indcs.nx1 + 2*(indcs.ng);
   int nmb1 = pmy_pack->nmb_thispack - 1;
   auto size = pmy_pack->pmb->mb_size;
   const bool &use_e = eos.use_e;
@@ -216,212 +203,195 @@ void Conduction::TDpendentHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &
   //--------------------------------------------------------------------------------------
   // fluxes in x1-direction
 
-  int scr_level = 0;
-  size_t scr_size = (ScrArray1D<Real>::shmem_size(ncells1));
-  auto flx1 = flx.x1f;
+  auto &flx1 = flx.x1f;
 
-  par_for_outer("conduct1", DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx1(member.team_scratch(scr_level), ncells1);
+  par_for("conduct1", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie+1,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie+1, [&](const int i) {
-      Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
-      Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
-      if (use_e) {
-        temp_l = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
-        temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
-        pres_l = w0(m,IEN,k,j,i-1)*gm1;
-        pres_r = w0(m,IEN,k,j,i)*gm1;
-      } else {
-        temp_l = w0(m,ITM,k,j,i-1);
-        temp_r = w0(m,ITM,k,j,i);
-        pres_l = w0(m,ITM,k,j,i-1)*w0(m,IDN,k,j,i-1);
-        pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
-      }
-      Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
-                    KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
-      Real dtempdx1 = (temp_r-temp_l)/size.d_view(m).dx1;
-      hflx1(i) = kappaf*dtempdx1;
-      // Saturation of thermal conduction by harmonic mean
-      if (sat_hflux_) {
-        Real dtempdx2 = 0.0, dtempdx3 = 0.0;
-        if (multi_d) {
-          if (use_e) {
-            temp_ll = w0(m,IEN,k,j-1,i-1)/w0(m,IDN,k,j-1,i-1)*gm1;
-            temp_lr = w0(m,IEN,k,j+1,i-1)/w0(m,IDN,k,j+1,i-1)*gm1;
-            temp_rl = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
-            temp_rr = w0(m,IEN,k,j+1,i)/w0(m,IDN,k,j+1,i)*gm1;
-          } else {
-            temp_ll = w0(m,ITM,k,j-1,i-1);
-            temp_lr = w0(m,ITM,k,j+1,i-1);
-            temp_rl = w0(m,ITM,k,j-1,i);
-            temp_rr = w0(m,ITM,k,j+1,i);
-          }
-          dtempdx2 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                                temp_lr-temp_l,temp_l-temp_ll);
-          dtempdx2 /= size.d_view(m).dx2;
+    Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
+    Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
+    if (use_e) {
+      temp_l = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
+      temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
+      pres_l = w0(m,IEN,k,j,i-1)*gm1;
+      pres_r = w0(m,IEN,k,j,i)*gm1;
+    } else {
+      temp_l = w0(m,ITM,k,j,i-1);
+      temp_r = w0(m,ITM,k,j,i);
+      pres_l = w0(m,ITM,k,j,i-1)*w0(m,IDN,k,j,i-1);
+      pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
+    }
+    Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
+                  KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
+    Real dtempdx1 = (temp_r-temp_l)/size.d_view(m).dx1;
+    Real hflx = kappaf*dtempdx1;
+    // Saturation of thermal conduction by harmonic mean
+    if (sat_hflux_) {
+      Real dtempdx2 = 0.0, dtempdx3 = 0.0;
+      if (multi_d) {
+        if (use_e) {
+          temp_ll = w0(m,IEN,k,j-1,i-1)/w0(m,IDN,k,j-1,i-1)*gm1;
+          temp_lr = w0(m,IEN,k,j+1,i-1)/w0(m,IDN,k,j+1,i-1)*gm1;
+          temp_rl = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
+          temp_rr = w0(m,IEN,k,j+1,i)/w0(m,IDN,k,j+1,i)*gm1;
+        } else {
+          temp_ll = w0(m,ITM,k,j-1,i-1);
+          temp_lr = w0(m,ITM,k,j+1,i-1);
+          temp_rl = w0(m,ITM,k,j-1,i);
+          temp_rr = w0(m,ITM,k,j+1,i);
         }
-        if (three_d) {
-          if (use_e) {
-            temp_ll = w0(m,IEN,k-1,j,i-1)/w0(m,IDN,k-1,j,i-1)*gm1;
-            temp_lr = w0(m,IEN,k+1,j,i-1)/w0(m,IDN,k+1,j,i-1)*gm1;
-            temp_rl = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
-            temp_rr = w0(m,IEN,k+1,j,i)/w0(m,IDN,k+1,j,i)*gm1;
-          } else {
-            temp_ll = w0(m,ITM,k-1,j,i-1);
-            temp_lr = w0(m,ITM,k+1,j,i-1);
-            temp_rl = w0(m,ITM,k-1,j,i);
-            temp_rr = w0(m,ITM,k+1,j,i);
-          }
-          dtempdx3 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                                temp_lr-temp_l,temp_l-temp_ll);
-          dtempdx3 /= size.d_view(m).dx3;
-        }
-        Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
-        Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
-        Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
-        hflx1(i) *= sat_fac;
+        dtempdx2 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                              temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx2;
       }
-      flx1(m,IEN,k,j,i) -= hflx1(i);
-    });
+      if (three_d) {
+        if (use_e) {
+          temp_ll = w0(m,IEN,k-1,j,i-1)/w0(m,IDN,k-1,j,i-1)*gm1;
+          temp_lr = w0(m,IEN,k+1,j,i-1)/w0(m,IDN,k+1,j,i-1)*gm1;
+          temp_rl = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
+          temp_rr = w0(m,IEN,k+1,j,i)/w0(m,IDN,k+1,j,i)*gm1;
+        } else {
+          temp_ll = w0(m,ITM,k-1,j,i-1);
+          temp_lr = w0(m,ITM,k+1,j,i-1);
+          temp_rl = w0(m,ITM,k-1,j,i);
+          temp_rr = w0(m,ITM,k+1,j,i);
+        }
+        dtempdx3 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                              temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx3;
+      }
+      Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
+      Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
+      Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
+      hflx *= sat_fac;
+    }
+    flx1(m,IEN,k,j,i) -= hflx;
   });
   if (pmy_pack->pmesh->one_d) {return;}
 
   //--------------------------------------------------------------------------------------
   // fluxes in x2-direction
 
-  auto flx2 = flx.x2f;
+  auto &flx2 = flx.x2f;
 
-  par_for_outer("conduct2",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke, js, je+1,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx2(member.team_scratch(scr_level), ncells1);
+  par_for("conduct2",DevExeSpace(), 0, nmb1, ks, ke, js, je+1, is, ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie, [&](const int i) {
-      Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
-      Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
+    Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
+    Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
+    if (use_e) {
+      temp_l = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
+      temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
+      pres_l = w0(m,IEN,k,j-1,i)*gm1;
+      pres_r = w0(m,IEN,k,j,i)*gm1;
+    } else {
+      temp_l = w0(m,ITM,k,j-1,i);
+      temp_r = w0(m,ITM,k,j,i);
+      pres_l = w0(m,ITM,k,j-1,i)*w0(m,IDN,k,j-1,i);
+      pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
+    }
+    Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
+                  KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
+    Real dtempdx2 = (temp_r-temp_l)/size.d_view(m).dx2;
+    Real hflx = kappaf*dtempdx2;
+    // Saturation of thermal conduction
+    if (sat_hflux_) {
+      Real dtempdx1 = 0.0, dtempdx3 = 0.0;
       if (use_e) {
-        temp_l = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
-        temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
-        pres_l = w0(m,IEN,k,j-1,i)*gm1;
-        pres_r = w0(m,IEN,k,j,i)*gm1;
+        temp_ll = w0(m,IEN,k,j-1,i-1)/w0(m,IDN,k,j-1,i-1)*gm1;
+        temp_lr = w0(m,IEN,k,j-1,i+1)/w0(m,IDN,k,j-1,i+1)*gm1;
+        temp_rl = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
+        temp_rr = w0(m,IEN,k,j,i+1)/w0(m,IDN,k,j,i+1)*gm1;
       } else {
-        temp_l = w0(m,ITM,k,j-1,i);
-        temp_r = w0(m,ITM,k,j,i);
-        pres_l = w0(m,ITM,k,j-1,i)*w0(m,IDN,k,j-1,i);
-        pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
+        temp_ll = w0(m,ITM,k,j-1,i-1);
+        temp_lr = w0(m,ITM,k,j-1,i+1);
+        temp_rl = w0(m,ITM,k,j,i-1);
+        temp_rr = w0(m,ITM,k,j,i+1);
       }
-      Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
-                    KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
-      Real dtempdx2 = (temp_r-temp_l)/size.d_view(m).dx2;
-      hflx2(i) = kappaf*dtempdx2;
-      // Saturation of thermal conduction
-      if (sat_hflux_) {
-        Real dtempdx1 = 0.0, dtempdx3 = 0.0;
+      dtempdx1 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                            temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx1;
+      if (three_d) {
         if (use_e) {
-          temp_ll = w0(m,IEN,k,j-1,i-1)/w0(m,IDN,k,j-1,i-1)*gm1;
-          temp_lr = w0(m,IEN,k,j-1,i+1)/w0(m,IDN,k,j-1,i+1)*gm1;
-          temp_rl = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
-          temp_rr = w0(m,IEN,k,j,i+1)/w0(m,IDN,k,j,i+1)*gm1;
+          temp_ll = w0(m,IEN,k-1,j-1,i)/w0(m,IDN,k-1,j-1,i)*gm1;
+          temp_lr = w0(m,IEN,k+1,j-1,i)/w0(m,IDN,k+1,j-1,i)*gm1;
+          temp_rl = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
+          temp_rr = w0(m,IEN,k+1,j,i)/w0(m,IDN,k+1,j,i)*gm1;
         } else {
-          temp_ll = w0(m,ITM,k,j-1,i-1);
-          temp_lr = w0(m,ITM,k,j-1,i+1);
-          temp_rl = w0(m,ITM,k,j,i-1);
-          temp_rr = w0(m,ITM,k,j,i+1);
+          temp_ll = w0(m,ITM,k-1,j-1,i);
+          temp_lr = w0(m,ITM,k+1,j-1,i);
+          temp_rl = w0(m,ITM,k-1,j,i);
+          temp_rr = w0(m,ITM,k+1,j,i);
         }
-        dtempdx1 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                              temp_lr-temp_l,temp_l-temp_ll);
-        dtempdx1 /= size.d_view(m).dx1;
-        if (three_d) {
-          if (use_e) {
-            temp_ll = w0(m,IEN,k-1,j-1,i)/w0(m,IDN,k-1,j-1,i)*gm1;
-            temp_lr = w0(m,IEN,k+1,j-1,i)/w0(m,IDN,k+1,j-1,i)*gm1;
-            temp_rl = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
-            temp_rr = w0(m,IEN,k+1,j,i)/w0(m,IDN,k+1,j,i)*gm1;
-          } else {
-            temp_ll = w0(m,ITM,k-1,j-1,i);
-            temp_lr = w0(m,ITM,k+1,j-1,i);
-            temp_rl = w0(m,ITM,k-1,j,i);
-            temp_rr = w0(m,ITM,k+1,j,i);
-          }
-          dtempdx3 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                                temp_lr-temp_l,temp_l-temp_ll);
-          dtempdx3 /= size.d_view(m).dx3;
-        }
-        Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
-        Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
-        Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
-        hflx2(i) *= sat_fac;
+        dtempdx3 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                              temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx3;
       }
-      flx2(m,IEN,k,j,i) -= hflx2(i);
-    });
+      Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
+      Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
+      Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
+      hflx *= sat_fac;
+    }
+    flx2(m,IEN,k,j,i) -= hflx;
   });
   if (pmy_pack->pmesh->two_d) {return;}
 
   //--------------------------------------------------------------------------------------
   // fluxes in x3-direction
 
-  auto flx3 = flx.x3f;
+  auto &flx3 = flx.x3f;
 
-  par_for_outer("conduct3",DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke+1, js, je,
-  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    ScrArray1D<Real> hflx3(member.team_scratch(scr_level), ncells1);
+  par_for("conduct3",DevExeSpace(), 0, nmb1, ks, ke+1, js, je, is, ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Add heat fluxes into fluxes of conserved variables: energy
-    par_for_inner(member, is, ie, [&](const int i) {
-      Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
-      Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
+    Real temp_l = 0.0, temp_r = 0.0, pres_l = 0.0, pres_r = 0.0;
+    Real temp_ll = 0.0, temp_lr = 0.0, temp_rl = 0.0, temp_rr = 0.0;
+    if (use_e) {
+      temp_l = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
+      temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
+      pres_l = w0(m,IEN,k-1,j,i)*gm1;
+      pres_r = w0(m,IEN,k,j,i)*gm1;
+    } else {
+      temp_l = w0(m,ITM,k-1,j,i);
+      temp_r = w0(m,ITM,k,j,i);
+      pres_l = w0(m,ITM,k-1,j,i)*w0(m,IDN,k-1,j,i);
+      pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
+    }
+    Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
+                  KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
+    Real dtempdx3 = (temp_r-temp_l)/size.d_view(m).dx3;
+    Real hflx = kappaf*dtempdx3;
+    // Saturation of thermal conduction
+    if (sat_hflux_) {
+      Real dtempdx1 = 0.0, dtempdx2 = 0.0;
       if (use_e) {
-        temp_l = w0(m,IEN,k-1,j,i)/w0(m,IDN,k-1,j,i)*gm1;
-        temp_r = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
-        pres_l = w0(m,IEN,k-1,j,i)*gm1;
-        pres_r = w0(m,IEN,k,j,i)*gm1;
+        temp_ll = w0(m,IEN,k-1,j,i-1)/w0(m,IDN,k-1,j,i-1)*gm1;
+        temp_lr = w0(m,IEN,k-1,j,i+1)/w0(m,IDN,k-1,j,i+1)*gm1;
+        temp_rl = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
+        temp_rr = w0(m,IEN,k,j,i+1)/w0(m,IDN,k,j,i+1)*gm1;
       } else {
-        temp_l = w0(m,ITM,k-1,j,i);
-        temp_r = w0(m,ITM,k,j,i);
-        pres_l = w0(m,ITM,k-1,j,i)*w0(m,IDN,k-1,j,i);
-        pres_r = w0(m,ITM,k,j,i)*w0(m,IDN,k,j,i);
+        temp_ll = w0(m,ITM,k-1,j,i-1);
+        temp_lr = w0(m,ITM,k-1,j,i+1);
+        temp_rl = w0(m,ITM,k,j,i-1);
+        temp_rr = w0(m,ITM,k,j,i+1);
       }
-      Real kappaf = 0.5*(KappaTemp(temp_unit*temp_l,kappaceil)+
-                    KappaTemp(temp_unit*temp_r,kappaceil))/kappa_unit;
-      Real dtempdx3 = (temp_r-temp_l)/size.d_view(m).dx3;
-      hflx3(i) = kappaf*dtempdx3;
-      // Saturation of thermal conduction
-      if (sat_hflux_) {
-        Real dtempdx1 = 0.0, dtempdx2 = 0.0;
-        if (use_e) {
-          temp_ll = w0(m,IEN,k-1,j,i-1)/w0(m,IDN,k-1,j,i-1)*gm1;
-          temp_lr = w0(m,IEN,k-1,j,i+1)/w0(m,IDN,k-1,j,i+1)*gm1;
-          temp_rl = w0(m,IEN,k,j,i-1)/w0(m,IDN,k,j,i-1)*gm1;
-          temp_rr = w0(m,IEN,k,j,i+1)/w0(m,IDN,k,j,i+1)*gm1;
-        } else {
-          temp_ll = w0(m,ITM,k-1,j,i-1);
-          temp_lr = w0(m,ITM,k-1,j,i+1);
-          temp_rl = w0(m,ITM,k,j,i-1);
-          temp_rr = w0(m,ITM,k,j,i+1);
-        }
-        dtempdx1 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                              temp_lr-temp_l,temp_l-temp_ll);
-        dtempdx1 /= size.d_view(m).dx1;
-        if (use_e) {
-          temp_ll = w0(m,IEN,k-1,j-1,i)/w0(m,IDN,k-1,j-1,i)*gm1;
-          temp_lr = w0(m,IEN,k-1,j+1,i)/w0(m,IDN,k-1,j+1,i)*gm1;
-          temp_rl = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
-          temp_rr = w0(m,IEN,k,j+1,i)/w0(m,IDN,k,j+1,i)*gm1;
-        } else {
-          temp_ll = w0(m,ITM,k-1,j-1,i);
-          temp_lr = w0(m,ITM,k-1,j+1,i);
-          temp_rl = w0(m,ITM,k,j-1,i);
-          temp_rr = w0(m,ITM,k,j+1,i);
-        }
-        dtempdx2 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
-                              temp_lr-temp_l,temp_l-temp_ll);
-        dtempdx2 /= size.d_view(m).dx2;
-        Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
-        Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
-        Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
-        hflx3(i) *= sat_fac;
+      dtempdx1 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                            temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx1;
+      if (use_e) {
+        temp_ll = w0(m,IEN,k-1,j-1,i)/w0(m,IDN,k-1,j-1,i)*gm1;
+        temp_lr = w0(m,IEN,k-1,j+1,i)/w0(m,IDN,k-1,j+1,i)*gm1;
+        temp_rl = w0(m,IEN,k,j-1,i)/w0(m,IDN,k,j-1,i)*gm1;
+        temp_rr = w0(m,IEN,k,j+1,i)/w0(m,IDN,k,j+1,i)*gm1;
+      } else {
+        temp_ll = w0(m,ITM,k-1,j-1,i);
+        temp_lr = w0(m,ITM,k-1,j+1,i);
+        temp_rl = w0(m,ITM,k,j-1,i);
+        temp_rr = w0(m,ITM,k,j+1,i);
       }
-      flx3(m,IEN,k,j,i) -= hflx3(i);
-    });
+      dtempdx2 = VL4Limiter(temp_rr-temp_r,temp_r-temp_rl,
+                            temp_lr-temp_l,temp_l-temp_ll)/size.d_view(m).dx2;
+      Real tempgrad = sqrt(SQR(dtempdx1)+SQR(dtempdx2)+SQR(dtempdx3));
+      Real pres_cs = 0.5*(pres_l*sqrt(temp_l)+pres_r*sqrt(temp_r));
+      Real sat_fac = 1.0/(1.0+kappaf*tempgrad/(1.5*pres_cs));
+      hflx *= sat_fac;
+    }
+    flx3(m,IEN,k,j,i) -= hflx;
   });
 
   return;
@@ -450,6 +420,7 @@ void Conduction::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_da
   const bool &use_e = eos_data.use_e;
   Real gm1 = eos_data.gamma-1.0;
   Real kappa0 = kappa;
+  bool tdepkappa = tdep_kappa;
   Real kappaceil = kappa_ceiling;
   Real fac;
   if (pmy_pack->pmesh->three_d) {
@@ -477,9 +448,9 @@ void Conduction::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_da
     k += ks;
     j += js;
 
-    Real temp = 1.0;
     Real kappa_ = kappa0;
-    if (kappa_ == -1.0) {
+    if (tdepkappa) {
+      Real temp = 1.0;
       if (use_e) {
         temp = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
       } else {
