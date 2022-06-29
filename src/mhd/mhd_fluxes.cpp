@@ -99,8 +99,10 @@ void MHD::CalculateFluxes(Driver *pdriver, int stage) {
         break;
       case ReconstructionMethod::ppm4:
       case ReconstructionMethod::ppmx:
-        PiecewiseParabolicX1(member, eos, extrema, m, k, j, is-1, ie+1, w0_, wl, wr);
-        PiecewiseParabolicX1(member, eos, extrema, m, k, j, is-1, ie+1, b0_, bl, br);
+        PiecewiseParabolicX1(member, eos, extrema, true,
+                             m, k, j, is-1, ie+1, w0_, wl, wr);
+        PiecewiseParabolicX1(member, eos, extrema, false,
+                             m, k, j, is-1, ie+1, b0_, bl, br);
         break;
       case ReconstructionMethod::wenoz:
         WENOZX1(member, m, k, j, is-1, ie+1, w0_, wl, wr);
@@ -202,8 +204,10 @@ void MHD::CalculateFluxes(Driver *pdriver, int stage) {
             break;
           case ReconstructionMethod::ppm4:
           case ReconstructionMethod::ppmx:
-            PiecewiseParabolicX2(member,eos,extrema,m, k, j, is-1, ie+1, w0_, wl_jp1, wr);
-            PiecewiseParabolicX2(member,eos,extrema,m, k, j, is-1, ie+1, b0_, bl_jp1, br);
+            PiecewiseParabolicX2(member, eos, extrema, true,
+                                 m, k, j, is-1, ie+1, w0_, wl_jp1, wr);
+            PiecewiseParabolicX2(member, eos, extrema, false,
+                                 m, k, j, is-1, ie+1, b0_, bl_jp1, br);
             break;
           case ReconstructionMethod::wenoz:
             WENOZX2(member, m, k, j, is-1, ie+1, w0_, wl_jp1, wr);
@@ -309,8 +313,10 @@ void MHD::CalculateFluxes(Driver *pdriver, int stage) {
             break;
           case ReconstructionMethod::ppm4:
           case ReconstructionMethod::ppmx:
-            PiecewiseParabolicX3(member,eos,extrema,m, k, j, is-1, ie+1, w0_, wl_kp1, wr);
-            PiecewiseParabolicX3(member,eos,extrema,m, k, j, is-1, ie+1, b0_, bl_kp1, br);
+            PiecewiseParabolicX3(member, eos, extrema, true,
+                                 m, k, j, is-1, ie+1, w0_, wl_kp1, wr);
+            PiecewiseParabolicX3(member, eos, extrema, false,
+                                 m, k, j, is-1, ie+1, b0_, bl_kp1, br);
             break;
           case ReconstructionMethod::wenoz:
             WENOZX3(member, m, k, j, is-1, ie+1, w0_, wl_kp1, wr);
