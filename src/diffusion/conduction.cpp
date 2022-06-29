@@ -94,11 +94,12 @@ Conduction::~Conduction() {
 
 void Conduction::AddHeatFlux(const DvceArray5D<Real> &w0, const EOS_Data &eos,
   DvceFaceFld5D<Real> &flx) {
-  if (kappa > 0.0) {
-    IsotropicHeatFlux(w0, eos, flx);
-  }
   if (tdep_kappa) {
     TempDependentHeatFlux(w0, eos, flx);
+  } else if (kappa > 0.0) {
+    IsotropicHeatFlux(w0, eos, flx);
+  } else {
+    return;
   }
   return;
 }
