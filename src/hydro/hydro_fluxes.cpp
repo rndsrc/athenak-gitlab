@@ -78,11 +78,10 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
         break;
       case ReconstructionMethod::ppm4:
       case ReconstructionMethod::ppmx:
-        PiecewiseParabolicX1(member, eos, extrema, true,
-                             m, k, j, is-1, ie+1, w0_, wl, wr);
+        PiecewiseParabolicX1(member,eos,extrema,true, m, k, j, is-1, ie+1, w0_, wl, wr);
         break;
       case ReconstructionMethod::wenoz:
-        WENOZX1(member, m, k, j, is-1, ie+1, w0_, wl, wr);
+        WENOZX1(member, eos, true, m, k, j, is-1, ie+1, w0_, wl, wr);
         break;
       default:
         break;
@@ -161,11 +160,10 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
             break;
           case ReconstructionMethod::ppm4:
           case ReconstructionMethod::ppmx:
-            PiecewiseParabolicX2(member, eos, extrema, true,
-                                 m, k, j, is, ie, w0_, wl_jp1, wr);
+            PiecewiseParabolicX2(member,eos,extrema,true,m,k,j,is,ie, w0_, wl_jp1, wr);
             break;
           case ReconstructionMethod::wenoz:
-            WENOZX2(member, m, k, j, is-1, ie+1, w0_, wl_jp1, wr);
+            WENOZX2(member, eos, true, m, k, j, is-1, ie+1, w0_, wl_jp1, wr);
             break;
           default:
             break;
@@ -247,11 +245,10 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
             break;
           case ReconstructionMethod::ppm4:
           case ReconstructionMethod::ppmx:
-            PiecewiseParabolicX3(member, eos, extrema, true,
-                                 m, k, j, is, ie, w0_, wl_kp1, wr);
+            PiecewiseParabolicX3(member,eos,extrema,true,m,k,j,is,ie, w0_, wl_kp1, wr);
             break;
           case ReconstructionMethod::wenoz:
-            WENOZX3(member, m, k, j, is-1, ie+1, w0_, wl_kp1, wr);
+            WENOZX3(member, eos, true, m, k, j, is-1, ie+1, w0_, wl_kp1, wr);
             break;
           default:
             break;
