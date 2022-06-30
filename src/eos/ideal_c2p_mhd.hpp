@@ -19,7 +19,8 @@
 
 KOKKOS_INLINE_FUNCTION
 void SingleC2P_IdealMHD(MHDCons1D &u, const EOS_Data &eos,
-                        HydPrim1D &w, bool &dfloor_used, bool &efloor_used) {
+                        HydPrim1D &w,
+                        bool &dfloor_used, bool &efloor_used, bool &tfloor_used) {
   const Real &dfloor_ = eos.dfloor;
   Real efloor = eos.pfloor/(eos.gamma - 1.0);
   Real tfloor = eos.tfloor;
@@ -51,6 +52,7 @@ void SingleC2P_IdealMHD(MHDCons1D &u, const EOS_Data &eos,
   if (gm1*w.e*di < tfloor) {
     w.e = w.d*tfloor/gm1;
     u.e = w.e + e_k + e_m;
+    tfloor_used =true;
   }
 
   return;
