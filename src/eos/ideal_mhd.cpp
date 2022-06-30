@@ -88,8 +88,15 @@ void IdealMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
         sumd++;  // use dfloor as counter for when either is true
       }
     } else {
-      if (dfloor_used) {sumd++;}
-      if (efloor_used) {sume++;}
+      // update counter, reset conserved if floor was hit
+      if (dfloor_used) {
+        cons(m,IDN,k,j,i) = u.d;
+        sumd++;
+      }
+      if (efloor_used) {
+        cons(m,IEN,k,j,i) = u.e;
+        sume++;
+      }
       if (tfloor_used) {
         cons(m,IEN,k,j,i) = u.e;
         sumt++;
