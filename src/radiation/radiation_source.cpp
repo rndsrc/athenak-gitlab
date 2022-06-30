@@ -3,10 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file radiation_update.cpp
-//  \brief Performs update of Radiation conserved variables (i0) for each stage of
-//   explicit SSP RK integrators (e.g. RK1, RK2, RK3). Update uses weighted average and
-//   partial time step appropriate to stage.
+//! \file radiation_source.cpp
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"

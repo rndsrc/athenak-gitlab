@@ -3,7 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file hydro_fluxes.cpp
+//! \file radiation_fluxes.cpp
 //  \brief Calculate 3D fluxes for radiation
 
 #include <iostream>

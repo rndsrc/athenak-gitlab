@@ -3,7 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file hydro_tasks.cpp
+//! \file radiation_tasks.cpp
 //  \brief implementation of functions that control Hydro tasks in the four task lists:
 //  stagestart_tl, stagerun_tl, stageend_tl, operatorsplit_tl (currently not used)
 

@@ -3,7 +3,7 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file cartesian_gr.hpp
+//! \file radiation_tetrad.hpp
 //! \brief implements functions for Cartesian Kerr-Schild Cartesian tetrad.  This
 //! includes inline functions to compute metric, derivatives of the metric, tetrad,
 //! derivatives of the tetrad, Christoffel coefficients, Ricci rotation matrices, etc.

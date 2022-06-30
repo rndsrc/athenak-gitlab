@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file gr_rad_beam.cpp
-//  \brief Beam test for radiation
+//! \file rad_snake.cpp
+//  \brief Snake beam test for radiation
 
 // C++ headers
 #include <algorithm>  // min, max
@@ -204,9 +204,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real p1 = pin->GetReal("problem", "pos_1");
   Real p2 = pin->GetReal("problem", "pos_2");
   Real p3 = pin->GetReal("problem", "pos_3");
-  Real d1 = pin->GetReal("problem", "dir_1");
-  Real d2 = pin->GetReal("problem", "dir_2");
-  Real d3 = pin->GetReal("problem", "dir_3");
   Real width_ = pin->GetReal("problem", "width");
   Real spread_ = pin->GetReal("problem", "spread");
   auto &beam_mask = pmbp->prad->beam_mask;
@@ -240,6 +237,13 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     Real mu_min = cos(spread_/2.0*M_PI/180.0);
 
     // Calculate contravariant time component of direction
+    Real dmag = sqrt(1.0 + SQR(mag_*kym_*M_PI*cos(kym_*M_PI*x2v)));
+    Real d1 = -mag_*kym_*M_PI*cos(kym_*M_PI*x2v);
+    Real d2 = 1.0;
+    Real d3 = 0.0;
+    d1 /= dmag;
+    d2 /= dmag;
+    d3 /= dmag;
     Real temp_a = g_[I00];
     Real temp_b = 2.0*(g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3);
     Real temp_c = (g_[I11]*d1*d1 + 2.0*g_[I12]*d1*d2 + 2.0*g_[I13]*d1*d3

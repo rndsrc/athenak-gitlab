@@ -4,7 +4,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file rad_diffusion.cpp
-//  \brief Relaxation test (flat space)
+//  \brief Static and dynamic diffusion test (flat space)
 
 // C++ headers
 #include <algorithm>  // min, max

@@ -29,24 +29,6 @@
 
 FormattedTableOutput::FormattedTableOutput(OutputParameters op, Mesh *pm) :
   BaseTypeOutput(op, pm) {
-  // check that 1D slice specified, otherwise issue warning and quit
-  if (pm->multi_d) {
-    if (!(out_params.slice1) && !(out_params.slice2)) {
-      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                << std::endl << "Formatted table outputs can only contain 1D slices"
-                << std::endl << "Please add additional slice planes" << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-  if (pm->three_d) {
-    if ((!(out_params.slice2) && !(out_params.slice3)) ||
-        (!(out_params.slice1) && !(out_params.slice3))) {
-      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                << std::endl << "Formatted table outputs can only contain 1D slices"
-                << std::endl << "Please add additional slice planes" << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  }
   // create directories for outputs. Comments in binary.cpp constructor explain why
   mkdir("tab",0775);
 }

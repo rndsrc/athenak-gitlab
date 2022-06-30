@@ -3,8 +3,8 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file gr_rad_beam.cpp
-//  \brief Beam test for radiation
+//! \file rad_relax.cpp
+//  \brief thermal relaxation test
 
 // C++ headers
 #include <algorithm>  // min, max
@@ -144,7 +144,10 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       // Calculate intensity in tetrad frame
       Real n_0 = 0.0;
       for (int d=0; d<4; ++d) {  n_0 += tetcov_c_(m,d,0,k,j,i)*nh_c_.d_view(n,d);  }
-      i0(m,n,k,j,i) = ii_f/SQR(SQR(n0_f));
+
+      printf("%24.16e %24.16e\n", ii_f, n_0);
+
+      i0(m,n,k,j,i) = n_0*ii_f/SQR(SQR(n0_f));
     }
   });
 

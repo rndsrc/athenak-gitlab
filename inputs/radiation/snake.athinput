@@ -7,7 +7,7 @@ basename = beam_snake  # name of run
 <time>
 evolution  = dynamic  # dynamic/kinematic/static
 integrator = rk2      # time integration algorithm
-cfl_number = 0.3      # The Courant, Friedrichs, & Lewy (CFL) Number
+cfl_number = 0.5      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1       # cycle limit
 tlim       = 3.0      # time limit
 
@@ -20,10 +20,10 @@ ix1_bc = outflow  # inner-X1 boundary flag
 ox1_bc = outflow  # outer-X1 boundary flag
 
 nx2    = 256      # Number of zones in X2-direction
-x2min  = -0.25    # minimum value of X1
-x2max  = 2.25     # maximum value of X1
-ix2_bc = outflow  # inner-X1 boundary flag
-ox2_bc = outflow  # outer-X1 boundary flag
+x2min  = -0.05    # minimum value of X2
+x2max  = 2.45     # maximum value of X2
+ix2_bc = outflow  # inner-X2 boundary flag
+ox2_bc = outflow  # outer-X2 boundary flag
 
 nx3    = 1         # Number of zones in X3-direction
 x3min  = -0.5      # minimum value of X3
@@ -37,33 +37,30 @@ nx2 = 256   # block size in X2-direction
 nx3 = 1     # block size in X3-direction
 
 <coord>
-general_rel = true   # general relativity
-minkowski   = true
-m           = 0.0
-a           = 0.0
-excise      = false  # excise black hole
+general_rel = true    # w/ general relativity
+minkowski = true      # Minkowski flag
+m = 0.0               # black hole mass m (0 <= a/M < 1)
+a = 0.0               # black hole spin a (0 <= a/M < 1)
+excise = false        # excise horizon
 
 <radiation>
-nlevel = 20          # geodesic mesh level
+nlevel = 22          # geodesic mesh level
 reconstruct = plm    # reconstruction method
 rad_source = false   # radiation source term
 beam_source = true   # apply beam source term
-dii_dt = 1.0
+dii_dt = 1.0e4       # injected I per unit time
 
 <problem>
-pos_1  = 0.0         # x-coordinate of beam origin
-pos_2  = 0.0         # y-coordinate of beam origin
-pos_3  = 0.0         # z-coordinate of beam origin
-width  = 0.01        # full proper diameter of beam
-dir_1  = -0.532018044501408  # relative x-direction of beam center
-dir_2  = 0.8467330159648304  # relative y-direction of beam center
-dir_3  = 0.0         # relative z-direction of beam center
-spread = 10.0        # full spread of beam in direction, in degrees
-dii_dt = 1.0         # injected I per unit time
-snake_kym = 2.0      # controls the wavelength of sinusoidal perturb in snake coord
-snake_mag = 0.1      # controls the magnitude  of sinusoidal perturb in snake coord
+pos_1  = 0.0     # x-coordinate of beam origin
+pos_2  = 0.0     # y-coordinate of beam origin
+pos_3  = 0.0     # z-coordinate of beam origin
+width  = 0.05    # full proper diameter of beam
+spread = 10.0    # full spread of beam in direction, in degrees
+snake_kym = 2.0  # controls the wavelength of sinusoidal perturb in snake coord
+snake_mag = 0.1  # controls the magnitude  of sinusoidal perturb in snake coord
 
 <output1>
-file_type = vtk          # output format
-variable  = rad_coord    # choice of variables to output
-dt        = 0.5          # output cadence
+file_type = tab         # output format
+data_format = %24.16e   # output precision
+variable  = rad_coord   # choice of variables to output
+dt        = 4.0         # output cadence
