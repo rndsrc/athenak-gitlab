@@ -118,6 +118,8 @@ template <typename T>
 using DualArray2D = Kokkos::DualView<T **, LayoutWrapper, DevMemSpace>;
 template <typename T>
 using DualArray3D = Kokkos::DualView<T ***, LayoutWrapper, DevMemSpace>;
+template <typename T>
+using DualArray4D = Kokkos::DualView<T ****, LayoutWrapper, DevMemSpace>;
 
 // template declarations for construction of Kokkos::View in scratch memory
 template <typename T>
@@ -303,6 +305,45 @@ inline void par_for(const std::string &name, DevExeSpace exec_space,
     k += kl;
     j += jl;
     function(m, n, k, j, i);
+  });
+}
+
+//------------------------------
+// 6D loop using Kokkos 1D Range
+template <typename Function>
+inline void par_for(const std::string &name, DevExeSpace exec_space,
+                    const int &ml, const int &mu,
+                    const int &ol, const int &ou,
+                    const int &nl, const int &nu, const int &kl, const int &ku,
+                    const int &jl, const int &ju, const int &il, const int &iu,
+                    const Function &function) {
+  // compute total number of elements and call Kokkos::parallel_for()
+  const int nm = mu - ml + 1;
+  const int no = ou - ol + 1;
+  const int nn = nu - nl + 1;
+  const int nk = ku - kl + 1;
+  const int nj = ju - jl + 1;
+  const int ni = iu - il + 1;
+  const int nmonkji = nm * no * nn * nk * nj * ni;
+  const int nonkji  = no * nn * nk * nj * ni;
+  const int nnkji   = nn * nk * nj * ni;
+  const int nkji    = nk * nj * ni;
+  const int nji     = nj * ni;
+  Kokkos::parallel_for(name, Kokkos::RangePolicy<>(exec_space, 0, nmonkji),
+                       KOKKOS_LAMBDA(const int &idx) {
+    // compute m,o,n,k,j,i indices of thread and call function
+    int m = (idx)/nonkji;
+    int o = (idx - m*nonkji)/nnkji;
+    int n = (idx - m*nonkji - o*nnkji)/nkji;
+    int k = (idx - m*nonkji - o*nnkji - n*nkji)/nji;
+    int j = (idx - m*nonkji - o*nnkji - n*nkji - k*nji)/ni;
+    int i = (idx - m*nonkji - o*nnkji - n*nkji - k*nji - j*ni) + il;
+    m += ml;
+    o += ol;
+    n += nl;
+    k += kl;
+    j += jl;
+    function(m, o, n, k, j, i);
   });
 }
 

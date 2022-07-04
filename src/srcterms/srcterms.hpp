@@ -38,6 +38,7 @@ class SourceTerms {
   bool const_accel;
   bool shearing_box;
   bool ism_cooling;
+  bool beam;
 
   // new timestep
   Real dtnew;
@@ -52,6 +53,9 @@ class SourceTerms {
   // heating rate used with ISM cooling
   Real hrate;
 
+  // beam source
+  Real dii_dt;
+
   // functions
   void AddConstantAccel(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
   void AddShearingBox(DvceArray5D<Real> &u0,const DvceArray5D<Real> &w0,const Real dt);
@@ -61,6 +65,7 @@ class SourceTerms {
   void AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
                      const EOS_Data &eos, const Real dt);
   void NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos);
+  void AddBeamSource(DvceArray5D<Real> &i0,const Real dt);
 
  private:
   MeshBlockPack* pmy_pack;

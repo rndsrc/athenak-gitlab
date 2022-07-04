@@ -6,6 +6,8 @@
 //! \file coordinates.cpp
 //! \brief
 
+#include <float.h>
+
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
@@ -21,6 +23,7 @@
 Coordinates::Coordinates(ParameterInput *pin, MeshBlockPack *ppack) :
     pmy_pack(ppack),
     cc_mask("cc_mask",1,1,1,1),
+    cc_rad_mask("cc_rad_mask",1,1,1,1),
     fc_mask("fc_mask",1,1,1,1) {
   // Check for relativistic dynamics
   is_special_relativistic = pin->GetOrAddBoolean("coord","special_rel",false);
@@ -39,17 +42,10 @@ Coordinates::Coordinates(ParameterInput *pin, MeshBlockPack *ppack) :
     coord_data.bh_excise = pin->GetOrAddBoolean("coord","excise",true);
 
     if (coord_data.bh_excise) {
-      // throw error if attempting to excise in 1D/2D
-      if (!(pmy_pack->pmesh->three_d)) {
-        std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__
-                  << std::endl << "Excising only supported in 3D" << std::endl;
-        std::exit(EXIT_FAILURE);
-      }
-
       // Set the density and pressure to which cells inside the excision radius will
       // be reset to.  Primitive velocities will be set to zero.
-      coord_data.dexcise = pin->GetReal("coord","dexcise");
-      coord_data.pexcise = pin->GetReal("coord","pexcise");
+      coord_data.dexcise = pin->GetOrAddReal("coord","dexcise",(FLT_MIN));
+      coord_data.pexcise = pin->GetOrAddReal("coord","pexcise",(FLT_MIN));
 
       // boolean masks allocation
       int nmb = ppack->nmb_thispack;
@@ -61,6 +57,10 @@ Coordinates::Coordinates(ParameterInput *pin, MeshBlockPack *ppack) :
       Kokkos::realloc(fc_mask.x1f, nmb, ncells3, ncells2, ncells1+1);
       Kokkos::realloc(fc_mask.x2f, nmb, ncells3, ncells2+1, ncells1);
       Kokkos::realloc(fc_mask.x3f, nmb, ncells3+1, ncells2, ncells1);
+      if (pin->DoesBlockExist("radiation")) {
+        coord_data.excise_rad = true;
+        Kokkos::realloc(cc_rad_mask, nmb, ncells3, ncells2, ncells1);
+      }
     }
   }
 }

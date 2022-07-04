@@ -27,6 +27,7 @@
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 
 #include <Kokkos_Random.hpp>
 
@@ -404,6 +405,15 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     pmbp->pmhd->peos->PrimToCons(w0_, bcc0_, u0_, 0, (n1-1), 0, (n2-1), 0, (n3-1));
   }
 
+  if (pmbp->prad != nullptr) {
+    int nang1 = (pmbp->prad->prgeo->nangles-1);
+    auto &i0 = pmbp->prad->i0;
+    par_for("rad_torus",DevExeSpace(),0,nmb1,0,nang1,0,(n3-1),0,(n2-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
+      i0(m,n,k,j,i) = 0.0;
+    });
+  }
+
   return;
 }
 
@@ -740,6 +750,13 @@ void NoInflowTorus(Mesh *pm) {
   int nmb = pm->pmb_pack->nmb_thispack;
   int nvar = u0_.extent_int(1);
 
+  bool is_radiation_enabled_ = (pm->pmb_pack->prad != nullptr) ? true : false;
+  DvceArray5D<Real> i0_; int nang1;
+  if (is_radiation_enabled_) {
+    i0_ = pm->pmb_pack->prad->i0;
+    nang1 = pm->pmb_pack->prad->prgeo->nangles - 1;
+  }
+
   // X1-Boundary
   // ConsToPrim over all x1 ghost zones *and* at the innermost/outermost x1-active zones
   // of Meshblocks, even if Meshblock face is not at the edge of computational domain
@@ -774,6 +791,22 @@ void NoInflowTorus(Mesh *pm) {
       }
     }
   });
+  if (is_radiation_enabled_) {
+    // Set X1-BCs on i0 if Meshblock face is at the edge of computational domain
+    par_for("noinflow_rad_x1", DevExeSpace(),0,(nmb-1),0,nang1,0,(n3-1),0,(n2-1),
+    KOKKOS_LAMBDA(int m, int n, int k, int j) {
+      if (mb_bcs.d_view(m,BoundaryFace::inner_x1) == BoundaryFlag::user) {
+        for (int i=0; i<ng; ++i) {
+          i0_(m,n,k,j,is-i-1) = i0_(m,n,k,j,is);
+        }
+      }
+      if (mb_bcs.d_view(m,BoundaryFace::outer_x1) == BoundaryFlag::user) {
+        for (int i=0; i<ng; ++i) {
+          i0_(m,n,k,j,ie+i+1) = i0_(m,n,k,j,ie);
+        }
+      }
+    });
+  }
   // Set X1-BCs on b0 and bcc0 if Meshblock face is at the edge of computational domain
   if (pm->pmb_pack->pmhd != nullptr) {
     auto &b0 = pm->pmb_pack->pmhd->b0;
@@ -861,6 +894,22 @@ void NoInflowTorus(Mesh *pm) {
       }
     }
   });
+  if (is_radiation_enabled_) {
+    // Set X2-BCs on i0 if Meshblock face is at the edge of computational domain
+    par_for("noinflow_rad_x2", DevExeSpace(),0,(nmb-1),0,nang1,0,(n3-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int n, int k, int i) {
+      if (mb_bcs.d_view(m,BoundaryFace::inner_x2) == BoundaryFlag::user) {
+        for (int j=0; j<ng; ++j) {
+          i0_(m,n,k,js-j-1,i) = i0_(m,n,k,js,i);
+        }
+      }
+      if (mb_bcs.d_view(m,BoundaryFace::outer_x2) == BoundaryFlag::user) {
+        for (int j=0; j<ng; ++j) {
+          i0_(m,n,k,je+j+1,i) = i0_(m,n,k,je,i);
+        }
+      }
+    });
+  }
   // Set X2-BCs on b0 and bcc0 if Meshblock face is at the edge of computational domain
   if (pm->pmb_pack->pmhd != nullptr) {
     auto &b0 = pm->pmb_pack->pmhd->b0;
@@ -948,6 +997,22 @@ void NoInflowTorus(Mesh *pm) {
       }
     }
   });
+  if (is_radiation_enabled_) {
+    // Set x3-BCs on i0 if Meshblock face is at the edge of computational domain
+    par_for("noinflow_rad_x3", DevExeSpace(),0,(nmb-1),0,nang1,0,(n2-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int n, int j, int i) {
+      if (mb_bcs.d_view(m,BoundaryFace::inner_x3) == BoundaryFlag::user) {
+        for (int k=0; k<ng; ++k) {
+          i0_(m,n,ks-k-1,j,i) = i0_(m,n,ks,j,i);
+        }
+      }
+      if (mb_bcs.d_view(m,BoundaryFace::outer_x3) == BoundaryFlag::user) {
+        for (int k=0; k<ng; ++k) {
+          i0_(m,n,ke+k+1,j,i) = i0_(m,n,ke,j,i);
+        }
+      }
+    });
+  }
   // Set x3-BCs on b0 and bcc0 if Meshblock face is at the edge of computational domain
   if (pm->pmb_pack->pmhd != nullptr) {
     auto &b0 = pm->pmb_pack->pmhd->b0;

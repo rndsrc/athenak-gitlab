@@ -1,0 +1,48 @@
+# AthenaXXX input file
+
+<job>
+basename  = geo       # problem ID: basename of output filenames
+
+<mesh>
+nghost = 2         # Number of ghost cells
+nx1    = 16        # Number of zones in X1-direction
+x1min  = -4.0      # minimum value of X1
+x1max  = 4.0       # maximum value of X1
+ix1_bc = periodic  # inner-X1 boundary flag
+ox1_bc = periodic  # outer-X1 boundary flag
+
+nx2    = 16        # Number of zones in X2-direction
+x2min  = -4.0      # minimum value of X1
+x2max  = 4.0       # maximum value of X1
+ix2_bc = periodic  # inner-X1 boundary flag
+ox2_bc = periodic  # outer-X1 boundary flag
+
+nx3    = 1         # Number of zones in X3-direction
+x3min  = -4.0      # minimum value of X3
+x3max  = 4.0       # maximum value of X3
+ix3_bc = periodic  # inner-X3 boundary flag
+ox3_bc = periodic  # outer-X3 boundary flag
+
+<time>
+evolution  = dynamic   # dynamic/kinematic/static
+tlim       = 1.0       # time limit
+cfl_number = 0.8       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = 0         # number of cycles
+
+<coord>
+general_rel = true
+m = 1.0
+a = 0.9375
+excise = true
+
+<hydro>
+eos     = ideal    # EOS type
+rsolver = llf      # Riemann-solver to be used
+gamma   = 1.4      # gamma = C_p/C_v
+
+<radiation>
+nlevel = 10
+rad_source = false
+
+<problem>
+nlevel = 10

@@ -39,8 +39,13 @@ void Coordinates::SetExcisionMasks() {
 
   auto &cc_mask_ = cc_mask;
   auto &fc_mask_ = fc_mask;
+
+  bool is_radiation_enabled_ = coord_data.excise_rad;
+  auto &cc_rad_mask_ = cc_rad_mask;
+
   // NOTE(@pdmullen):
   // cc_mask: if r_ks evaluated at *this cell-center* is <= 1, mask the cell.
+  // cc_rad_mask: if r_ks evaluated at *this cell-center* is <= r_h, mask the cell.
   // fc_mask: if r_ks evaluated at *this face-center* is <=1, or if *any other
   // portion of grid cells sharing this face* is <=1, mask the cell (added complexity
   // here as two neighboring cells share a face)
@@ -83,11 +88,15 @@ void Coordinates::SetExcisionMasks() {
     Real x3fp1 = LeftEdgeX  (k+1-ks, indcs.nx3, x3min, x3max);
     Real x3fp2 = LeftEdgeX  (k+2-ks, indcs.nx3, x3min, x3max);
 
-    // Set cc_mask
+    // Set cc_masks
     x1 = x1v;
     x2 = x2v;
     x3 = x3v;
     cc_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= 1.0) ? true : false;
+    if (is_radiation_enabled_) {
+      Real r_out_ergo = 1.0 + sqrt(1.0 - SQR(spin)*SQR(x3)/SQR(KSRX(x1,x2,x3,spin)));
+      cc_rad_mask_(m,k,j,i) = (KSRX(x1,x2,x3,spin) <= r_out_ergo) ? true : false;
+    }
 
     // Set fc_mask.x1f
     x1 = x1v;

@@ -32,6 +32,7 @@ struct CoordData {
   bool bh_excise;                  // flag to specify excision
   Real dexcise;                    // rest-mass density inside excised region
   Real pexcise;                    // pressure inside excised region
+  bool excise_rad=false;           // excise radiation field
 };
 
 //----------------------------------------------------------------------------------------
@@ -53,6 +54,7 @@ class Coordinates {
   // excision masks
   DvceArray4D<bool> cc_mask;          // cell-centered mask for C2P
   DvceFaceFld4D<bool> fc_mask;        // face-centered mask to enable first-order fluxes
+  DvceArray4D<bool> cc_rad_mask;      // cell-centered mask for radiation
 
   // functions
   void AddCoordTerms(const DvceArray5D<Real> &w0, const EOS_Data &eos, const Real dt,

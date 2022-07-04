@@ -17,6 +17,7 @@
 #include "eos/eos.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "radiation/radiation.hpp"
 #include "srcterms/srcterms.hpp"
 #include "srcterms/turb_driver.hpp"
 #include "outputs.hpp"
@@ -68,6 +69,13 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
        << "Output of Force variable requested in <output> block '"
        << out_params.block_name << "' but no Force object has been constructed."
        << std::endl << "Input file is likely missing a <forcing> block" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  if ((ivar==42 || ivar==43) && (pm->pmb_pack->prad == nullptr)) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+       << "Output of Radiation moments requested in <output> block '"
+       << out_params.block_name << "' but no Radiation object has been constructed."
+       << std::endl << "Input file is likely missing a <radiation> block" << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -302,6 +310,32 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
     outvars.emplace_back("force1",0,&(pm->pmb_pack->pturb->force));
     outvars.emplace_back("force2",1,&(pm->pmb_pack->pturb->force));
     outvars.emplace_back("force3",2,&(pm->pmb_pack->pturb->force));
+  }
+
+  if (out_params.variable.compare("rad_coord") == 0) {
+    outvars.emplace_back(true,"r00",0,&(derived_var));
+    outvars.emplace_back(true,"r01",1,&(derived_var));
+    outvars.emplace_back(true,"r02",2,&(derived_var));
+    outvars.emplace_back(true,"r03",3,&(derived_var));
+    outvars.emplace_back(true,"r11",4,&(derived_var));
+    outvars.emplace_back(true,"r12",5,&(derived_var));
+    outvars.emplace_back(true,"r13",6,&(derived_var));
+    outvars.emplace_back(true,"r22",7,&(derived_var));
+    outvars.emplace_back(true,"r23",8,&(derived_var));
+    outvars.emplace_back(true,"r33",9,&(derived_var));
+  }
+
+  if (out_params.variable.compare("rad_fluid") == 0) {
+    outvars.emplace_back(true,"r00_ff",0,&(derived_var));
+    outvars.emplace_back(true,"r01_ff",1,&(derived_var));
+    outvars.emplace_back(true,"r02_ff",2,&(derived_var));
+    outvars.emplace_back(true,"r03_ff",3,&(derived_var));
+    outvars.emplace_back(true,"r11_ff",4,&(derived_var));
+    outvars.emplace_back(true,"r12_ff",5,&(derived_var));
+    outvars.emplace_back(true,"r13_ff",6,&(derived_var));
+    outvars.emplace_back(true,"r22_ff",7,&(derived_var));
+    outvars.emplace_back(true,"r23_ff",8,&(derived_var));
+    outvars.emplace_back(true,"r33_ff",9,&(derived_var));
   }
 }
 

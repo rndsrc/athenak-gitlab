@@ -18,7 +18,9 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "hydro/hydro.hpp"
+#include "radiation/radiation.hpp"
 #include "pgen/pgen.hpp"
 
 namespace {
@@ -175,6 +177,15 @@ void ProblemGenerator::BondiAccretion(ParameterInput *pin, const bool restart) {
     pmbp->phydro->peos->PrimToCons(w0_, u1_, 0, (n1-1), 0, (n2-1), 0, (n3-1));
   } else {
     pmbp->phydro->peos->PrimToCons(w0_, u0_, 0, (n1-1), 0, (n2-1), 0, (n3-1));
+  }
+
+  if (pmbp->prad != nullptr) {
+    int nang1 = (pmbp->prad->prgeo->nangles-1);
+    auto &i0 = pmbp->prad->i0;
+    par_for("rad_beam",DevExeSpace(),0,(nmb-1),0,nang1,0,(n3-1),0,(n2-1),0,(n1-1),
+    KOKKOS_LAMBDA(int m, int n, int k, int j, int i) {
+      i0(m,n,k,j,i) = 0.0;
+    });
   }
 
   return;
@@ -613,6 +624,13 @@ void FixedBondiInflow(Mesh *pm) {
   auto u0_ = pm->pmb_pack->phydro->u0;
   auto w0_ = pm->pmb_pack->phydro->w0;
 
+  bool is_radiation_enabled_ = (pm->pmb_pack->prad != nullptr) ? true : false;
+  DvceArray5D<Real> i0_; int nang1;
+  if (is_radiation_enabled_) {
+    i0_ = pm->pmb_pack->prad->i0;
+    nang1 = pm->pmb_pack->prad->prgeo->nangles - 1;
+  }
+
   pm->pmb_pack->phydro->peos->ConsToPrim(u0_,w0_,false,is-ng,is-1,0,(n2-1),0,(n3-1));
   pm->pmb_pack->phydro->peos->ConsToPrim(u0_,w0_,false,ie+1,ie+ng,0,(n2-1),0,(n3-1));
   par_for("fixed_x1", DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,(ng-1),
@@ -638,6 +656,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,k,j,i) = uu1;
       w0_(m,IM2,k,j,i) = uu2;
       w0_(m,IM3,k,j,i) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,k,j,i) = i0_(m,n,k,j,is);
+        }
+      }
     }
 
     // outer x1 boundary
@@ -650,6 +673,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,k,j,(ie+i+1)) = uu1;
       w0_(m,IM2,k,j,(ie+i+1)) = uu2;
       w0_(m,IM3,k,j,(ie+i+1)) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,k,j,(ie+i+1)) = i0_(m,n,k,j,ie);
+        }
+      }
     }
   });
   // PrimToCons on X1 physical boundary ghost zones
@@ -681,6 +709,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,k,j,i) = uu1;
       w0_(m,IM2,k,j,i) = uu2;
       w0_(m,IM3,k,j,i) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,k,j,i) = i0_(m,n,k,js,i);
+        }
+      }
     }
 
     // outer x2 boundary
@@ -693,6 +726,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,k,(je+j+1),i) = uu1;
       w0_(m,IM2,k,(je+j+1),i) = uu2;
       w0_(m,IM3,k,(je+j+1),i) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,k,(je+j+1),i) = i0_(m,n,k,je,i);
+        }
+      }
     }
   });
   pm->pmb_pack->phydro->peos->PrimToCons(w0_,u0_,0,(n1-1),js-ng,js-1,0,(n3-1));
@@ -723,6 +761,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,k,j,i) = uu1;
       w0_(m,IM2,k,j,i) = uu2;
       w0_(m,IM3,k,j,i) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,k,j,i) = i0_(m,n,ks,j,i);
+        }
+      }
     }
 
     // outer x3 boundary
@@ -735,6 +778,11 @@ void FixedBondiInflow(Mesh *pm) {
       w0_(m,IM1,(ke+k+1),j,i) = uu1;
       w0_(m,IM2,(ke+k+1),j,i) = uu2;
       w0_(m,IM3,(ke+k+1),j,i) = uu3;
+      if (is_radiation_enabled_) {
+        for (int n=0; n<=nang1; ++n) {
+          i0_(m,n,(ke+k+1),j,i) = i0_(m,n,ke,j,i);
+        }
+      }
     }
   });
   pm->pmb_pack->phydro->peos->PrimToCons(w0_,u0_,0,(n1-1),0,(n2-1),ks-ng,ks-1);

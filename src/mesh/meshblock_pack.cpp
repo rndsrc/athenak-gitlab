@@ -18,6 +18,7 @@
 #include "ion-neutral/ion_neutral.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
+#include "radiation/radiation.hpp"
 #include "srcterms/turb_driver.hpp"
 #include "units/units.hpp"
 #include "meshblock_pack.hpp"
@@ -43,6 +44,7 @@ MeshBlockPack::~MeshBlockPack() {
   delete pcoord;
   if (phydro != nullptr) {delete phydro;}
   if (pmhd   != nullptr) {delete pmhd;}
+  if (prad   != nullptr) {delete prad;}
   if (pturb  != nullptr) {delete pturb;}
   if (punit  != nullptr) {delete punit;}
 }
@@ -75,7 +77,7 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
   if (pin->DoesBlockExist("hydro")) {
     phydro = new hydro::Hydro(this, pin);
     nphysics++;
-    if (!(pin->DoesBlockExist("mhd"))) {
+    if (!(pin->DoesBlockExist("mhd")) && !(pin->DoesBlockExist("radiation"))) {
       phydro->AssembleHydroTasks(start_tl, run_tl, end_tl);
     }
   } else {
@@ -87,7 +89,7 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
   if (pin->DoesBlockExist("mhd")) {
     pmhd = new mhd::MHD(this, pin);
     nphysics++;
-    if (!(pin->DoesBlockExist("hydro"))) {
+    if (!(pin->DoesBlockExist("hydro")) && !(pin->DoesBlockExist("radiation"))) {
       pmhd->AssembleMHDTasks(start_tl, run_tl, end_tl);
     }
   } else {
@@ -119,7 +121,17 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
     pionn = nullptr;
   }
 
-  // (4) TURBULENCE DRIVER
+  // (4) RADIATION
+  // Create radiation physics module.  Create tasklist.
+  if (pin->DoesBlockExist("radiation")) {
+    prad = new radiation::Radiation(this, pin);
+    nphysics++;
+    prad->AssembleRadiationTasks(start_tl, run_tl, end_tl);
+  } else {
+    prad = nullptr;
+  }
+
+  // (5) TURBULENCE DRIVER
   // This is a special module to drive turbulence in hydro, MHD, or both. Cannot be
   // included as a source term since it requires evolving force array via O-U process.
   // Instead, TurbulenceDriver object is stored in MeshBlockPack and tasks for evolving
@@ -133,7 +145,7 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
     pturb = nullptr;
   }
 
-  // Units
+  // (6) Units
   // Default units are cgs units
   if (pin->DoesBlockExist("units")) {
     punit = new units::Units(pin);
