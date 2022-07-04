@@ -28,15 +28,17 @@
 #include "radiation/radiation_tetrad.hpp"
 #include "outputs.hpp"
 
-#include "coordinates/cartesian_ks.hpp"
-#include "radiation/radiation_tetrad.hpp"
-
 //----------------------------------------------------------------------------------------
 // BaseTypeOutput::ComputeDerivedVariable()
 
 void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   int nmb = pm->pmb_pack->nmb_thispack;
   auto &indcs = pm->mb_indcs;
+  int &ng = indcs.ng;
+  int n1 = indcs.nx1 + 2*ng;
+  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
+  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
+
   int &is = indcs.is;  int &ie  = indcs.ie;
   int &js = indcs.js;  int &je  = indcs.je;
   int &ks = indcs.ks;  int &ke  = indcs.ke;
@@ -48,6 +50,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // Not computed in ghost zones since requires derivative
   if (name.compare("hydro_wz") == 0 ||
       name.compare("mhd_wz") == 0) {
+    Kokkos::realloc(derived_var, nmb, 1, n3, n2, n1);
     auto dv = derived_var;
     auto w0_ = (name.compare("hydro_wz") == 0)?
       pm->pmb_pack->phydro->w0 : pm->pmb_pack->pmhd->w0;
@@ -64,6 +67,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // Not computed in ghost zones since requires derivative
   if (name.compare("hydro_w2") == 0 ||
       name.compare("mhd_w2") == 0) {
+    Kokkos::realloc(derived_var, nmb, 1, n3, n2, n1);
     auto dv = derived_var;
     auto w0_ = (name.compare("hydro_w2") == 0)?
       pm->pmb_pack->phydro->w0 : pm->pmb_pack->pmhd->w0;
@@ -88,6 +92,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // This makes for a large stencil, but approximates volume-averaged value within cell.
   // Not computed in ghost zones since requires derivative
   if (name.compare("mhd_jz") == 0) {
+    Kokkos::realloc(derived_var, nmb, 1, n3, n2, n1);
     auto dv = derived_var;
     auto bcc = pm->pmb_pack->pmhd->bcc0;
     par_for("jz", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,
@@ -102,6 +107,7 @@ void BaseTypeOutput::ComputeDerivedVariable(std::string name, Mesh *pm) {
   // magnitude of current density.  Calculated from cell-centered fields.
   // Not computed in ghost zones since requires derivative
   if (name.compare("mhd_j2") == 0) {
+    Kokkos::realloc(derived_var, nmb, 1, n3, n2, n1);
     auto dv = derived_var;
     auto bcc = pm->pmb_pack->pmhd->bcc0;
     par_for("jz", DevExeSpace(), 0, (nmb-1), ks, ke, js, je, is, ie,

@@ -53,7 +53,6 @@ class Coordinates {
 
   // excision masks
   DvceArray4D<bool> cc_mask;          // cell-centered mask for C2P
-  DvceArray4D<bool> cc_rad_mask;      // cell-centered mask for radiation
   DvceFaceFld4D<bool> fc_mask;        // face-centered mask to enable first-order fluxes
   DvceArray4D<bool> cc_rad_mask;      // cell-centered mask for radiation
 

@@ -97,14 +97,6 @@ add_executable(
         radiation/radiation_tetrad.cpp
         radiation/radiation_update.cpp
 
-        radiation/radiation.cpp
-        radiation/radiation_fluxes.cpp
-        radiation/radiation_geom.cpp
-        radiation/radiation_newdt.cpp
-        radiation/radiation_source.cpp
-        radiation/radiation_tasks.cpp
-        radiation/radiation_update.cpp
-
         srcterms/srcterms.cpp
         srcterms/srcterms_newdt.cpp
         srcterms/turb_driver.cpp
