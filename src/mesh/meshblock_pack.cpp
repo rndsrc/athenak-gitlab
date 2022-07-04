@@ -47,6 +47,7 @@ MeshBlockPack::~MeshBlockPack() {
   if (prad   != nullptr) {delete prad;}
   if (pturb  != nullptr) {delete pturb;}
   if (punit  != nullptr) {delete punit;}
+  if (prad   != nullptr) {delete prad;}
 }
 
 //----------------------------------------------------------------------------------------

@@ -305,6 +305,36 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
     outvars.emplace_back(true,"divb",0,&(derived_var));
   }
 
+  if (out_params.variable.compare("rad_coord") == 0) {
+    out_params.derived = true;
+    outvars.emplace_back("r00",0,&(derived_var));
+    outvars.emplace_back("r01",1,&(derived_var));
+    outvars.emplace_back("r02",2,&(derived_var));
+    outvars.emplace_back("r03",3,&(derived_var));
+    outvars.emplace_back("r11",4,&(derived_var));
+    outvars.emplace_back("r12",5,&(derived_var));
+    outvars.emplace_back("r13",6,&(derived_var));
+    outvars.emplace_back("r22",7,&(derived_var));
+    outvars.emplace_back("r23",8,&(derived_var));
+    outvars.emplace_back("r33",9,&(derived_var));
+    ndvars += 10;
+  }
+
+  if (out_params.variable.compare("rad_fluid") == 0) {
+    out_params.derived = true;
+    outvars.emplace_back("r00_ff",0,&(derived_var));
+    outvars.emplace_back("r01_ff",1,&(derived_var));
+    outvars.emplace_back("r02_ff",2,&(derived_var));
+    outvars.emplace_back("r03_ff",3,&(derived_var));
+    outvars.emplace_back("r11_ff",4,&(derived_var));
+    outvars.emplace_back("r12_ff",5,&(derived_var));
+    outvars.emplace_back("r13_ff",6,&(derived_var));
+    outvars.emplace_back("r22_ff",7,&(derived_var));
+    outvars.emplace_back("r23_ff",8,&(derived_var));
+    outvars.emplace_back("r33_ff",9,&(derived_var));
+    ndvars += 10;
+  }
+
   // turbulent forcing
   if (out_params.variable.compare("turb_force") == 0) {
     outvars.emplace_back("force1",0,&(pm->pmb_pack->pturb->force));
@@ -445,11 +475,6 @@ void BaseTypeOutput::LoadOutputData(Mesh *pm) {
 
   // Now copy data to host (outarray) over all variables and MeshBlocks
   for (int n=0; n<nout_vars; ++n) {
-    // Calculate derived variable, if required
-    if (outvars[n].derived) {
-      ComputeDerivedVariable(out_params.variable, pm);
-    }
-
     for (int m=0; m<nout_mbs; ++m) {
       int &ois = outmbs[m].ois;
       int &oie = outmbs[m].oie;
