@@ -19,6 +19,7 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "coordinates/coordinates.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "mesh/mesh.hpp"
 #include "radiation/radiation.hpp"
 #include "radiation/radiation_tetrad.hpp"
@@ -36,7 +37,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
   int nmb1 = (pmbp->nmb_thispack-1);
-  int nang1 = (pmbp->prad->nangles-1);
+  int nang1 = (pmbp->prad->prgeo->nangles-1);
   auto &coord = pmbp->pcoord->coord_data;
   auto &size = pmbp->pmb->mb_size;
 
@@ -67,33 +68,35 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     Real &x3max = size.d_view(m).x3max;
     Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-    Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-    Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
-    ComputeTetrad(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, e, e_cov, omega);
+    Real glower[4][4], gupper[4][4];
+    ComputeMetricAndInverse(x1v,x2v,x3v,flat,spin,glower,gupper);
+    Real dgx[4][4], dgy[4][4], dgz[4][4];
+    ComputeMetricDerivatives(x1v,x2v,x3v,flat,spin,dgx,dgy,dgz);
+    Real e[4][4], e_cov[4][4], omega[4][4][4];
+    ComputeTetrad(x1v,x2v,x3v,flat,spin,glower,gupper,dgx,dgy,dgz,e,e_cov,omega);
 
     // Calculate proper distance to beam origin and minimum angle between directions
     Real dx1 = x1v - p1;
     Real dx2 = x2v - p2;
     Real dx3 = x3v - p3;
-    Real dx_sq = (g_[I11]*dx1*dx1 + 2.0*g_[I12]*dx1*dx2 + 2.0*g_[I13]*dx1*dx3
-                                  +     g_[I22]*dx2*dx2 + 2.0*g_[I23]*dx2*dx3
-                                                        +     g_[I33]*dx3*dx3);
+    Real dx_sq = glower[1][1]*dx1*dx1 +2.0*glower[1][2]*dx1*dx2 + 2.0*glower[1][3]*dx1*dx3
+               + glower[2][2]*dx2*dx2 +2.0*glower[2][3]*dx2*dx3
+               + glower[3][3]*dx3*dx3;
     Real mu_min = cos(spread_/2.0*M_PI/180.0);
 
     // Calculate contravariant time component of direction
-    Real temp_a = g_[I00];
-    Real temp_b = 2.0*(g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3);
-    Real temp_c = (g_[I11]*d1*d1 + 2.0*g_[I12]*d1*d2 + 2.0*g_[I13]*d1*d3
-                                 +     g_[I22]*d2*d2 + 2.0*g_[I23]*d2*d3
-                                                     +     g_[I33]*d3*d3);
+    Real temp_a = glower[0][0];
+    Real temp_b = 2.0*(glower[0][1]*d1 + glower[0][2]*d2 + glower[0][3]*d3);
+    Real temp_c = glower[1][1]*d1*d1 + 2.0*glower[1][2]*d1*d2 + 2.0*glower[1][3]*d1*d3
+                + glower[2][2]*d2*d2 + 2.0*glower[2][3]*d2*d3
+                + glower[3][3]*d3*d3;
     Real d0 = ((-temp_b - sqrt(SQR(temp_b) - 4.0*temp_a*temp_c))/(2.0*temp_a));
 
     // lower indices
-    Real dc0 = g_[I00]*d0 + g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3;
-    Real dc1 = g_[I01]*d0 + g_[I11]*d1 + g_[I12]*d2 + g_[I13]*d3;
-    Real dc2 = g_[I02]*d0 + g_[I12]*d1 + g_[I22]*d2 + g_[I23]*d3;
-    Real dc3 = g_[I03]*d0 + g_[I13]*d1 + g_[I23]*d2 + g_[I33]*d3;
+    Real dc0 = glower[0][0]*d0 + glower[0][1]*d1 + glower[0][2]*d2 + glower[0][3]*d3;
+    Real dc1 = glower[0][1]*d0 + glower[1][1]*d1 + glower[1][2]*d2 + glower[1][3]*d3;
+    Real dc2 = glower[0][2]*d0 + glower[1][2]*d1 + glower[2][2]*d2 + glower[2][3]*d3;
+    Real dc3 = glower[0][3]*d0 + glower[1][3]*d1 + glower[2][3]*d2 + glower[3][3]*d3;
 
     // Calculate covariant direction in tetrad frame
     Real dtc0 = (tet_c_(m,0,0,k,j,i)*dc0 + tet_c_(m,0,1,k,j,i)*dc1 +

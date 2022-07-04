@@ -44,9 +44,9 @@ MeshBlockPack::~MeshBlockPack() {
   delete pcoord;
   if (phydro != nullptr) {delete phydro;}
   if (pmhd   != nullptr) {delete pmhd;}
+  if (prad   != nullptr) {delete prad;}
   if (pturb  != nullptr) {delete pturb;}
   if (punit  != nullptr) {delete punit;}
-  if (prad   != nullptr) {delete prad;}
 }
 
 //----------------------------------------------------------------------------------------
@@ -145,7 +145,7 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
     pturb = nullptr;
   }
 
-  // (6) UNITS
+  // (6) Units
   // Default units are cgs units
   if (pin->DoesBlockExist("units")) {
     punit = new units::Units(pin);

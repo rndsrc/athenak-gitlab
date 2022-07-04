@@ -12,6 +12,7 @@
 #include "athena.hpp"
 #include "globals.hpp"
 #include "parameter_input.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "tasklist/task_list.hpp"
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
@@ -47,9 +48,8 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
     // run task list
     id.copycons  = run.AddTask(&Radiation::CopyCons, this, none);
 
-    id.rad_flux  = run.AddTask(&Radiation::CalcFluxes, this, id.copycons);
-    id.mhd_flux  = run.AddTask(&mhd::MHD::CalcFluxes<MHD_RSolver::hlle_gr>,
-                               pmhd,id.rad_flux);
+    id.rad_flux  = run.AddTask(&Radiation::CalculateFluxes, this, id.copycons);
+    id.mhd_flux  = run.AddTask(&mhd::MHD::Fluxes, pmhd, id.rad_flux);
 
     id.rad_sendf = run.AddTask(&Radiation::SendFlux, this, id.mhd_flux);
     id.rad_recvf = run.AddTask(&Radiation::RecvFlux, this, id.rad_sendf);
@@ -96,9 +96,8 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
     // run task list
     id.copycons = run.AddTask(&Radiation::CopyCons, this, none);
 
-    id.rad_flux  = run.AddTask(&Radiation::CalcFluxes, this, id.copycons);
-    id.hyd_flux  = run.AddTask(&hydro::Hydro::CalcFluxes<Hydro_RSolver::hlle_gr>,
-                               phyd,id.rad_flux);
+    id.rad_flux  = run.AddTask(&Radiation::CalculateFluxes, this, id.copycons);
+    id.hyd_flux  = run.AddTask(&hydro::Hydro::Fluxes, phyd, id.rad_flux);
 
     id.rad_sendf = run.AddTask(&Radiation::SendFlux, this, id.hyd_flux);
     id.rad_recvf = run.AddTask(&Radiation::RecvFlux, this, id.rad_sendf);
@@ -133,7 +132,7 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
 
     // run task list
     id.copycons  = run.AddTask(&Radiation::CopyCons, this, none);
-    id.rad_flux  = run.AddTask(&Radiation::CalcFluxes, this, id.copycons);
+    id.rad_flux  = run.AddTask(&Radiation::CalculateFluxes, this, id.copycons);
     id.rad_sendf = run.AddTask(&Radiation::SendFlux, this, id.rad_flux);
     id.rad_recvf = run.AddTask(&Radiation::RecvFlux, this, id.rad_sendf);
     id.rad_expl  = run.AddTask(&Radiation::ExpRKUpdate, this, id.rad_recvf);
@@ -155,11 +154,11 @@ void Radiation::AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList 
 //  receive status flags to waiting (with or without MPI) for Radiation variables.
 
 TaskStatus Radiation::InitRecv(Driver *pdrive, int stage) {
-  TaskStatus tstat = pbval_i->InitRecv(nangles);
+  TaskStatus tstat = pbval_i->InitRecv(prgeo->nangles);
   if (tstat != TaskStatus::complete) return tstat;
 
   if (pmy_pack->pmesh->multilevel && (stage >= 0)) {
-    tstat = pbval_i->InitFluxRecv(nangles);
+    tstat = pbval_i->InitFluxRecv(prgeo->nangles);
   }
   return tstat;
 }

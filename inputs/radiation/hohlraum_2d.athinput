@@ -49,13 +49,11 @@ reconstruct = plm       # reconstruction method
 angular_fluxes = false  # flag to disable angular fluxes
 rad_source = false      # flag for radiation source term
 
+<problem>
+pgen_name  = hohlraum
+
 <output1>
 file_type   = tab        # output format
 data_format = %24.16e    # output precision
 variable    = rad_coord  # choice of variables to output
 dt          = 1.0        # output cadence
-
-<output2>
-file_type = vtk        # output format
-variable  = rad_coord  # choice of variables to output
-dt        = 1.0        # output cadence

@@ -44,7 +44,10 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
     e1x3("e1x3",1,1,1,1),
     e1_cc("e1_cc",1,1,1,1),
     e2_cc("e2_cc",1,1,1,1),
-    e3_cc("e3_cc",1,1,1,1) {
+    e3_cc("e3_cc",1,1,1,1),
+    utest("utest",1,1,1,1,1),
+    bcctest("bcctest",1,1,1,1,1),
+    fofc("fofc",1,1,1,1) {
   // (1) construct EOS object (no default)
   {std::string eqn_of_state = pin->GetString("mhd","eos");
   // ideal gas EOS
@@ -154,24 +157,23 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
       recon_method = ReconstructionMethod::dc;
     } else if (xorder.compare("plm") == 0) {
       recon_method = ReconstructionMethod::plm;
-    } else if (xorder.compare("ppm") == 0) {
+    } else if (xorder.compare("ppm4") == 0 ||
+               xorder.compare("ppmx") == 0 ||
+               xorder.compare("wenoz") == 0) {
       // check that nghost > 2
       if (indcs.ng < 3) {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-            << std::endl << "PPM reconstruction requires at least 3 ghost zones, "
-            << "but <mesh>/nghost=" << indcs.ng << std::endl;
+          << std::endl << xorder << " reconstruction requires at least 3 ghost zones, "
+          << "but <mesh>/nghost=" << indcs.ng << std::endl;
         std::exit(EXIT_FAILURE);
       }
-      recon_method = ReconstructionMethod::ppm;
-    } else if (xorder.compare("wenoz") == 0) {
-      // check that nghost > 2
-      if (indcs.ng < 3) {
-        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-            << std::endl << "WENOZ reconstruction requires at least 3 ghost zones, "
-            << "but <mesh>/nghost=" << indcs.ng << std::endl;
-        std::exit(EXIT_FAILURE);
+      if (xorder.compare("ppm4") == 0) {
+        recon_method = ReconstructionMethod::ppm4;
+      } else if (xorder.compare("ppmx") == 0) {
+        recon_method = ReconstructionMethod::ppmx;
+      } else if (xorder.compare("wenoz") == 0) {
+        recon_method = ReconstructionMethod::wenoz;
       }
-      recon_method = ReconstructionMethod::wenoz;
     } else {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                 << std::endl << "<mhd>/recon = '" << xorder << "' not implemented"
@@ -284,6 +286,14 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
     Kokkos::realloc(e1_cc, nmb, ncells3, ncells2, ncells1);
     Kokkos::realloc(e2_cc, nmb, ncells3, ncells2, ncells1);
     Kokkos::realloc(e3_cc, nmb, ncells3, ncells2, ncells1);
+
+    // allocate array of flags used with FOFC
+    use_fofc = pin->GetOrAddBoolean("mhd","fofc",false);
+    if (use_fofc) {
+      Kokkos::realloc(fofc,    nmb, ncells3, ncells2, ncells1);
+      Kokkos::realloc(utest,   nmb, nmhd, ncells3, ncells2, ncells1);
+      Kokkos::realloc(bcctest, nmb, 3,    ncells3, ncells2, ncells1);
+    }
   }
 }
 

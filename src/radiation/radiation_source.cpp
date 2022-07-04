@@ -11,6 +11,7 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/coordinates.hpp"
 #include "coordinates/cell_locations.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "eos/eos.hpp"
 #include "srcterms/srcterms.hpp"
 #include "hydro/hydro.hpp"
@@ -40,7 +41,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
   int nmb1 = pmy_pack->nmb_thispack - 1;
-  int nang1 = nangles - 1;
+  int nang1 = prgeo->nangles - 1;
   auto &size = pmy_pack->pmb->mb_size;
   auto &coord = pmy_pack->pcoord->coord_data;
   bool is_hydro_enabled_ = is_hydro_enabled;
@@ -56,19 +57,20 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     gm1_ = pmy_pack->pmhd->peos->eos_data.gamma - 1.0;
   }
   Real gammap_ = gamma_/gm1_;
-  auto arad_ = arad;
+  Real arad_ = arad;
 
   // extract frame data
   auto nh_c_ = nh_c;
   auto tet_c_ = tet_c;
   auto tetcov_c_ = tetcov_c;
-  auto solid_angle_ = solid_angle;
   auto norm_to_tet_ = norm_to_tet;
+
+  // extract angular mesh data
+  auto solid_angles_ = prgeo->solid_angles;
 
   // extract coupling flags
   bool fixed_fluid_ = fixed_fluid;
   bool affect_fluid_ = affect_fluid;
-  bool zero_radiation_force_ = zero_radiation_force;
 
   // Load radiation quantities
   auto i0_ = i0;
@@ -92,22 +94,22 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
   // ConsToPrim over active zones
   if (!(fixed_fluid_)) {
     if (is_hydro_enabled_) {
-      pmy_pack->phydro->peos->ConsToPrim(u0_,w0_,is,ie,js,je,ks,ke);
+      pmy_pack->phydro->peos->ConsToPrim(u0_,w0_,false,is,ie,js,je,ks,ke);
     } else if (is_mhd_enabled_) {
       auto &b0_ = pmy_pack->pmhd->b0;
-      pmy_pack->pmhd->peos->ConsToPrim(u0_,b0_,w0_,bcc0_,is,ie,js,je,ks,ke);
+      pmy_pack->pmhd->peos->ConsToPrim(u0_,b0_,w0_,bcc0_,false,is,ie,js,je,ks,ke);
     }
   }
 
   // opacities
   bool constant_opacity_ = constant_opacity;
   bool power_opacity_ = power_opacity;
-  auto kappa_a_ = kappa_a;
-  auto kappa_s_ = kappa_s;
-  auto kappa_p_ = kappa_p;
+  Real kappa_a_ = kappa_a;
+  Real kappa_s_ = kappa_s;
+  Real kappa_p_ = kappa_p;
 
   // extract excision flags
-  auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
+  bool &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
 
   // timestep
@@ -129,8 +131,8 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
     // compute metric and inverse
-    Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
+    Real glower[4][4], gupper[4][4];
+    ComputeMetricAndInverse(x1v,x2v,x3v,coord.is_minkowski,coord.bh_spin,glower,gupper);
 
     // fluid state
     Real &wdn = w0_(m,IDN,k,j,i);
@@ -141,9 +143,10 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
 
     // derived quantities
     Real tgas = (gm1_*wen)/wdn;
-    Real gg = sqrt(1. + (g_[I11]*wvx*wvx + 2.*g_[I12]*wvx*wvy + 2.*g_[I13]*wvx*wvz
-                                         +    g_[I22]*wvy*wvy + 2.*g_[I23]*wvy*wvz
-                                                              +    g_[I33]*wvz*wvz));
+    Real q = glower[1][1]*wvx*wvx + 2.0*glower[1][2]*wvx*wvy + 2.0*glower[1][3]*wvx*wvz
+           + glower[2][2]*wvy*wvy + 2.0*glower[2][3]*wvy*wvz
+           + glower[3][3]*wvz*wvz;
+    Real gg = sqrt(1.0 + q);
 
     // set opacities
     Real sigma_a = 0.0, sigma_s = 0.0, sigma_p = 0.0;
@@ -153,9 +156,9 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
     Real dtcsigmaa = dt_*sigma_a;
     Real dtcsigmas = dt_*sigma_s;
     Real dtcsigmap = dt_*sigma_p;
-    Real dtaucsigmaa = dtcsigmaa/(gg*sqrt(-gi_[I00]));
-    Real dtaucsigmas = dtcsigmas/(gg*sqrt(-gi_[I00]));
-    Real dtaucsigmap = dtcsigmap/(gg*sqrt(-gi_[I00]));
+    Real dtaucsigmaa = dtcsigmaa/(gg*sqrt(-gupper[0][0]));
+    Real dtaucsigmas = dtcsigmas/(gg*sqrt(-gupper[0][0]));
+    Real dtaucsigmap = dtcsigmap/(gg*sqrt(-gupper[0][0]));
 
     // compute fluid velocity in tetrad frame
     Real u_tet[4];
@@ -182,7 +185,7 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
                        u_tet[2]*nh_c_.d_view(n,2) +
                        u_tet[3]*nh_c_.d_view(n,3));
       Real n0_cm    = (u_tet[0]*nh_c_.d_view(n,0) - un_tet);
-      Real omega_cm = solid_angle_.d_view(n)/SQR(n0_cm);
+      Real omega_cm = solid_angles_.d_view(n)/SQR(n0_cm);
       Real intensity_cm = 4.0*M_PI*(i0_(m,n,k,j,i)/n_0)*SQR(SQR(n0_cm));
       Real vncsigma = 1.0/(n0 + (dtcsigmaa + dtcsigmas)*n0_cm);
       Real vncsigma2 = n0_cm*vncsigma;
@@ -233,10 +236,10 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         }
 
         // compute moments before coupling
-        m_old[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_old[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_old[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_old[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_old[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_old[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_old[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_old[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
 
         // update intensity
         Real un_tet   = (u_tet[1]*nh_c_.d_view(n,1) +
@@ -258,62 +261,19 @@ TaskStatus Radiation::AddRadiationSourceTerm(Driver *pdriver, int stage) {
         }
 
         // compute moments after coupling
-        m_new[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_new[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_new[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
-        m_new[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angle_.d_view(n));
+        m_new[0] += (n0*n_0*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_new[1] += (n0*n_1*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_new[2] += (n0*n_2*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
+        m_new[3] += (n0*n_3*(i0_(m,n,k,j,i)/n_0)*solid_angles_.d_view(n));
       }
     }
 
-    // Feedback on fluid
+    // update conserved fluid variables
     if (affect_fluid_) {
-      // update conserved variables
-      if (!(zero_radiation_force_)) {
-        u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);
-        u0_(m,IM1,k,j,i) += (m_old[1] - m_new[1]);
-        u0_(m,IM2,k,j,i) += (m_old[2] - m_new[2]);
-        u0_(m,IM3,k,j,i) += (m_old[3] - m_new[3]);
-      } else {
-        Real alpha = sqrt(-1.0/gi_[I00]);
-        Real u0_tmp = gg/alpha;
-        Real u1_tmp = wvx - alpha * gg * gi_[I01];
-        Real u2_tmp = wvy - alpha * gg * gi_[I02];
-        Real u3_tmp = wvz - alpha * gg * gi_[I03];
-        Real u_0_tmp = g_[I00]*u0_tmp + g_[I01]*u1_tmp + g_[I02]*u2_tmp + g_[I03]*u3_tmp;
-        Real u_1_tmp = g_[I01]*u0_tmp + g_[I11]*u1_tmp + g_[I12]*u2_tmp + g_[I13]*u3_tmp;
-        Real u_2_tmp = g_[I02]*u0_tmp + g_[I12]*u1_tmp + g_[I22]*u2_tmp + g_[I23]*u3_tmp;
-        Real u_3_tmp = g_[I03]*u0_tmp + g_[I13]*u1_tmp + g_[I23]*u2_tmp + g_[I33]*u3_tmp;
-        Real pgas_new = wdn*tgasnew;
-        if (is_hydro_enabled_) {
-          Real wgas_u0 = (wdn + gammap_ * pgas_new) * u0_tmp;
-          u0_(m,IEN,k,j,i) = wgas_u0 * u_0_tmp + pgas_new + wdn * u0_tmp;
-          u0_(m,IM1,k,j,i) = wgas_u0 * u_1_tmp;
-          u0_(m,IM2,k,j,i) = wgas_u0 * u_2_tmp;
-          u0_(m,IM3,k,j,i) = wgas_u0 * u_3_tmp;
-        } else if (is_mhd_enabled_) {
-          Real &bcc1 = bcc0_(m,IBX,k,j,i);
-          Real &bcc2 = bcc0_(m,IBY,k,j,i);
-          Real &bcc3 = bcc0_(m,IBZ,k,j,i);
-          Real b0 = g_[I01]*u0_tmp*bcc1 + g_[I02]*u0_tmp*bcc2 + g_[I03]*u0_tmp*bcc3
-                  + g_[I11]*u1_tmp*bcc1 + g_[I12]*u1_tmp*bcc2 + g_[I13]*u1_tmp*bcc3
-                  + g_[I12]*u2_tmp*bcc1 + g_[I22]*u2_tmp*bcc2 + g_[I23]*u2_tmp*bcc3
-                  + g_[I13]*u3_tmp*bcc1 + g_[I23]*u3_tmp*bcc2 + g_[I33]*u3_tmp*bcc3;
-          Real b1 = (bcc1 + b0 * u1_tmp) / u0_tmp;
-          Real b2 = (bcc2 + b0 * u2_tmp) / u0_tmp;
-          Real b3 = (bcc3 + b0 * u3_tmp) / u0_tmp;
-          Real b_0 = g_[I00]*b0 + g_[I01]*b1 + g_[I02]*b2 + g_[I03]*b3;
-          Real b_1 = g_[I01]*b0 + g_[I11]*b1 + g_[I12]*b2 + g_[I13]*b3;
-          Real b_2 = g_[I02]*b0 + g_[I12]*b1 + g_[I22]*b2 + g_[I23]*b3;
-          Real b_3 = g_[I03]*b0 + g_[I13]*b1 + g_[I23]*b2 + g_[I33]*b3;
-          Real b_sq = b0*b_0 + b1*b_1 + b2*b_2 + b3*b_3;
-          Real wtot = wdn + gammap_ * pgas_new + b_sq;
-          Real ptot = pgas_new + 0.5 * b_sq;
-          u0_(m,IEN,k,j,i) = wtot * u0_tmp * u_0_tmp - b0 * b_0 + ptot + wdn * u0_tmp;
-          u0_(m,IM1,k,j,i) = wtot * u0_tmp * u_1_tmp - b0 * b_1;
-          u0_(m,IM2,k,j,i) = wtot * u0_tmp * u_2_tmp - b0 * b_2;
-          u0_(m,IM3,k,j,i) = wtot * u0_tmp * u_3_tmp - b0 * b_3;
-        }
-      }
+      u0_(m,IEN,k,j,i) += (m_old[0] - m_new[0]);
+      u0_(m,IM1,k,j,i) += (m_old[1] - m_new[1]);
+      u0_(m,IM2,k,j,i) += (m_old[2] - m_new[2]);
+      u0_(m,IM3,k,j,i) += (m_old[3] - m_new[3]);
     }
   });
 

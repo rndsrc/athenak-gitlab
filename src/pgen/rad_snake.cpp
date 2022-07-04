@@ -17,17 +17,16 @@
 #include "athena.hpp"
 #include "parameter_input.hpp"
 #include "coordinates/cell_locations.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "mesh/mesh.hpp"
 #include "radiation/radiation.hpp"
 #include "srcterms/srcterms.hpp"
 #include "pgen.hpp"
 
 KOKKOS_INLINE_FUNCTION
-void ComputeSnakeMetric(Real x, Real y, Real z, Real mag, Real kym, Real g[]);
-
-KOKKOS_INLINE_FUNCTION
-void ComputeSnakeTetrad(Real x, Real y, Real z, Real mag, Real kym,
-                        Real e[][4], Real ecov[][4], Real omega[][4][4]);
+void ComputeSnakeMetricAndTetrad(Real x, Real y, Real z, Real mag, Real kym,
+                                 Real g[][4], Real gi[][4],
+                                 Real e[][4], Real ecov[][4], Real omega[][4][4]);
 
 //----------------------------------------------------------------------------------------
 //! \fn void MeshBlock::UserProblem(ParameterInput *pin)
@@ -45,14 +44,14 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
   int nmb1 = (pmbp->nmb_thispack-1);
-  int nang1 = (pmbp->prad->nangles-1);
+  int nang1 = (pmbp->prad->prgeo->nangles-1);
   auto &size = pmbp->pmb->mb_size;
   int &nmb = pmbp->nmb_thispack;
 
   auto nh_c_ = pmbp->prad->nh_c;
   auto nh_f_ = pmbp->prad->nh_f;
-  auto num_neighbors_ = pmbp->prad->num_neighbors;
-  auto ind_neighbors_ = pmbp->prad->ind_neighbors;
+  auto num_neighbors_ = pmbp->prad->prgeo->num_neighbors;
+  auto ind_neighbors_ = pmbp->prad->prgeo->ind_neighbors;
 
   Real mag_ = pin->GetReal("problem", "snake_mag");
   Real kym_ = pin->GetReal("problem", "snake_kym");
@@ -60,6 +59,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // set tetrad components
   auto tet_c_ = pmbp->prad->tet_c;
   auto tetcov_c_ = pmbp->prad->tetcov_c;
+  auto unit_flux_ = pmbp->prad->prgeo->unit_flux;
   auto na_ = pmbp->prad->na;
   par_for("tet_c",DevExeSpace(),0,(nmb-1),0,(n3-1),0,(n2-1),0,(n1-1),
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -105,17 +105,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
                     -  nh_f_.d_view(n,nb,1)*omega[2][q][p]));
           }
         }
-        Real atilde = (sin(psif)/tan(zetav)-sin(psiv)/tan(zetaf))/sin(psif-psiv);
-        Real btilde = (cos(psif)/tan(zetav)-cos(psiv)/tan(zetaf))/sin(psiv-psif);
-        Real p_par = atan2(btilde, atilde);
-        Real a_par = sqrt(atilde*atilde+btilde*btilde);
-        Real zeta_deriv = (a_par*sin(psif-p_par)
-                           / (1.0+a_par*a_par*cos(psif-p_par)*cos(psif-p_par)));
-        Real denom = 1.0/sqrt(zeta_deriv*zeta_deriv+sin(zetaf)*sin(zetaf));
-        Real signfactor = copysign(1.0,psif-psiv)*copysign(1.0,M_PI-fabs(psif-psiv));
-        Real unit_zeta = signfactor*zeta_deriv*denom;
-        Real unit_psi = signfactor*denom;
-        na_(m,n,k,j,i,nb) = na1*unit_zeta + SQR(sin(zetaf))*na2*unit_psi;
+        na_(m,n,k,j,i,nb) = na1*unit_flux_.d_view(n,nb,0)
+                          + SQR(sin(zetaf))*na2*unit_flux_.d_view(n,nb,1);
       }
     }
 
@@ -222,18 +213,17 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     Real &x3max = size.d_view(m).x3max;
     Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
 
-    Real g_[NMETRIC];
-    ComputeSnakeMetric(x1v, x2v, x3v, mag_, kym_, g_);
+    Real glower[4][4] = {0.0}; Real gupper[4][4] = {0.0};
     Real e[4][4] = {0.0}; Real e_cov[4][4] = {0.0}; Real omega[4][4][4] = {0.0};
-    ComputeSnakeTetrad(x1v, x2v, x3v, mag_, kym_, e, e_cov, omega);
+    ComputeSnakeMetricAndTetrad(x1v,x2v,x3v,mag_,kym_,glower,gupper,e,e_cov,omega);
 
     // Calculate proper distance to beam origin and minimum angle between directions
     Real dx1 = x1v - p1;
     Real dx2 = x2v - p2;
     Real dx3 = x3v - p3;
-    Real dx_sq = (g_[I11]*dx1*dx1 + 2.0*g_[I12]*dx1*dx2 + 2.0*g_[I13]*dx1*dx3
-                                  +     g_[I22]*dx2*dx2 + 2.0*g_[I23]*dx2*dx3
-                                                        +     g_[I33]*dx3*dx3);
+    Real dx_sq = glower[1][1]*dx1*dx1+2.0*glower[1][2]*dx1*dx2+2.0*glower[1][3]*dx1*dx3
+               + glower[2][2]*dx2*dx2+2.0*glower[2][3]*dx2*dx3
+               + glower[3][3]*dx3*dx3;
     Real mu_min = cos(spread_/2.0*M_PI/180.0);
 
     // Calculate contravariant time component of direction
@@ -244,18 +234,18 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     d1 /= dmag;
     d2 /= dmag;
     d3 /= dmag;
-    Real temp_a = g_[I00];
-    Real temp_b = 2.0*(g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3);
-    Real temp_c = (g_[I11]*d1*d1 + 2.0*g_[I12]*d1*d2 + 2.0*g_[I13]*d1*d3
-                                 +     g_[I22]*d2*d2 + 2.0*g_[I23]*d2*d3
-                                                     +     g_[I33]*d3*d3);
+    Real temp_a = glower[0][0];
+    Real temp_b = 2.0*(glower[0][1]*d1 + glower[0][2]*d2 + glower[0][3]*d3);
+    Real temp_c = glower[1][1]*d1*d1 + 2.0*glower[1][2]*d1*d2 + 2.0*glower[1][3]*d1*d3
+                + glower[2][2]*d2*d2 + 2.0*glower[2][3]*d2*d3
+                + glower[3][3]*d3*d3;
     Real d0 = ((-temp_b - sqrt(SQR(temp_b) - 4.0*temp_a*temp_c))/(2.0*temp_a));
 
     // lower indices
-    Real dc0 = g_[I00]*d0 + g_[I01]*d1 + g_[I02]*d2 + g_[I03]*d3;
-    Real dc1 = g_[I01]*d0 + g_[I11]*d1 + g_[I12]*d2 + g_[I13]*d3;
-    Real dc2 = g_[I02]*d0 + g_[I12]*d1 + g_[I22]*d2 + g_[I23]*d3;
-    Real dc3 = g_[I03]*d0 + g_[I13]*d1 + g_[I23]*d2 + g_[I33]*d3;
+    Real dc0 = glower[0][0]*d0 + glower[0][1]*d1 + glower[0][2]*d2 + glower[0][3]*d3;
+    Real dc1 = glower[0][1]*d0 + glower[1][1]*d1 + glower[1][2]*d2 + glower[1][3]*d3;
+    Real dc2 = glower[0][2]*d0 + glower[1][2]*d1 + glower[2][2]*d2 + glower[2][3]*d3;
+    Real dc3 = glower[0][3]*d0 + glower[1][3]*d1 + glower[2][3]*d2 + glower[3][3]*d3;
 
     // Calculate covariant direction in tetrad frame
     Real dtc0 = (tet_c_(m,0,0,k,j,i)*dc0 + tet_c_(m,0,1,k,j,i)*dc1 +
@@ -285,26 +275,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 }
 
 KOKKOS_INLINE_FUNCTION
-void ComputeSnakeMetric(Real x, Real y, Real z, Real mag, Real kym, Real g[]) {
-  // covariant metric
-  g[I00] = -1.0;
-  g[I01] = 0.0;
-  g[I02] = 0.0;
-  g[I03] = 0.0;
-  g[I11] = 1.0;
-  g[I12] = mag*kym*M_PI*cos(kym*M_PI*y);
-  g[I13] = 0.0;
-  g[I22] = 1.0 + SQR(mag*kym*M_PI*cos(kym*M_PI*y));
-  g[I23] = 0.0;
-  g[I33] = 1.0;
-  return;
-}
-
-KOKKOS_INLINE_FUNCTION
 void ComputeSnakeTetrad(Real x, Real y, Real z, Real mag, Real kym,
+                        Real g[][4], Real gi[][4],
                         Real e[][4], Real ecov[][4], Real omega[][4][4]) {
   // create temporary arrays
-  Real eta[4][4] = {0.0}, g[4][4] = {0.0}, gi[4][4] = {0.0};
+  Real eta[4][4] = {0.0};
   Real dg[4][4][4] = {0.0}, de[4][4][4] = {0.0};
   Real ei[4][4] = {0.0};
   Real gamma[4][4][4] = {0.0};

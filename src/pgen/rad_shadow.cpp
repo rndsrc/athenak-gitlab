@@ -20,6 +20,7 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "driver/driver.hpp"
@@ -45,7 +46,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int &ks = indcs.ks;
   auto &size = pmbp->pmb->mb_size;
   int nmb1 = (pmbp->nmb_thispack-1);
-  int nang1 = (pmbp->prad->nangles-1);
+  int nang1 = (pmbp->prad->pgreo->nangles-1);
 
   // error check input flags
   int geodesic_nlevel = pin->GetInteger("radiation", "nlevel");
@@ -86,6 +87,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   });
 
   // set inflow state in BoundaryValues, sync to device
+  Real n_0 = -1.0;
   auto &u_in = pmbp->phydro->pbval_u->u_in;
   auto &i_in = pmbp->prad->pbval_i->i_in;
   u_in.h_view(IDN,BoundaryFace::inner_x1) = 1.0;
@@ -95,7 +97,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   u_in.h_view(IEN,BoundaryFace::inner_x1) = -1.0;
   for (int n=0; n<=nang1; ++n) {
     if (n==2 || n==5) {
-      i_in.h_view(n,BoundaryFace::inner_x1) = -100.0;
+      i_in.h_view(n,BoundaryFace::inner_x1) = n_0*100.0;
     } else {
       i_in.h_view(n,BoundaryFace::inner_x1) = 0.0;
     }

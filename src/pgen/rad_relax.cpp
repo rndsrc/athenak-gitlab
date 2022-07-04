@@ -20,6 +20,7 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "driver/driver.hpp"
@@ -46,7 +47,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   auto &size = pmbp->pmb->mb_size;
   auto &coord = pmbp->pcoord->coord_data;
   int nmb1 = (pmbp->nmb_thispack-1);
-  int nang1 = (pmbp->prad->nangles-1);
+  int nang1 = (pmbp->prad->prgeo->nangles-1);
 
   Real erad = pin->GetReal("problem", "erad");
   Real temp = pin->GetReal("problem", "temp");
@@ -99,9 +100,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     int nx3 = indcs.nx3;
     Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-    Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-
     // Calculate normalized flux in fluid frame
     Real ee_f  = erad;
 
@@ -109,10 +107,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     Real uu1 = w0(m,IVX,k,j,i);
     Real uu2 = w0(m,IVY,k,j,i);
     Real uu3 = w0(m,IVZ,k,j,i);
-    Real tmp_var = g_[I11]*uu1*uu1 + 2.0*g_[I12]*uu1*uu2 + 2.0*g_[I13]*uu1*uu3
-                                   +     g_[I22]*uu2*uu2 + 2.0*g_[I23]*uu2*uu3
-                                                         +     g_[I33]*uu3*uu3;
-    Real uu0 = sqrt(1.0 + tmp_var);
+    Real uu0 = sqrt(1.0 + SQR(uu1) + SQR(uu2) + SQR(uu3));
 
     Real u_tet_[4];
     u_tet_[0] = (norm_to_tet_(m,0,0,k,j,i)*uu0 + norm_to_tet_(m,0,1,k,j,i)*uu1 +

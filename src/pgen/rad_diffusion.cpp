@@ -20,6 +20,7 @@
 #include "coordinates/cell_locations.hpp"
 #include "coordinates/coordinates.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "hydro/hydro.hpp"
 #include "mesh/mesh.hpp"
 #include "radiation/radiation.hpp"
@@ -43,7 +44,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int &js = indcs.js; int &je = indcs.je;
   int &ks = indcs.ks; int &ke = indcs.ke;
   int nmb1 = (pmbp->nmb_thispack-1);
-  int nangles_ = pmbp->prad->nangles;
+  int nangles_ = pmbp->prad->prgeo->nangles;
   auto &size = pmbp->pmb->mb_size;
   auto &coord = pmbp->pcoord->coord_data;
 
@@ -95,11 +96,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     int nx3 = indcs.nx3;
     Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
 
-    // compute metric and inverse
-    Real g_[NMETRIC], gi_[NMETRIC];
-    ComputeMetricAndInverse(x1v, x2v, x3v, coord.is_minkowski, coord.bh_spin, g_, gi_);
-
-
     // energy density and flux
     // NOTE(@pdmullen): there is some subtelty here. We need to find the energy density er
     // and flux fr in the comoving frame to pass to @c-white's Minerbo function...but the
@@ -126,7 +122,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     Real f2_f = ff2_f/ff_f;
     Real f3_f = ff3_f/ff_f;
 
-    Real uu0 = sqrt(1.0 + (g_[I11]*uu1*uu1));
+    Real uu0 = sqrt(1.0 + SQR(uu1));
 
     // Compute fluid velocity in tetrad frame
     Real u_tet_[4];

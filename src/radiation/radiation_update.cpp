@@ -16,6 +16,7 @@
 #include "coordinates/coordinates.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "srcterms/srcterms.hpp"
 #include "radiation.hpp"
 
@@ -29,7 +30,7 @@ TaskStatus Radiation::ExpRKUpdate(Driver *pdriver, int stage) {
   int &is = indcs.is, &ie = indcs.ie;
   int &js = indcs.js, &je = indcs.je;
   int &ks = indcs.ks, &ke = indcs.ke;
-  int nang1 = nangles - 1;
+  int nang1 = prgeo->nangles - 1;
   int nmb1 = pmy_pack->nmb_thispack - 1;
 
   auto &mbsize  = pmy_pack->pmb->mb_size;

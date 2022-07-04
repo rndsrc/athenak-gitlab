@@ -16,6 +16,7 @@
 #include "srcterms/srcterms.hpp"
 #include "bvals/bvals.hpp"
 #include "coordinates/coordinates.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "radiation/radiation.hpp"
 
 namespace radiation {
@@ -28,11 +29,8 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     i1("i1",1,1,1,1,1),
     iflx("iflx",1,1,1,1,1),
     divfa("divfa",1,1,1,1,1),
-    beam_mask("beam_mask",1,1,1,1,1),
     nh_c("nh_c",1,1),
     nh_f("nh_f",1,1,1),
-    arc_lengths("arclen",1,1),
-    solid_angle("solidang",1),
     tet_c("tet_c",1,1,1,1,1,1),
     tetcov_c("tetcov_c",1,1,1,1,1,1),
     tet_d1_x1f("tet_d1_x1f",1,1,1,1,1),
@@ -40,12 +38,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     tet_d3_x3f("tet_d3_x3f",1,1,1,1,1),
     na("na",1,1,1,1,1,1),
     norm_to_tet("norm_to_tet",1,1,1,1,1,1),
-    amesh_normals("ameshnorm",1,1,1,1),
-    ameshp_normals("ameshpnorm",1,1),
-    amesh_indices("ameshind",1,1,1),
-    ameshp_indices("ameshpind",1),
-    num_neighbors("numneigh",1),
-    ind_neighbors("indneigh",1,1) {
+    beam_mask("beam_mask",1,1,1,1,1) {
   // Check for general relativity
   if (!(pmy_pack->pcoord->is_general_relativistic)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
@@ -73,7 +66,6 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   }
   fixed_fluid = pin->GetOrAddBoolean("radiation","fixed_fluid",false);
   affect_fluid = pin->GetOrAddBoolean("radiation","affect_fluid",true);
-  zero_radiation_force = pin->GetOrAddBoolean("radiation","zero_radiation_force",false);
   arad = pin->GetOrAddReal("radiation","arad",1.0);
   kappa_a = pin->GetOrAddReal("radiation","kappa_a",0.0);
   kappa_s = pin->GetOrAddReal("radiation","kappa_s",0.0);
@@ -92,36 +84,27 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   psrc = new SourceTerms("radiation", ppack, pin);
 
   // Setup angular mesh and radiation geometry data
-  nlevel = pin->GetInteger("radiation", "nlevel");
-  nangles = (nlevel > 0) ? (5*2*SQR(nlevel) + 2) : 8;
   rotate_geo = pin->GetOrAddBoolean("radiation","rotate_geo",true);
   angular_fluxes = pin->GetOrAddBoolean("radiation","angular_fluxes",true);
-  if (nlevel==0) angular_fluxes=false;
+  int nlevel = pin->GetInteger("radiation", "nlevel");
+  prgeo = new GeodesicGrid(nlevel,rotate_geo,angular_fluxes,1.0);
+
   int nmb = ppack->nmb_thispack;
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   {
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
   int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
   int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
-  Kokkos::realloc(amesh_normals, 5, 2+nlevel, 2+2*nlevel, 3);
-  Kokkos::realloc(ameshp_normals, 2, 3);
-  Kokkos::realloc(amesh_indices, 5, 2+nlevel, 2+2*nlevel);
-  Kokkos::realloc(ameshp_indices, 2);
-  Kokkos::realloc(num_neighbors, nangles);
-  Kokkos::realloc(ind_neighbors, nangles, 6);
-  Kokkos::realloc(solid_angle, nangles);
-  Kokkos::realloc(arc_lengths, nangles, 6);
-  Kokkos::realloc(nh_c, nangles, 4);
-  Kokkos::realloc(nh_f, nangles, 6, 4);
-  Kokkos::realloc(na, nmb, nangles, ncells3, ncells2, ncells1, 6);
-  Kokkos::realloc(norm_to_tet, nmb, 4, 4, ncells3, ncells2, ncells1);
+  Kokkos::realloc(nh_c,prgeo->nangles,4);
+  Kokkos::realloc(nh_f,prgeo->nangles,6,4);
   Kokkos::realloc(tet_c,nmb,4,4,ncells3,ncells2,ncells1);
   Kokkos::realloc(tetcov_c,nmb,4,4,ncells3,ncells2,ncells1);
+  Kokkos::realloc(norm_to_tet,nmb,4,4,ncells3,ncells2,ncells1);
   Kokkos::realloc(tet_d1_x1f,nmb,4,ncells3,ncells2,ncells1+1);
   Kokkos::realloc(tet_d2_x2f,nmb,4,ncells3,ncells2+1,ncells1);
   Kokkos::realloc(tet_d3_x3f,nmb,4,ncells3+1,ncells2,ncells1);
+  Kokkos::realloc(na,nmb,prgeo->nangles,ncells3,ncells2,ncells1,6);
   }
-  InitAngularMesh();
   SetOrthonormalTetrad();
 
   // (3) read time-evolution option [already error checked in driver constructor]
@@ -133,7 +116,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
   int ncells1 = indcs.nx1 + 2*(indcs.ng);
   int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
   int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
-  Kokkos::realloc(i0,nmb,nangles,ncells3,ncells2,ncells1);
+  Kokkos::realloc(i0,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
   }
 
   // allocate memory for conserved variables on coarse mesh
@@ -142,12 +125,12 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     int nccells1 = indcs.cnx1 + 2*(indcs.ng);
     int nccells2 = (indcs.cnx2 > 1)? (indcs.cnx2 + 2*(indcs.ng)) : 1;
     int nccells3 = (indcs.cnx3 > 1)? (indcs.cnx3 + 2*(indcs.ng)) : 1;
-    Kokkos::realloc(coarse_i0,nmb,nangles,nccells3,nccells2,nccells1);
+    Kokkos::realloc(coarse_i0,nmb,prgeo->nangles,nccells3,nccells2,nccells1);
   }
 
   // allocate boundary buffers for conserved (cell-centered) variables
   pbval_i = new BoundaryValuesCC(ppack, pin);
-  pbval_i->InitializeBuffers(nangles);
+  pbval_i->InitializeBuffers(prgeo->nangles);
 
   // for time-evolving problems, continue to construct methods, allocate arrays
   if (evolution_t.compare("stationary") != 0) {
@@ -157,24 +140,23 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
       recon_method = ReconstructionMethod::dc;
     } else if (xorder.compare("plm") == 0) {
       recon_method = ReconstructionMethod::plm;
-    } else if (xorder.compare("ppm") == 0) {
+    } else if (xorder.compare("ppm4") == 0 ||
+               xorder.compare("ppmx") == 0 ||
+               xorder.compare("wenoz") == 0) {
       // check that nghost > 2
       if (indcs.ng < 3) {
         std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-          << std::endl << "PPM reconstruction requires at least 3 ghost zones, "
+          << std::endl << xorder << " reconstruction requires at least 3 ghost zones, "
           << "but <mesh>/nghost=" << indcs.ng << std::endl;
         std::exit(EXIT_FAILURE);
       }
-      recon_method = ReconstructionMethod::ppm;
-    } else if (xorder.compare("wenoz") == 0) {
-      // check that nghost > 2
-      if (indcs.ng < 3) {
-        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-            << std::endl << "WENOZ reconstruction requires at least 3 ghost zones, "
-            << "but <mesh>/nghost=" << indcs.ng << std::endl;
-        std::exit(EXIT_FAILURE);
+      if (xorder.compare("ppm4") == 0) {
+        recon_method = ReconstructionMethod::ppm4;
+      } else if (xorder.compare("ppmx") == 0) {
+        recon_method = ReconstructionMethod::ppmx;
+      } else if (xorder.compare("wenoz") == 0) {
+        recon_method = ReconstructionMethod::wenoz;
       }
-      recon_method = ReconstructionMethod::wenoz;
     } else {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                 << std::endl << "<hydro> recon = '" << xorder << "' not implemented"
@@ -187,15 +169,15 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
     int ncells1 = indcs.nx1 + 2*(indcs.ng);
     int ncells2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*(indcs.ng)) : 1;
     int ncells3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*(indcs.ng)) : 1;
-    Kokkos::realloc(i1,      nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(iflx.x1f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(iflx.x2f,nmb,nangles,ncells3,ncells2,ncells1);
-    Kokkos::realloc(iflx.x3f,nmb,nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(i1,      nmb,prgeo->nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x1f,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x2f,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
+    Kokkos::realloc(iflx.x3f,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
     if (angular_fluxes) {
-      Kokkos::realloc(divfa,nmb,nangles,ncells3,ncells2,ncells1);
+      Kokkos::realloc(divfa,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
     }
     if (beam_source) {
-      Kokkos::realloc(beam_mask,nmb,nangles,ncells3,ncells2,ncells1);
+      Kokkos::realloc(beam_mask,nmb,prgeo->nangles,ncells3,ncells2,ncells1);
     }
   }
 }
@@ -205,6 +187,7 @@ Radiation::Radiation(MeshBlockPack *ppack, ParameterInput *pin) :
 
 Radiation::~Radiation() {
   delete pbval_i;
+  delete prgeo;
   if (psrc != nullptr) {delete psrc;}
 }
 

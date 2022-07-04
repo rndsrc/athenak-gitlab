@@ -19,7 +19,7 @@
     #error NHISTORY > NREDUCTION in outputs.hpp
 #endif
 
-#define NOUTPUT_CHOICES 43
+#define NOUTPUT_CHOICES 44
 // choices for output variables used in <ouput> blocks in input file
 // TO ADD MORE CHOICES:
 //   - add more strings to array below, change NOUTPUT_CHOICES above appropriately
@@ -34,7 +34,7 @@ static const char *var_choice[NOUTPUT_CHOICES] = {
   "mhd_w_d",   "mhd_w_vx",   "mhd_w_vy",   "mhd_w_vz",   "mhd_w_e",   "mhd_w",
   "mhd_u_s",   "mhd_w_s",    "mhd_wz",     "mhd_w2",
   "mhd_bcc1",  "mhd_bcc2",   "mhd_bcc3",   "mhd_bcc",    "mhd_u_bcc", "mhd_w_bcc",
-  "mhd_jz",    "mhd_j2",
+  "mhd_jz",    "mhd_j2",     "mhd_divb",
   "turb_force",
   "rad_coord", "rad_fluid"};
 
@@ -61,7 +61,6 @@ struct OutputParameters {
   bool include_gzs;
   bool slice1, slice2, slice3;
   Real slice_x1, slice_x2, slice_x3;
-  bool derived = false;
 };
 
 //----------------------------------------------------------------------------------------
@@ -69,12 +68,15 @@ struct OutputParameters {
 //  \brief  container for various properties of each output variable
 
 struct OutputVariableInfo {
+  bool derived;                  // true if variable derived from cons or prims
   std::string label;             // "name" of variable
   int data_index;                // index of variable in device array
   DvceArray5D<Real> *data_ptr;   // ptr to device array containing variable
   // constructor(s)
   OutputVariableInfo(std::string lab, int indx, DvceArray5D<Real> *ptr) :
-    label(lab), data_index(indx), data_ptr(ptr) {}
+    derived(false), label(lab), data_index(indx), data_ptr(ptr) {}
+  OutputVariableInfo(bool der, std::string lab, int indx, DvceArray5D<Real> *ptr) :
+    derived(der), label(lab), data_index(indx), data_ptr(ptr) {}
 };
 
 //----------------------------------------------------------------------------------------

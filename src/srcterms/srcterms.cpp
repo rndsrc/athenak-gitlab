@@ -17,6 +17,7 @@
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 #include "radiation/radiation.hpp"
@@ -258,10 +259,8 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn
-// Add beam of radiation
-// NOTE Radiation beam source terms calculation does not depend on values stored in i0.
-// Rather, it directly updates i0.
+//! \fn SourceTerms::AddBeamSource()
+// \brief Add beam of radiation
 
 void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
@@ -269,7 +268,7 @@ void SourceTerms::AddBeamSource(DvceArray5D<Real> &i0, const Real bdt) {
   int js = indcs.js, je = indcs.je;
   int ks = indcs.ks, ke = indcs.ke;
   int nmb1 = (pmy_pack->nmb_thispack-1);
-  int nang1 = (pmy_pack->prad->nangles-1);
+  int nang1 = (pmy_pack->prad->prgeo->nangles-1);
 
   auto &beam_mask_ = pmy_pack->prad->beam_mask;
   auto &nh_c_ = pmy_pack->prad->nh_c;

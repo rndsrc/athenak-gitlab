@@ -1,3 +1,5 @@
+#ifndef RADIATION_RADIATION_OPACITIES_HPP_
+#define RADIATION_RADIATION_OPACITIES_HPP_
 //========================================================================================
 // AthenaXXX astrophysical plasma code
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
@@ -33,3 +35,5 @@ void OpacityFunction(const Real dens, const Real temp,
     return;
   }
 }
+
+#endif // RADIATION_RADIATION_OPACITIES_HPP_

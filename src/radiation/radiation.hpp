@@ -17,6 +17,7 @@
 class EquationOfState;
 class Coordinates;
 class SourceTerms;
+class GeodesicGrid;
 class Driver;
 
 //----------------------------------------------------------------------------------------
@@ -94,7 +95,6 @@ class Radiation {
   bool rad_source;            // flag to enable/disable radiation source term
   bool fixed_fluid;           // flag to enable/disable fluid integration
   bool affect_fluid;          // flag to enable/disable feedback of rad field on fluid
-  bool zero_radiation_force;  // flag to enable/disable radiation momentum force
   Real arad;                  // radiation constant
   Real kappa_a;               // Rosseland mean absoprtion coefficient
   Real kappa_s;               // scattering coefficient
@@ -106,29 +106,21 @@ class Radiation {
   bool beam_source;
   SourceTerms *psrc = nullptr;
 
-  // Angular mesh parameters and functions
-  int nlevel;                         // geodesic nlevel
-  int nangles;                        // number of angles
+  // Angular mesh
   bool rotate_geo;                    // rotate geodesic mesh
   bool angular_fluxes;                // flag to enable/disable angular fluxes
-  DualArray4D<Real> amesh_normals;    // normal components (regular faces)
-  DualArray2D<Real> ameshp_normals;   // normal components (at poles)
-  DualArray3D<Real> amesh_indices;    // indexing (regular faces)
-  DualArray1D<Real> ameshp_indices;   // indexing (at poles)
-  DualArray1D<int>  num_neighbors;    // number of neighbors
-  DualArray2D<int>  ind_neighbors;    // indices of neighbors
-  DualArray2D<Real> arc_lengths;      // arc lengths
-  DualArray1D<Real> solid_angle;      // solid angles
+  GeodesicGrid *prgeo = nullptr;
+
+  // Tetrad arrays and functions
   DualArray2D<Real> nh_c;             // normal vector computed at face center
   DualArray3D<Real> nh_f;             // normal vector computed at face edges
-  DvceArray6D<Real> na;               // n^a*n_0
-  DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
   DvceArray6D<Real> tet_c;            // tetrad components at cell centers
   DvceArray6D<Real> tetcov_c;         // covariant tetrad components at cell centers
+  DvceArray6D<Real> norm_to_tet;      // used in transform b/w normal frame and tet frame
   DvceArray5D<Real> tet_d1_x1f;       // tetrad components (subset) at x1f
   DvceArray5D<Real> tet_d2_x2f;       // tetrad components (subset) at x2f
   DvceArray5D<Real> tet_d3_x3f;       // tetrad components (subset) at x3f
-  void InitAngularMesh();
+  DvceArray6D<Real> na;               // n^a*n_0
   void SetOrthonormalTetrad();
 
   // intensity arrays
@@ -151,25 +143,28 @@ class Radiation {
   // container to hold names of TaskIDs
   RadiationTaskIDs id;
 
-  // TaskStatus functions
+  // functions...
   void AssembleRadiationTasks(TaskList &start, TaskList &run, TaskList &end);
+  // ...in start task list
   TaskStatus InitRecv(Driver *d, int stage);
-  TaskStatus ClearRecv(Driver *d, int stage);
-  TaskStatus ClearSend(Driver *d, int stage);
+  // ...in run task list
   TaskStatus CopyCons(Driver *d, int stage);
-  TaskStatus ExpRKUpdate(Driver *d, int stage);
-  TaskStatus AddRadiationSourceTerm(Driver *d, int stage);
-  TaskStatus SendI(Driver *d, int stage);
-  TaskStatus RecvI(Driver *d, int stage);
-  TaskStatus CalcFluxes(Driver *d, int stage);
+  TaskStatus CalculateFluxes(Driver *d, int stage);
   TaskStatus SendFlux(Driver *d, int stage);
   TaskStatus RecvFlux(Driver *d, int stage);
+  TaskStatus ExpRKUpdate(Driver *d, int stage);
+  TaskStatus AddRadiationSourceTerm(Driver *d, int stage);
   TaskStatus RestrictI(Driver *d, int stage);
-  TaskStatus NewTimeStep(Driver *d, int stage);
+  TaskStatus SendI(Driver *d, int stage);
+  TaskStatus RecvI(Driver *d, int stage);
   TaskStatus ApplyPhysicalBCs(Driver* pdrive, int stage);
+  TaskStatus NewTimeStep(Driver *d, int stage);
+  // ...in end task list
+  TaskStatus ClearRecv(Driver *d, int stage);
+  TaskStatus ClearSend(Driver *d, int stage);
 
  private:
-  MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
+  MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Radiation
 };
 
 } // namespace radiation

@@ -17,6 +17,7 @@
 #include "mesh/mesh.hpp"
 #include "coordinates/coordinates.hpp"
 #include "coordinates/cell_locations.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
 #include "driver/driver.hpp"
 #include "radiation.hpp"
 #include "radiation_tetrad.hpp"
@@ -44,19 +45,18 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
   const int nmkji = (pmy_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
-  int nang1 = nangles - 1;
+  int nang1 = prgeo->nangles - 1;
 
+  // data needed to compute angular dt
   bool &angular_fluxes_ = angular_fluxes;
+  auto &nh_c_ = nh_c;
   auto &nh_f_ = nh_f;
   auto &na_ = na;
   auto &tet_c_ = tet_c;
   auto &excise = pmy_pack->pcoord->coord_data.bh_excise;
   auto &cc_rad_mask_ = pmy_pack->pcoord->cc_rad_mask;
-  auto &num_neighbors_ = num_neighbors;
-  auto &indn_ = ind_neighbors;
-  int &nlvl = nlevel;
-  auto &anorm = amesh_normals;
-  auto &apnorm = ameshp_normals;
+  auto &numn = prgeo->num_neighbors;
+  auto &indn = prgeo->ind_neighbors;
 
   // find smallest (dx/c) and (dangle/na) in each direction for radiation problems
   Kokkos::parallel_reduce("RadiationNudt",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
@@ -72,59 +72,32 @@ TaskStatus Radiation::NewTimeStep(Driver *pdriver, int stage) {
     Real tmp_min_dta = (FLT_MAX);
     if (angular_fluxes_) {
       for (int n=0; n<=nang1; ++n) {
-        for (int nb=0; nb<num_neighbors_.d_view(n); ++nb) {
-          // find position at angle center
-          Real x_n, y_n, z_n;
-          int ibl0_n = (n / (2*nlvl*nlvl));
-          int ibl1_n = (n % (2*nlvl*nlvl)) / (2*nlvl);
-          int ibl2_n = (n % (2*nlvl*nlvl)) % (2*nlvl);
-          if (ibl0_n == 5) {
-            x_n = apnorm.d_view(ibl2_n, 0);
-            y_n = apnorm.d_view(ibl2_n, 1);
-            z_n = apnorm.d_view(ibl2_n, 2);
-          } else {
-            x_n = anorm.d_view(ibl0_n,ibl1_n+1,ibl2_n+1,0);
-            y_n = anorm.d_view(ibl0_n,ibl1_n+1,ibl2_n+1,1);
-            z_n = anorm.d_view(ibl0_n,ibl1_n+1,ibl2_n+1,2);
-          }
-
+        // find position at angle center
+        Real x = nh_c_.d_view(n,1);
+        Real y = nh_c_.d_view(n,2);
+        Real z = nh_c_.d_view(n,3);
+        for (int nb=0; nb<numn.d_view(n); ++nb) {
           // find position at neighbor's angle center
-          Real x_nb, y_nb, z_nb;
-          int ibl0_nb = (indn_.d_view(n,nb) / (2*nlvl*nlvl));
-          int ibl1_nb = (indn_.d_view(n,nb) % (2*nlvl*nlvl)) / (2*nlvl);
-          int ibl2_nb = (indn_.d_view(n,nb) % (2*nlvl*nlvl)) % (2*nlvl);
-          if (ibl0_nb == 5) {
-            x_nb = apnorm.d_view(ibl2_nb, 0);
-            y_nb = apnorm.d_view(ibl2_nb, 1);
-            z_nb = apnorm.d_view(ibl2_nb, 2);
-          } else {
-            x_nb = anorm.d_view(ibl0_nb,ibl1_nb+1,ibl2_nb+1,0);
-            y_nb = anorm.d_view(ibl0_nb,ibl1_nb+1,ibl2_nb+1,1);
-            z_nb = anorm.d_view(ibl0_nb,ibl1_nb+1,ibl2_nb+1,2);
-          }
-
+          Real xn = nh_f_.d_view(n,nb,1);
+          Real yn = nh_f_.d_view(n,nb,2);
+          Real zn = nh_f_.d_view(n,nb,3);
           // compute timestep limitation
           Real n0 = 0.0;
           for (int d=0; d<4; ++d) { n0 += tet_c_(m,d,0,k,j,i)*nh_f_.d_view(n,nb,d); }
-          Real angle_dt = fmin(tmp_min_dta,
-                               (acos(x_n*x_nb+y_n*y_nb+z_n*z_nb)/
-                                fabs(na_(m,n,k,j,i,nb)/n0)));
-
+          Real adt = fmin(tmp_min_dta,(acos(x*xn+y*yn+z*zn)/fabs(na_(m,n,k,j,i,nb)/n0)));
           // set timestep limitation if not excising this cell
           if (excise) {
-            if (!(cc_rad_mask_(m,k,j,i))) { tmp_min_dta = angle_dt; }
+            if (!(cc_rad_mask_(m,k,j,i))) { tmp_min_dta = adt; }
           } else {
-            tmp_min_dta = angle_dt;
+            tmp_min_dta = adt;
           }
         }
       }
     }
-
     min_dt1 = fmin((size.d_view(m).dx1), min_dt1);
     min_dt2 = fmin((size.d_view(m).dx2), min_dt2);
     min_dt3 = fmin((size.d_view(m).dx3), min_dt3);
     min_dta = fmin((tmp_min_dta),        min_dta);
-
   }, Kokkos::Min<Real>(dt1),  Kokkos::Min<Real>(dt2), Kokkos::Min<Real>(dt3),
      Kokkos::Min<Real>(dta));
 

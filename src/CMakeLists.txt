@@ -42,13 +42,16 @@ add_executable(
         eos/ideal_srmhd.cpp
         eos/ideal_grmhd.cpp
 
+        geodesic-grid/geodesic_grid.cpp
+
         hydro/hydro.cpp
         hydro/hydro_fluxes.cpp
+        hydro/hydro_fofc.cpp
         hydro/hydro_newdt.cpp
         hydro/hydro_tasks.cpp
         hydro/hydro_update.cpp
 
-	      ion-neutral/ion_neutral.cpp
+        ion-neutral/ion_neutral.cpp
 
         mesh/build_tree.cpp
         mesh/mesh.cpp
@@ -61,6 +64,7 @@ add_executable(
         mhd/mhd_corner_e.cpp
         mhd/mhd_ct.cpp
         mhd/mhd_fluxes.cpp
+        mhd/mhd_fofc.cpp
         mhd/mhd_newdt.cpp
         mhd/mhd_tasks.cpp
         mhd/mhd_update.cpp
@@ -83,13 +87,14 @@ add_executable(
         pgen/tests/lw_implode.cpp
         pgen/tests/orszag_tang.cpp
         pgen/tests/shock_tube.cpp
+        pgen/tests/rad_hohlraum.cpp
 
         radiation/radiation.cpp
         radiation/radiation_fluxes.cpp
-        radiation/radiation_geom.cpp
         radiation/radiation_newdt.cpp
         radiation/radiation_source.cpp
         radiation/radiation_tasks.cpp
+        radiation/radiation_tetrad.cpp
         radiation/radiation_update.cpp
 
         srcterms/srcterms.cpp
