@@ -23,11 +23,12 @@ class SphericalGrid: public GeodesicGrid {
     DualArray1D<Real> area;          // surface area of each face, for integration
     DualArray2D<Real> cart_rcoord;   // cartesian coordinates for grid points
     DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
-    DualArray2D<Real> interp_wghts;  // weights for interpolation
+    DualArray3D<Real> interp_wghts;  // weights for interpolation
     DualArray2D<Real> interp_vals;   // container for data interpolated to sphere
 
     Real ctr[3];  // center of the sphere
     int nvars; // number of variables to be interpolated to sphere
+    int stencil_size; // size of stencil in each dimension
     void SetPointwiseRadius(DualArray1D<Real> rad);  // set pointwise radius of sphere
     void SetInterpolationIndices();  // set indexing for interpolation
     void SetInterpolationWeights();  // set weights for interpolation
