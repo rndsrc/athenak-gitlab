@@ -34,20 +34,12 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
   ctr[1] = center[1];
   ctr[2] = center[2];
 
-  // set number of variables
-  if (pmy_pack->phydro != nullptr) {
-    nvars = pmy_pack->phydro->nhydro + pmy_pack->phydro->nscalars;
-  } else if (pmy_pack->pmhd != nullptr) {
-    nvars = pmy_pack->pmhd->nmhd + pmy_pack->pmhd->nscalars;
-  }
-
   // reallocate spherical grid arrays
   int &ng = pmy_pack->pmesh->mb_indcs.ng;
   Kokkos::realloc(area,nangles);
   Kokkos::realloc(cart_rcoord,nangles,3);
   Kokkos::realloc(interp_indcs,nangles,4);
   Kokkos::realloc(interp_wghts,nangles,2*ng,3);
-  Kokkos::realloc(interp_vals,nangles,nvars);
 
   // NOTE(@pdmullen): by default, set positions and surface areas by assuming a constant
   // spherical radius. Override by calling SphericalGrid::SetPointwiseRadius()
@@ -206,12 +198,15 @@ void SphericalGrid::SetInterpolationWeights() {
 //! \fn void SphericalGrid::InterpolateToSphere
 //! \brief interpolate Cartesian data to surface of sphere
 
-void SphericalGrid::InterpolateToSphere(DvceArray5D<Real> &val) {
+void SphericalGrid::InterpolateToSphere(int nvars, DvceArray5D<Real> &val) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int &ng = indcs.ng;
   int nang1 = nangles - 1;
   int nvar1 = nvars - 1;
+
+  // reallocate container
+  Kokkos::realloc(interp_vals,nangles,nvars);
 
   auto &iindcs = interp_indcs;
   auto &iwghts = interp_wghts;

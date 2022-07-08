@@ -25,10 +25,9 @@ class SphericalGrid: public GeodesicGrid {
     DualArray2D<Real> cart_rcoord;  // Cartesian coordinates for grid points
     DualArray2D<Real> interp_vals;  // container for data interpolated to sphere
     void SetPointwiseRadius(DualArray1D<Real> rad);    // set pointwise radius of sphere
-    void InterpolateToSphere(DvceArray5D<Real> &val);  // interpolate val to sphere
+    void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate to sphere
   private:
     MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
-    int nvars;                // number of variables to be interpolated to sphere
     DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
     DualArray3D<Real> interp_wghts;  // weights for interpolation
     void SetInterpolationIndices();  // set indexing for interpolation

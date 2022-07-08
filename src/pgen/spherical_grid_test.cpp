@@ -139,7 +139,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   SphericalGrid *pmy_sphere = nullptr;
   Real center[3] = {0.0};
   pmy_sphere = new SphericalGrid(pmbp, nlevel, center, true, true, 2.0);
-  pmy_sphere->InterpolateToSphere(w0_);
+  int nhydro = pmbp->phydro->nhydro;
+  pmy_sphere->InterpolateToSphere(nhydro, w0_);
 
   // guarantee mass flux is 4 pi
   Real mass_flux = 0.0;
