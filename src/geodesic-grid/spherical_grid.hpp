@@ -19,22 +19,20 @@ class SphericalGrid: public GeodesicGrid {
     // Creates a geodetic grid with nlev levels and radius rad
     SphericalGrid(MeshBlockPack *pmy_pack, int nlev, Real center[3],
                   bool rotate_g, bool fluxes, Real rad);
-    Real radius;
-    DualArray1D<Real> area;          // surface area of each face, for integration
-    DualArray2D<Real> cart_rcoord;   // cartesian coordinates for grid points
-    DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
-    DualArray3D<Real> interp_wghts;  // weights for interpolation
-    DualArray2D<Real> interp_vals;   // container for data interpolated to sphere
-
+    Real radius;  // const radius for SphericalGrid (SetPointwiseRadius() can override)
     Real ctr[3];  // center of the sphere
-    int nvars; // number of variables to be interpolated to sphere
-    int stencil_size; // size of stencil in each dimension
-    void SetPointwiseRadius(DualArray1D<Real> rad);  // set pointwise radius of sphere
-    void SetInterpolationIndices();  // set indexing for interpolation
-    void SetInterpolationWeights();  // set weights for interpolation
-    void InterpToSphere(DvceArray5D<Real> &val);  // interpolate vars in val to sphere
+    DualArray1D<Real> area;         // surface area of each face, for integration
+    DualArray2D<Real> cart_rcoord;  // Cartesian coordinates for grid points
+    DualArray2D<Real> interp_vals;  // container for data interpolated to sphere
+    void SetPointwiseRadius(DualArray1D<Real> rad);    // set pointwise radius of sphere
+    void InterpolateToSphere(DvceArray5D<Real> &val);  // interpolate val to sphere
   private:
     MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
+    int nvars;                // number of variables to be interpolated to sphere
+    DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
+    DualArray3D<Real> interp_wghts;  // weights for interpolation
+    void SetInterpolationIndices();  // set indexing for interpolation
+    void SetInterpolationWeights();  // set weights for interpolation
 };
 
 #endif // SPHERICAL_GRID_SPHERICAL_GRID_HPP_

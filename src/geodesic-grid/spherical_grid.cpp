@@ -41,19 +41,16 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
     nvars = pmy_pack->pmhd->nmhd + pmy_pack->pmhd->nscalars;
   }
 
-  // set stencil size
-  stencil_size = pmy_pack->pmesh->mb_indcs.ng*2;
-
   // reallocate spherical grid arrays
+  int &ng = pmy_pack->pmesh->mb_indcs.ng;
   Kokkos::realloc(area,nangles);
   Kokkos::realloc(cart_rcoord,nangles,3);
   Kokkos::realloc(interp_indcs,nangles,4);
-  Kokkos::realloc(interp_wghts,nangles,stencil_size,3);
+  Kokkos::realloc(interp_wghts,nangles,2*ng,3);
   Kokkos::realloc(interp_vals,nangles,nvars);
 
-  // NOTE(@pdmullen): by default, set positions and surface areas assuming constant
-  // spherical radius for sphere. Can be overidden by calling
-  // SphericalGrid::SetPointwiseRadius()
+  // NOTE(@pdmullen): by default, set positions and surface areas by assuming a constant
+  // spherical radius. Override by calling SphericalGrid::SetPointwiseRadius()
   for (int n=0; n<nangles; ++n) {
     cart_rcoord.h_view(n,0) = radius*cart_pos.h_view(n,0) + ctr[0];
     cart_rcoord.h_view(n,1) = radius*cart_pos.h_view(n,1) + ctr[1];
@@ -67,6 +64,7 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
   area.template modify<HostMemSpace>();
   area.template sync<DevExeSpace>();
 
+  // set interpolation indices and weights
   SetInterpolationIndices();
   SetInterpolationWeights();
 
@@ -81,17 +79,18 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
 
 void SphericalGrid::SetPointwiseRadius(DualArray1D<Real> rad_tmp) {
   for (int n=0; n<nangles; ++n) {
-    area.h_view(n) = SQR(rad_tmp.h_view(n))*solid_angles.h_view(n);
     cart_rcoord.h_view(n,0) = rad_tmp.h_view(n)*cart_pos.h_view(n,0) + ctr[0];
     cart_rcoord.h_view(n,1) = rad_tmp.h_view(n)*cart_pos.h_view(n,1) + ctr[1];
     cart_rcoord.h_view(n,2) = rad_tmp.h_view(n)*cart_pos.h_view(n,2) + ctr[2];
+    area.h_view(n) = SQR(rad_tmp.h_view(n))*solid_angles.h_view(n);
   }
   // sync dual arrays
-  area.template modify<HostMemSpace>();
-  area.template sync<DevExeSpace>();
   cart_rcoord.template modify<HostMemSpace>();
   cart_rcoord.template sync<DevExeSpace>();
+  area.template modify<HostMemSpace>();
+  area.template sync<DevExeSpace>();
 
+  // reset interpolation indices and weights
   SetInterpolationIndices();
   SetInterpolationWeights();
   return;
@@ -103,17 +102,14 @@ void SphericalGrid::SetPointwiseRadius(DualArray1D<Real> rad_tmp) {
 //         interpolation onto the sphere
 
 void SphericalGrid::SetInterpolationIndices() {
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
   auto &size = pmy_pack->pmb->mb_size;
-  int &ng = indcs.ng;
-  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int nmb1 = pmy_pack->nmb_thispack - 1;
   int nang1 = nangles - 1;
 
   auto &rcoord = cart_rcoord;
   auto &iindcs = interp_indcs;
   for (int m=0; m<=nmb1; ++m) {
-    // determine coordinate maxima for this MeshBlock
+    // extract MeshBlock bounds
     Real &x1min = size.h_view(m).x1min;
     Real &x1max = size.h_view(m).x1max;
     Real &x2min = size.h_view(m).x2min;
@@ -121,19 +117,17 @@ void SphericalGrid::SetInterpolationIndices() {
     Real &x3min = size.h_view(m).x3min;
     Real &x3max = size.h_view(m).x3max;
 
-    // determine grid cell spacings for this MeshBlock
+    // extract MeshBlock grid cell spacings
     Real &dx1 = size.h_view(m).dx1;
     Real &dx2 = size.h_view(m).dx2;
     Real &dx3 = size.h_view(m).dx3;
 
-    // Loop over all points to find those belonging to this spherical patch
+    // save MeshBlock and zone index for nearest position to spherical patch center
     for (int n=0; n<=nang1; ++n) {
-      // Default meshblock indices to -1
-      if (m==0) { iindcs.h_view(n,0) = -1; }
+      if (m==0) { iindcs.h_view(n,0) = -1; }  // Default MeshBlock indices to -1
       if ((rcoord.h_view(n,0) >= x1min && rcoord.h_view(n,0) <= x1max) &&
           (rcoord.h_view(n,1) >= x2min && rcoord.h_view(n,1) <= x2max) &&
           (rcoord.h_view(n,2) >= x3min && rcoord.h_view(n,2) <= x3max)) {
-        // save MeshBlock and zone index for nearest position to spherical patch center
         iindcs.h_view(n,0) = m;
         iindcs.h_view(n,1) = (int) std::floor((rcoord.h_view(n,0)-(x1min+dx1/2.0))/dx1);
         iindcs.h_view(n,2) = (int) std::floor((rcoord.h_view(n,1)-(x2min+dx2/2.0))/dx2);
@@ -157,42 +151,45 @@ void SphericalGrid::SetInterpolationWeights() {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   auto &size = pmy_pack->pmb->mb_size;
   int &ng = indcs.ng;
-  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
-  int nmb1 = pmy_pack->nmb_thispack - 1;
 
   auto &iindcs = interp_indcs;
   auto &iwghts = interp_wghts;
   for (int n=0; n<nangles; ++n) {
+    // extract indices
     int &ii0 = iindcs.d_view(n,0);
     int &ii1 = iindcs.d_view(n,1);
     int &ii2 = iindcs.d_view(n,2);
     int &ii3 = iindcs.d_view(n,3);
 
+    // extract spherical grid positions
     Real &x0 = cart_rcoord.h_view(n,0);
     Real &y0 = cart_rcoord.h_view(n,1);
     Real &z0 = cart_rcoord.h_view(n,2);
 
+    // extract MeshBlock bounds
     Real &x1min = size.h_view(ii0).x1min;
     Real &x1max = size.h_view(ii0).x1max;
     Real &x2min = size.h_view(ii0).x2min;
     Real &x2max = size.h_view(ii0).x2max;
     Real &x3min = size.h_view(ii0).x3min;
     Real &x3max = size.h_view(ii0).x3max;
+
+    // set interpolation weights
     for (int i=0; i<2*ng; ++i) {
       iwghts.h_view(n,i,0) = 1.;
       iwghts.h_view(n,i,1) = 1.;
       iwghts.h_view(n,i,2) = 1.;
       for (int j=0; j<2*ng; ++j) {
         if (j != i) {
-          Real x1vpi = CellCenterX(ii1-ng+i+1, indcs.nx1, x1min, x1max);
-          Real x1vpj = CellCenterX(ii1-ng+j+1, indcs.nx1, x1min, x1max);
-          iwghts.h_view(n,i,0) *= (x0-x1vpj)/(x1vpi-x1vpj);
-          Real x2vpi = CellCenterX(ii2-ng+i+1, indcs.nx2, x2min, x2max);
-          Real x2vpj = CellCenterX(ii2-ng+j+1, indcs.nx2, x2min, x2max);
-          iwghts.h_view(n,i,1) *= (y0-x2vpj)/(x2vpi-x2vpj);
-          Real x3vpi = CellCenterX(ii3-ng+i+1, indcs.nx3, x3min, x3max);
-          Real x3vpj = CellCenterX(ii3-ng+j+1, indcs.nx3, x3min, x3max);
-          iwghts.h_view(n,i,2) *= (z0-x3vpj)/(x3vpi-x3vpj);
+          Real x1vpi1 = CellCenterX(ii1-ng+i+1, indcs.nx1, x1min, x1max);
+          Real x1vpj1 = CellCenterX(ii1-ng+j+1, indcs.nx1, x1min, x1max);
+          iwghts.h_view(n,i,0) *= (x0-x1vpj1)/(x1vpi1-x1vpj1);
+          Real x2vpi1 = CellCenterX(ii2-ng+i+1, indcs.nx2, x2min, x2max);
+          Real x2vpj1 = CellCenterX(ii2-ng+j+1, indcs.nx2, x2min, x2max);
+          iwghts.h_view(n,i,1) *= (y0-x2vpj1)/(x2vpi1-x2vpj1);
+          Real x3vpi1 = CellCenterX(ii3-ng+i+1, indcs.nx3, x3min, x3max);
+          Real x3vpj1 = CellCenterX(ii3-ng+j+1, indcs.nx3, x3min, x3max);
+          iwghts.h_view(n,i,2) *= (z0-x3vpj1)/(x3vpi1-x3vpj1);
         }
       }
     }
@@ -206,15 +203,13 @@ void SphericalGrid::SetInterpolationWeights() {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn void SphericalGrid::InterpToSphere
+//! \fn void SphericalGrid::InterpolateToSphere
 //! \brief interpolate Cartesian data to surface of sphere
 
-void SphericalGrid::InterpToSphere(DvceArray5D<Real> &val) {
+void SphericalGrid::InterpolateToSphere(DvceArray5D<Real> &val) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
-  int &is = indcs.is;
-  int &js = indcs.js;
-  int &ks = indcs.ks;
-  int &ng = pmy_pack->pmesh->mb_indcs.ng;
+  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
+  int &ng = indcs.ng;
   int nang1 = nangles - 1;
   int nvar1 = nvars - 1;
 
@@ -223,12 +218,12 @@ void SphericalGrid::InterpToSphere(DvceArray5D<Real> &val) {
   auto &ivals = interp_vals;
   par_for("int2sph",DevExeSpace(),0,nang1,0,nvar1,
   KOKKOS_LAMBDA(int n, int v) {
-    int ii0 = iindcs.d_view(n,0);
-    int ii1 = iindcs.d_view(n,1);
-    int ii2 = iindcs.d_view(n,2);
-    int ii3 = iindcs.d_view(n,3);
-    Real int_value = 0.0;
+    int &ii0 = iindcs.d_view(n,0);
+    int &ii1 = iindcs.d_view(n,1);
+    int &ii2 = iindcs.d_view(n,2);
+    int &ii3 = iindcs.d_view(n,3);
 
+    Real int_value = 0.0;
     for (int i=0; i<2*ng; i++) {
       for (int j=0; j<2*ng; j++) {
         for (int k=0; k<2*ng; k++) {

@@ -1,7 +1,7 @@
 # AthenaXXX input file
 
 <job>
-basename  = geo       # problem ID: basename of output filenames
+basename  = spherical_grid  # problem ID: basename of output filenames
 
 <mesh>
 nghost = 2         # Number of ghost cells
@@ -32,7 +32,7 @@ nlim       = 0         # number of cycles
 <hydro>
 eos     = ideal    # EOS type
 rsolver = llf      # Riemann-solver to be used
-gamma   = 1.4      # gamma = C_p/C_v
+gamma   = 2.0      # gamma = C_p/C_v
 
 <problem>
 nlevel = 10

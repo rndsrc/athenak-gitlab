@@ -50,7 +50,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   for (int n=0; n<=nang1; ++n) {
     sum_angles += solid_angles_.h_view(n);
   }
-  printf("|sum_angles-four_pi|/four_pi: %24.16e\n\n",
+  printf("\n|sum_angles-four_pi|/four_pi: %24.16e\n",
          fabs(sum_angles-4.0*M_PI)/(4.0*M_PI));
 
   // check that arc lengths are equivalent after computed separately for each angle
@@ -106,6 +106,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       }
     }
   }
+
   delete pmy_geo;
 
   // test mass flux
@@ -134,28 +135,28 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     w0_(m,IVZ,k,j,i) = vr*x3v/rad;
   });
 
+  // spherical mesh
   SphericalGrid *pmy_sphere = nullptr;
   Real center[3] = {0.0};
   pmy_sphere = new SphericalGrid(pmbp, nlevel, center, true, true, 2.0);
-  pmy_sphere->InterpToSphere(w0_);
+  pmy_sphere->InterpolateToSphere(w0_);
 
+  // guarantee mass flux is 4 pi
   Real mass_flux = 0.0;
   for (int n=0; n<pmy_sphere->nangles; ++n) {
-    Real idn = pmy_sphere->interp_vals.h_view(n,IDN);
-    Real ivx = pmy_sphere->interp_vals.h_view(n,IVX);
-    Real ivy = pmy_sphere->interp_vals.h_view(n,IVY);
-    Real ivz = pmy_sphere->interp_vals.h_view(n,IVZ);
+    Real &int_dn = pmy_sphere->interp_vals.h_view(n,IDN);
+    Real &int_vx = pmy_sphere->interp_vals.h_view(n,IVX);
+    Real &int_vy = pmy_sphere->interp_vals.h_view(n,IVY);
+    Real &int_vz = pmy_sphere->interp_vals.h_view(n,IVZ);
     Real theta = acos(pmy_sphere->cart_pos.h_view(n,2));
     Real phi = atan2(pmy_sphere->cart_pos.h_view(n,1), pmy_sphere->cart_pos.h_view(n,0));
-    Real cosphi = cos(phi);
-    Real sinphi = sin(phi);
-    Real costheta = cos(theta);
-    Real sintheta = sin(theta);
-    Real ivr = ivx*cosphi*sintheta + ivy*sinphi*sintheta + ivz*costheta;
-    mass_flux += pmy_sphere->area.h_view(n)*idn*ivr;
+    Real int_vr = (int_vx*cos(phi)*sin(theta) +
+                   int_vy*sin(phi)*sin(theta) +
+                   int_vz*cos(theta));
+    mass_flux += pmy_sphere->area.h_view(n)*int_dn*int_vr;
   }
-
-  printf("|mass flux - analytic|/analytic: %24.16e\n", fabs(mass_flux-4.0*M_PI)/(4.0*M_PI));
+  printf("\n|mass flux-analytic|/analytic: %24.16e\n",
+         fabs(mass_flux-4.0*M_PI)/(4.0*M_PI));
 
   delete pmy_sphere;
 
