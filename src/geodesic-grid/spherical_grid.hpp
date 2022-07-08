@@ -27,6 +27,7 @@ class SphericalGrid: public GeodesicGrid {
     DualArray1D<Real> area;         // surface area of each face, for integration
     DualArray2D<Real> cart_rcoord;  // Cartesian coordinates for grid points
     DualArray2D<Real> interp_vals;  // container for data interpolated to sphere
+    DualArray2D<Real> polar_pos;   // polar coordinates for grid points
     void SetPointwiseRadius(DualArray1D<Real> rad);    // set pointwise radius of sphere
     void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate to sphere
 

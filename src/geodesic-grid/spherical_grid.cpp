@@ -26,6 +26,7 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
     radius(rad),
     area("area",1),
     cart_rcoord("cart_rcoord",1,1),
+    polar_pos("polar_pos",1,1),
     interp_indcs("interp_indcs",1,1),
     interp_wghts("interp_wghts",1,1,1),
     interp_vals("interp_vals",1,1) {
@@ -38,6 +39,7 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
   int &ng = pmy_pack->pmesh->mb_indcs.ng;
   Kokkos::realloc(area,nangles);
   Kokkos::realloc(cart_rcoord,nangles,3);
+  Kokkos::realloc(polar_pos,nangles,2);
   Kokkos::realloc(interp_indcs,nangles,4);
   Kokkos::realloc(interp_wghts,nangles,2*ng,3);
 
@@ -47,6 +49,8 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
     cart_rcoord.h_view(n,0) = radius*cart_pos.h_view(n,0) + ctr[0];
     cart_rcoord.h_view(n,1) = radius*cart_pos.h_view(n,1) + ctr[1];
     cart_rcoord.h_view(n,2) = radius*cart_pos.h_view(n,2) + ctr[2];
+    polar_pos.h_view(n,0) = acos(cart_pos.h_view(n,2));
+    polar_pos.h_view(n,1) = atan2(cart_pos.h_view(n,1),cart_pos.h_view(n,0));
     area.h_view(n) = SQR(radius)*solid_angles.h_view(n);
   }
 
@@ -55,7 +59,9 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
   cart_rcoord.template sync<DevExeSpace>();
   area.template modify<HostMemSpace>();
   area.template sync<DevExeSpace>();
-
+  polar_pos.template modify<HostMemSpace>();
+  polar_pos.template sync<DevExeSpace>();
+  
   // set interpolation indices and weights
   SetInterpolationIndices();
   SetInterpolationWeights();
