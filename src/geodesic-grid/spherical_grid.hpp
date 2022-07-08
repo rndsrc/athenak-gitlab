@@ -20,6 +20,8 @@ class SphericalGrid: public GeodesicGrid {
     // Creates a geodetic grid with nlev levels and radius rad
     SphericalGrid(MeshBlockPack *pmy_pack, int nlev, Real center[3],
                   bool rotate_g, bool fluxes, Real rad);
+    ~SphericalGrid();
+
     Real radius;  // const radius for SphericalGrid (SetPointwiseRadius() can override)
     Real ctr[3];  // center of the sphere
     DualArray1D<Real> area;         // surface area of each face, for integration

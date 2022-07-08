@@ -64,6 +64,12 @@ SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
 }
 
 //----------------------------------------------------------------------------------------
+//! \brief SphericalGrid destructor
+
+SphericalGrid::~SphericalGrid() {
+}
+
+//----------------------------------------------------------------------------------------
 //! \fn void SphericalGrid::SetPointwiseRadius
 //! \brief set radii, coordinate positions, and surface areas given pointwise radii
 //         NOTE(@pdmullen): assumes that if rad_tmp was set in DevExeSpace that it will
