@@ -12,8 +12,9 @@
 #include "athena.hpp"
 #include "geodesic-grid/geodesic_grid.hpp"
 
+//----------------------------------------------------------------------------------------
 //! \class SphericalGrid
-//! \brief class to initialize a topological sphere (wrapping around GeodesicGrid class)
+
 class SphericalGrid: public GeodesicGrid {
   public:
     // Creates a geodetic grid with nlev levels and radius rad
@@ -26,6 +27,7 @@ class SphericalGrid: public GeodesicGrid {
     DualArray2D<Real> interp_vals;  // container for data interpolated to sphere
     void SetPointwiseRadius(DualArray1D<Real> rad);    // set pointwise radius of sphere
     void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate to sphere
+
   private:
     MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
     DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp

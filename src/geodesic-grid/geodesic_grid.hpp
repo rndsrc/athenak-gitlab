@@ -11,7 +11,7 @@
 #include "athena.hpp"
 
 //----------------------------------------------------------------------------------------
-//! \class IonNeutral
+//! \class GeodesicGrid
 
 class GeodesicGrid {
  public:
