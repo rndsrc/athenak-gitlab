@@ -4,9 +4,10 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file spherical_grid.cpp
-//  \brief Initializes a spherical grid
+//  \brief Initializes a spherical grid to interpolate data onto
 
 #include <cmath>
+#include <iostream>
 #include <list>
 
 #include "athena.hpp"
@@ -14,55 +15,27 @@
 #include "mesh/mesh.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
+#include "coordinates/coordinates.hpp"
 #include "spherical_grid.hpp"
 
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures and parameters
 
-SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real center[3],
-                             bool rotate_g, bool fluxes, Real rad):
-    GeodesicGrid(nlev,rotate_g,fluxes),
+SphericalGrid::SphericalGrid(MeshBlockPack *ppack, int nlev, Real rad):
+    GeodesicGrid(nlev,true,false),
     pmy_pack(ppack),
     radius(rad),
-    area("area",1),
-    cart_rcoord("cart_rcoord",1,1),
-    polar_pos("polar_pos",1,1),
+    interp_coord("interp_coord",1,1),
     interp_indcs("interp_indcs",1,1),
     interp_wghts("interp_wghts",1,1,1),
     interp_vals("interp_vals",1,1) {
-  // define center of spherical grid
-  ctr[0] = center[0];
-  ctr[1] = center[1];
-  ctr[2] = center[2];
-
-  // reallocate spherical grid arrays
+  // reallocate and set interpolation coordinates, indices, and weights
   int &ng = pmy_pack->pmesh->mb_indcs.ng;
-  Kokkos::realloc(area,nangles);
-  Kokkos::realloc(cart_rcoord,nangles,3);
-  Kokkos::realloc(polar_pos,nangles,2);
+  Kokkos::realloc(interp_coord,nangles,3);
   Kokkos::realloc(interp_indcs,nangles,4);
   Kokkos::realloc(interp_wghts,nangles,2*ng,3);
 
-  // NOTE(@pdmullen): by default, set positions and surface areas by assuming a constant
-  // spherical radius. Override by calling SphericalGrid::SetPointwiseRadius()
-  for (int n=0; n<nangles; ++n) {
-    cart_rcoord.h_view(n,0) = radius*cart_pos.h_view(n,0) + ctr[0];
-    cart_rcoord.h_view(n,1) = radius*cart_pos.h_view(n,1) + ctr[1];
-    cart_rcoord.h_view(n,2) = radius*cart_pos.h_view(n,2) + ctr[2];
-    polar_pos.h_view(n,0) = acos(cart_pos.h_view(n,2));
-    polar_pos.h_view(n,1) = atan2(cart_pos.h_view(n,1),cart_pos.h_view(n,0));
-    area.h_view(n) = SQR(radius)*solid_angles.h_view(n);
-  }
-
-  // sync dual arrays
-  cart_rcoord.template modify<HostMemSpace>();
-  cart_rcoord.template sync<DevExeSpace>();
-  area.template modify<HostMemSpace>();
-  area.template sync<DevExeSpace>();
-  polar_pos.template modify<HostMemSpace>();
-  polar_pos.template sync<DevExeSpace>();
-  
-  // set interpolation indices and weights
+  SetInterpolationCoordinates();
   SetInterpolationIndices();
   SetInterpolationWeights();
 
@@ -76,27 +49,33 @@ SphericalGrid::~SphericalGrid() {
 }
 
 //----------------------------------------------------------------------------------------
-//! \fn void SphericalGrid::SetPointwiseRadius
-//! \brief set radii, coordinate positions, and surface areas given pointwise radii
-//         NOTE(@pdmullen): assumes that if rad_tmp was set in DevExeSpace that it will
-//         be synced prior to passing to function
+//! \fn void SphericalGrid::SetInterpolationCoordinates
+//! \brief set Cartesian coordinates corresponding to radius at spherical surface
 
-void SphericalGrid::SetPointwiseRadius(DualArray1D<Real> rad_tmp) {
-  for (int n=0; n<nangles; ++n) {
-    cart_rcoord.h_view(n,0) = rad_tmp.h_view(n)*cart_pos.h_view(n,0) + ctr[0];
-    cart_rcoord.h_view(n,1) = rad_tmp.h_view(n)*cart_pos.h_view(n,1) + ctr[1];
-    cart_rcoord.h_view(n,2) = rad_tmp.h_view(n)*cart_pos.h_view(n,2) + ctr[2];
-    area.h_view(n) = SQR(rad_tmp.h_view(n))*solid_angles.h_view(n);
+void SphericalGrid::SetInterpolationCoordinates() {
+  if (pmy_pack->pcoord->is_general_relativistic) {
+    for (int n=0; n<nangles; ++n) {
+      Real &spin = pmy_pack->pcoord->coord_data.bh_spin;
+      Real &theta = polar_pos.h_view(n,0);
+      Real &phi = polar_pos.h_view(n,1);
+      interp_coord.h_view(n,0) = (radius*cos(phi)-spin*sin(phi))*sin(theta);
+      interp_coord.h_view(n,1) = (radius*sin(phi)+spin*cos(phi))*sin(theta);
+      interp_coord.h_view(n,2) = radius*cos(theta);
+    }
+  } else {
+    for (int n=0; n<nangles; ++n) {
+      Real &theta = polar_pos.h_view(n,0);
+      Real &phi = polar_pos.h_view(n,1);
+      interp_coord.h_view(n,0) = radius*cos(phi)*sin(theta);
+      interp_coord.h_view(n,1) = radius*sin(phi)*sin(theta);
+      interp_coord.h_view(n,2) = radius*cos(theta);
+    }
   }
-  // sync dual arrays
-  cart_rcoord.template modify<HostMemSpace>();
-  cart_rcoord.template sync<DevExeSpace>();
-  area.template modify<HostMemSpace>();
-  area.template sync<DevExeSpace>();
 
-  // reset interpolation indices and weights
-  SetInterpolationIndices();
-  SetInterpolationWeights();
+  // sync dual arrays
+  interp_coord.template modify<HostMemSpace>();
+  interp_coord.template sync<DevExeSpace>();
+
   return;
 }
 
@@ -110,7 +89,7 @@ void SphericalGrid::SetInterpolationIndices() {
   int nmb1 = pmy_pack->nmb_thispack - 1;
   int nang1 = nangles - 1;
 
-  auto &rcoord = cart_rcoord;
+  auto &rcoord = interp_coord;
   auto &iindcs = interp_indcs;
   for (int m=0; m<=nmb1; ++m) {
     // extract MeshBlock bounds
@@ -166,9 +145,9 @@ void SphericalGrid::SetInterpolationWeights() {
     int &ii3 = iindcs.d_view(n,3);
 
     // extract spherical grid positions
-    Real &x0 = cart_rcoord.h_view(n,0);
-    Real &y0 = cart_rcoord.h_view(n,1);
-    Real &z0 = cart_rcoord.h_view(n,2);
+    Real &x0 = interp_coord.h_view(n,0);
+    Real &y0 = interp_coord.h_view(n,1);
+    Real &z0 = interp_coord.h_view(n,2);
 
     // extract MeshBlock bounds
     Real &x1min = size.h_view(ii0).x1min;

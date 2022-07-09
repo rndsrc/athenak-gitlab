@@ -31,6 +31,8 @@ GeodesicGrid::GeodesicGrid(int nlev, bool rotate, bool fluxes) :
     arc_lengths("arc_lengths",1,1),
     cart_pos("cart_pos",1,1),
     cart_pos_mid("cart_pos_mid",1,1,1),
+    polar_pos("polar_pos",1,1),
+    polar_pos_mid("polar_pos_mid",1,1,1),
     xi_eta("xi_eta",1,1,1),
     unit_flux("unit_flux",1,1,1) {
   if (nlevel > 0) {  // construct geodesic mesh
@@ -49,6 +51,8 @@ GeodesicGrid::GeodesicGrid(int nlev, bool rotate, bool fluxes) :
     Kokkos::realloc(arc_lengths, nangles, 6);
     Kokkos::realloc(cart_pos, nangles, 3);
     Kokkos::realloc(cart_pos_mid, nangles, 6, 3);
+    Kokkos::realloc(polar_pos, nangles, 2);
+    Kokkos::realloc(polar_pos_mid, nangles, 6, 2);
 
     Real sin_ang = 2.0/sqrt(5.0);
     Real cos_ang = 1.0/sqrt(5.0);
@@ -255,6 +259,22 @@ GeodesicGrid::GeodesicGrid(int nlev, bool rotate, bool fluxes) :
       }
     }
 
+    // set polar coordinate positions
+    for (int n=0; n<nangles; ++n) {
+      polar_pos.h_view(n,0) = acos(cart_pos.h_view(n,2));
+      polar_pos.h_view(n,1) = atan2(cart_pos.h_view(n,1), cart_pos.h_view(n,0));
+      int nn = num_neighbors.h_view(n);
+      for (int nb=0; nb<nn; ++nb) {
+        polar_pos_mid.h_view(n,nb,0) = acos(cart_pos_mid.h_view(n,nb,2));
+        polar_pos_mid.h_view(n,nb,1) = atan2(cart_pos_mid.h_view(n,nb,1),
+                                             cart_pos_mid.h_view(n,nb,0));
+      }
+      if (nn==5) {
+        polar_pos_mid.h_view(n,5,0) = (FLT_MAX);
+        polar_pos_mid.h_view(n,5,1) = (FLT_MAX);
+      }
+    }
+
     // set angular unit vectors along edges of angle faces
     if (geo_fluxes) {
       if (rotate_geo) {
@@ -339,6 +359,10 @@ GeodesicGrid::GeodesicGrid(int nlev, bool rotate, bool fluxes) :
     cart_pos.template sync<DevExeSpace>();
     cart_pos_mid.template modify<HostMemSpace>();
     cart_pos_mid.template sync<DevExeSpace>();
+    polar_pos.template modify<HostMemSpace>();
+    polar_pos.template sync<DevExeSpace>();
+    polar_pos_mid.template modify<HostMemSpace>();
+    polar_pos_mid.template sync<DevExeSpace>();
     unit_flux.template modify<HostMemSpace>();
     unit_flux.template sync<DevExeSpace>();
     xi_eta.template modify<HostMemSpace>();

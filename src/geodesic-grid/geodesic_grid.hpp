@@ -26,6 +26,8 @@ class GeodesicGrid {
   DualArray2D<Real> arc_lengths;          // arc lengths
   DualArray2D<Real> cart_pos;             // coord position (cartesian) at face center
   DualArray3D<Real> cart_pos_mid;         // coord position (cartesian) at face edges
+  DualArray2D<Real> polar_pos;            // polar coordinates at face center
+  DualArray3D<Real> polar_pos_mid;        // polar coordinates at face edges
   DualArray3D<Real> unit_flux;            // angular unit vectors computed at face edges
   DualArray3D<Real> xi_eta;               // xi/eta coordinate system for MAPR recon
 
