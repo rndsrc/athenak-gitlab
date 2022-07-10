@@ -112,9 +112,12 @@ void SphericalGrid::SetInterpolationIndices() {
           (rcoord.h_view(n,1) >= x2min && rcoord.h_view(n,1) <= x2max) &&
           (rcoord.h_view(n,2) >= x3min && rcoord.h_view(n,2) <= x3max)) {
         iindcs.h_view(n,0) = m;
-        iindcs.h_view(n,1) = (int) std::floor((rcoord.h_view(n,0)-(x1min+dx1/2.0))/dx1);
-        iindcs.h_view(n,2) = (int) std::floor((rcoord.h_view(n,1)-(x2min+dx2/2.0))/dx2);
-        iindcs.h_view(n,3) = (int) std::floor((rcoord.h_view(n,2)-(x3min+dx3/2.0))/dx3);
+        iindcs.h_view(n,1) = static_cast<int>(std::floor((rcoord.h_view(n,0)-
+                                                          (x1min+dx1/2.0))/dx1));
+        iindcs.h_view(n,2) = static_cast<int>(std::floor((rcoord.h_view(n,1)-
+                                                          (x2min+dx2/2.0))/dx2));
+        iindcs.h_view(n,3) = static_cast<int>(std::floor((rcoord.h_view(n,2)-
+                                                          (x3min+dx3/2.0))/dx3));
       }
     }
   }

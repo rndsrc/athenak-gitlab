@@ -16,6 +16,7 @@ lint_python-job:
     - ias-cuda01
   only:
     - master
+    - spherical_grid
     - merge_requests
   script:
     - cd $CI_PROJECT_DIR

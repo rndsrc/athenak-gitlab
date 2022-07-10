@@ -120,13 +120,13 @@ void ProblemGenerator::BondiAccretion(ParameterInput *pin, const bool restart) {
   bondi.n_adi = 1.0/(bondi.gm - 1.0);
 
   // Prepare various constants for determining primitives
-  Real u_crit_sq = 1.0/(2.0*bondi.r_crit);                    // (HSW 71)
+  Real u_crit_sq = 1.0/(2.0*bondi.r_crit);                           // (HSW 71)
   Real u_crit = -sqrt(u_crit_sq);
   Real t_crit = (bondi.n_adi/(bondi.n_adi+1.0)
                  * u_crit_sq/(1.0-(bondi.n_adi+3.0)*u_crit_sq));     // (HSW 74)
   bondi.c1 = pow(t_crit, bondi.n_adi) * u_crit * SQR(bondi.r_crit);  // (HSW 68)
   bondi.c2 = (SQR(1.0 + (bondi.n_adi+1.0) * t_crit)
-              * (1.0 - 3.0*1.0/(2.0*bondi.r_crit)));          // (HSW 69)
+              * (1.0 - 3.0/(2.0*bondi.r_crit)));                     // (HSW 69)
 
   // capture variables for the kernel
   auto &indcs = pmy_mesh_->mb_indcs;
@@ -388,11 +388,10 @@ static void GetBoyerLindquistCoordinates(struct bondi_pgen pgen,
   Real rad = sqrt(SQR(x1) + SQR(x2) + SQR(x3));
   Real r = fmax((sqrt( SQR(rad) - SQR(pgen.spin) + sqrt(SQR(SQR(rad)-SQR(pgen.spin))
                       + 4.0*SQR(pgen.spin)*SQR(x3)) ) / sqrt(2.0)), 1.0);
-  Real phi = (atan2(r*x2-pgen.spin*x1, pgen.spin*x2+r*x1) -
-              pgen.spin*r/(SQR(r)-2.0*r+SQR(pgen.spin)));
   *pr = r;
-  *ptheta = acos(x3/r);
-  *pphi = ((phi >= 0) ? phi : (phi + 2.0*M_PI));  // remap to [0,2pi]
+  *ptheta = (fabs(x3/r) < 1.0) ? acos(x3/r) : acos(copysign(1.0, x3));
+  *pphi = atan2(r*x2-pgen.spin*x1, pgen.spin*x2+r*x1) -
+          pgen.spin*r/(SQR(r)-2.0*r+SQR(pgen.spin));
   return;
 }
 

@@ -1,5 +1,5 @@
-#ifndef SPHERICAL_GRID_SPHERICAL_GRID_HPP_
-#define SPHERICAL_GRID_SPHERICAL_GRID_HPP_
+#ifndef GEODESIC_GRID_SPHERICAL_GRID_HPP_
+#define GEODESIC_GRID_SPHERICAL_GRID_HPP_
 
 //========================================================================================
 // AthenaXXX astrophysical plasma code
@@ -16,7 +16,7 @@
 //! \class SphericalGrid
 
 class SphericalGrid: public GeodesicGrid {
-  public:
+ public:
     // Creates a geodetic grid with nlev levels and radius rad
     SphericalGrid(MeshBlockPack *pmy_pack, int nlev, Real rad);
     ~SphericalGrid();
@@ -26,7 +26,7 @@ class SphericalGrid: public GeodesicGrid {
     DualArray2D<Real> interp_vals;   // container for data interpolated to sphere
     void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate to sphere
 
-  private:
+ private:
     MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
     DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
     DualArray3D<Real> interp_wghts;  // weights for interpolation
@@ -35,4 +35,4 @@ class SphericalGrid: public GeodesicGrid {
     void SetInterpolationWeights();      // set weights for interpolation
 };
 
-#endif // SPHERICAL_GRID_SPHERICAL_GRID_HPP_
+#endif // GEODESIC_GRID_SPHERICAL_GRID_HPP_
