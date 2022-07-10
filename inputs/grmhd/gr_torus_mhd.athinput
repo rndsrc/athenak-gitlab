@@ -74,7 +74,7 @@ potential_cutoff  = 0.2     # amount to subtract from density when calculating p
                             # (field_config=renorm)
 potential_r_pow   = 0.0     # vector potential proportional to this power of radius
 potential_rho_pow = 1.0     # vector potential proportional to this power of density
-b_norm = 1.e-1           # factor scaling the magnetic field strength
+potential_norm = 1.e-1      # factor scaling the vector potential
 
 <output1>
 file_type  = hst        # History data dump
