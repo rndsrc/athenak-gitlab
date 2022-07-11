@@ -52,6 +52,11 @@ static void CalculateVelocityInTorus(struct torus_pgen pgen,
                                      Real r, Real sin_theta, Real *pu0, Real *pu3);
 
 KOKKOS_INLINE_FUNCTION
+static void CalculateVectorPotentialInTiltedTorus(struct torus_pgen pgen,
+                                                  Real r, Real theta, Real phi,
+                                                  Real *patheta, Real *paphi);
+
+KOKKOS_INLINE_FUNCTION
 static void TransformVector(struct torus_pgen pgen,
                             Real a0_bl, Real a1_bl, Real a2_bl, Real a3_bl,
                             Real x1, Real x2, Real x3,
@@ -633,9 +638,9 @@ static void TransformVector(struct torus_pgen pgen,
 //   patheta,paphi: pointers to lower theta, phi components in desired coordinates
 
 KOKKOS_INLINE_FUNCTION
-void CalculateVectorPotentialInTiltedTorus(struct torus_pgen pgen,
-                                           Real r, Real theta, Real phi,
-                                           Real *patheta, Real *paphi) {
+static void CalculateVectorPotentialInTiltedTorus(struct torus_pgen pgen,
+                                                  Real r, Real theta, Real phi,
+                                                  Real *patheta, Real *paphi) {
   Real sin_theta = sin(theta);
   Real cos_theta = cos(theta);
   Real sin_phi = sin(phi);
