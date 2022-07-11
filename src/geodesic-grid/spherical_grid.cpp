@@ -91,23 +91,28 @@ void SphericalGrid::SetInterpolationIndices() {
 
   auto &rcoord = interp_coord;
   auto &iindcs = interp_indcs;
-  for (int m=0; m<=nmb1; ++m) {
-    // extract MeshBlock bounds
-    Real &x1min = size.h_view(m).x1min;
-    Real &x1max = size.h_view(m).x1max;
-    Real &x2min = size.h_view(m).x2min;
-    Real &x2max = size.h_view(m).x2max;
-    Real &x3min = size.h_view(m).x3min;
-    Real &x3max = size.h_view(m).x3max;
+  for (int n=0; n<=nang1; ++n) {
+    // indices default to -1 if angle does not reside in this MeshBlockPack
+    iindcs.h_view(n,0) = -1;
+    iindcs.h_view(n,1) = -1;
+    iindcs.h_view(n,2) = -1;
+    iindcs.h_view(n,3) = -1;
+    for (int m=0; m<=nmb1; ++m) {
+      // extract MeshBlock bounds
+      Real &x1min = size.h_view(m).x1min;
+      Real &x1max = size.h_view(m).x1max;
+      Real &x2min = size.h_view(m).x2min;
+      Real &x2max = size.h_view(m).x2max;
+      Real &x3min = size.h_view(m).x3min;
+      Real &x3max = size.h_view(m).x3max;
 
-    // extract MeshBlock grid cell spacings
-    Real &dx1 = size.h_view(m).dx1;
-    Real &dx2 = size.h_view(m).dx2;
-    Real &dx3 = size.h_view(m).dx3;
+      // extract MeshBlock grid cell spacings
+      Real &dx1 = size.h_view(m).dx1;
+      Real &dx2 = size.h_view(m).dx2;
+      Real &dx3 = size.h_view(m).dx3;
 
-    // save MeshBlock and zone index for nearest position to spherical patch center
-    for (int n=0; n<=nang1; ++n) {
-      if (m==0) { iindcs.h_view(n,0) = -1; }  // Default MeshBlock indices to -1
+      // save MeshBlock and zone indicies for nearest position to spherical patch center
+      // if this angle position resides in this MeshBlock
       if ((rcoord.h_view(n,0) >= x1min && rcoord.h_view(n,0) <= x1max) &&
           (rcoord.h_view(n,1) >= x2min && rcoord.h_view(n,1) <= x2max) &&
           (rcoord.h_view(n,2) >= x3min && rcoord.h_view(n,2) <= x3max)) {
@@ -147,35 +152,43 @@ void SphericalGrid::SetInterpolationWeights() {
     int &ii2 = iindcs.d_view(n,2);
     int &ii3 = iindcs.d_view(n,3);
 
-    // extract spherical grid positions
-    Real &x0 = interp_coord.h_view(n,0);
-    Real &y0 = interp_coord.h_view(n,1);
-    Real &z0 = interp_coord.h_view(n,2);
+    if (ii0==-1) {  // angle not on this rank
+      for (int i=0; i<2*ng; ++i) {
+        iwghts.h_view(n,i,0) = 0.0;
+        iwghts.h_view(n,i,1) = 0.0;
+        iwghts.h_view(n,i,2) = 0.0;
+      }
+    } else {
+      // extract spherical grid positions
+      Real &x0 = interp_coord.h_view(n,0);
+      Real &y0 = interp_coord.h_view(n,1);
+      Real &z0 = interp_coord.h_view(n,2);
 
-    // extract MeshBlock bounds
-    Real &x1min = size.h_view(ii0).x1min;
-    Real &x1max = size.h_view(ii0).x1max;
-    Real &x2min = size.h_view(ii0).x2min;
-    Real &x2max = size.h_view(ii0).x2max;
-    Real &x3min = size.h_view(ii0).x3min;
-    Real &x3max = size.h_view(ii0).x3max;
+      // extract MeshBlock bounds
+      Real &x1min = size.h_view(ii0).x1min;
+      Real &x1max = size.h_view(ii0).x1max;
+      Real &x2min = size.h_view(ii0).x2min;
+      Real &x2max = size.h_view(ii0).x2max;
+      Real &x3min = size.h_view(ii0).x3min;
+      Real &x3max = size.h_view(ii0).x3max;
 
-    // set interpolation weights
-    for (int i=0; i<2*ng; ++i) {
-      iwghts.h_view(n,i,0) = 1.;
-      iwghts.h_view(n,i,1) = 1.;
-      iwghts.h_view(n,i,2) = 1.;
-      for (int j=0; j<2*ng; ++j) {
-        if (j != i) {
-          Real x1vpi1 = CellCenterX(ii1-ng+i+1, indcs.nx1, x1min, x1max);
-          Real x1vpj1 = CellCenterX(ii1-ng+j+1, indcs.nx1, x1min, x1max);
-          iwghts.h_view(n,i,0) *= (x0-x1vpj1)/(x1vpi1-x1vpj1);
-          Real x2vpi1 = CellCenterX(ii2-ng+i+1, indcs.nx2, x2min, x2max);
-          Real x2vpj1 = CellCenterX(ii2-ng+j+1, indcs.nx2, x2min, x2max);
-          iwghts.h_view(n,i,1) *= (y0-x2vpj1)/(x2vpi1-x2vpj1);
-          Real x3vpi1 = CellCenterX(ii3-ng+i+1, indcs.nx3, x3min, x3max);
-          Real x3vpj1 = CellCenterX(ii3-ng+j+1, indcs.nx3, x3min, x3max);
-          iwghts.h_view(n,i,2) *= (z0-x3vpj1)/(x3vpi1-x3vpj1);
+      // set interpolation weights
+      for (int i=0; i<2*ng; ++i) {
+        iwghts.h_view(n,i,0) = 1.;
+        iwghts.h_view(n,i,1) = 1.;
+        iwghts.h_view(n,i,2) = 1.;
+        for (int j=0; j<2*ng; ++j) {
+          if (j != i) {
+            Real x1vpi1 = CellCenterX(ii1-ng+i+1, indcs.nx1, x1min, x1max);
+            Real x1vpj1 = CellCenterX(ii1-ng+j+1, indcs.nx1, x1min, x1max);
+            iwghts.h_view(n,i,0) *= (x0-x1vpj1)/(x1vpi1-x1vpj1);
+            Real x2vpi1 = CellCenterX(ii2-ng+i+1, indcs.nx2, x2min, x2max);
+            Real x2vpj1 = CellCenterX(ii2-ng+j+1, indcs.nx2, x2min, x2max);
+            iwghts.h_view(n,i,1) *= (y0-x2vpj1)/(x2vpi1-x2vpj1);
+            Real x3vpi1 = CellCenterX(ii3-ng+i+1, indcs.nx3, x3min, x3max);
+            Real x3vpj1 = CellCenterX(ii3-ng+j+1, indcs.nx3, x3min, x3max);
+            iwghts.h_view(n,i,2) *= (z0-x3vpj1)/(x3vpi1-x3vpj1);
+          }
         }
       }
     }
@@ -212,16 +225,20 @@ void SphericalGrid::InterpolateToSphere(int nvars, DvceArray5D<Real> &val) {
     int &ii2 = iindcs.d_view(n,2);
     int &ii3 = iindcs.d_view(n,3);
 
-    Real int_value = 0.0;
-    for (int i=0; i<2*ng; i++) {
-      for (int j=0; j<2*ng; j++) {
-        for (int k=0; k<2*ng; k++) {
-          Real iwght = iwghts.d_view(n,i,0)*iwghts.d_view(n,j,1)*iwghts.d_view(n,k,2);
-          int_value += iwght*val(ii0,v,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
+    if (ii0==-1) {  // angle not on this rank
+      ivals.d_view(n,v);
+    } else {
+      Real int_value = 0.0;
+      for (int i=0; i<2*ng; i++) {
+        for (int j=0; j<2*ng; j++) {
+          for (int k=0; k<2*ng; k++) {
+            Real iwght = iwghts.d_view(n,i,0)*iwghts.d_view(n,j,1)*iwghts.d_view(n,k,2);
+            int_value += iwght*val(ii0,v,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
+          }
         }
       }
+      ivals.d_view(n,v) = int_value;
     }
-    ivals.d_view(n,v) = int_value;
   });
 
   // sync dual arrays

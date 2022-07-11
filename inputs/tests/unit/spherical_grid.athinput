@@ -1,27 +1,32 @@
-# AthenaXXX input file
+# Athena++ (Kokkos version) input file for spherical grid test
 
 <job>
-basename  = spherical  # problem ID: basename of output filenames
+basename = spherical  # problem ID: basename of output filenames
 
 <mesh>
 nghost = 2         # Number of ghost cells
 nx1    = 64        # Number of zones in X1-direction
 x1min  = -4.0      # minimum value of X1
 x1max  = 4.0       # maximum value of X1
-ix1_bc = periodic  # inner-X1 boundary flag
-ox1_bc = periodic  # outer-X1 boundary flag
+ix1_bc = outflow   # inner-X1 boundary flag
+ox1_bc = outflow   # outer-X1 boundary flag
 
 nx2    = 64        # Number of zones in X2-direction
 x2min  = -4.0      # minimum value of X1
 x2max  = 4.0       # maximum value of X1
-ix2_bc = periodic  # inner-X1 boundary flag
-ox2_bc = periodic  # outer-X1 boundary flag
+ix2_bc = outflow   # inner-X1 boundary flag
+ox2_bc = outflow   # outer-X1 boundary flag
 
 nx3    = 64        # Number of zones in X3-direction
 x3min  = -4.0      # minimum value of X3
 x3max  = 4.0       # maximum value of X3
-ix3_bc = periodic  # inner-X3 boundary flag
-ox3_bc = periodic  # outer-X3 boundary flag
+ix3_bc = outflow   # inner-X3 boundary flag
+ox3_bc = outflow   # outer-X3 boundary flag
+
+<meshblock>
+nx1 = 8
+nx2 = 8
+nx3 = 8
 
 <time>
 evolution  = dynamic   # dynamic/kinematic/static
@@ -44,3 +49,8 @@ gamma   = 2.0      # gamma = C_p/C_v
 
 <problem>
 nlevel = 10
+user_hist = true
+
+<output1>
+file_type = hst
+dt = 1.0

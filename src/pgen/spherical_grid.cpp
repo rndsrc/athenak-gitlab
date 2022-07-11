@@ -3,22 +3,31 @@
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
-//! \file spherical_grid_test.cpp
-//  \brief Tests the geodesic sphere and spherical implementation
+//! \file spherical_grid.cpp
+//  \brief Tests the geodesic and spherical grid implementation
 
 #include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "athena.hpp"
 
 #include "parameter_input.hpp"
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
+#include "eos/eos.hpp"
+#include "globals.hpp"
 #include "hydro/hydro.hpp"
+#include "mhd/mhd.hpp"
 #include "mesh/mesh.hpp"
 #include "coordinates/coordinates.hpp"
 #include "geodesic-grid/geodesic_grid.hpp"
 #include "geodesic-grid/spherical_grid.hpp"
+#include "outputs/outputs.hpp"
 #include "pgen.hpp"
+
+void GeodesicGridFluxes(HistoryData *pdata, Mesh *pm);
 
 KOKKOS_INLINE_FUNCTION
 static void GetBoyerLindquistCoordinates(Real spin, Real x1, Real x2, Real x3,
@@ -31,7 +40,7 @@ static void TransformVector(Real spin, Real a1_bl, Real a2_bl, Real a3_bl,
 
 //----------------------------------------------------------------------------------------
 //! \fn ProblemGenerator::UserProblem
-//  \brief Problem Generator for geodesic grid test
+//  \brief Problem Generator for spherical grid test
 
 void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
@@ -45,13 +54,24 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int nmb1 = pmbp->nmb_thispack - 1;
 
+  // nlevels for geodesic mesh employed in this pgen
+  int nlevel = pin->GetInteger("problem","nlevel");
+
+  // User defined history function
+  auto &radii = spherical_grids;
+  radii.push_back(std::make_unique<SphericalGrid>(pmbp, nlevel, 2.0));
+  radii.push_back(std::make_unique<SphericalGrid>(pmbp, nlevel, 3.0));
+  radii.push_back(std::make_unique<SphericalGrid>(pmbp, nlevel, 4.0));
+  user_hist_func = GeodesicGridFluxes;
+
   // geodesic mesh
   GeodesicGrid *pmy_geo = nullptr;
-  int nlevel = pin->GetInteger("problem","nlevel");
   pmy_geo = new GeodesicGrid(nlevel, true, true);
 
   // print number of angles
-  printf("\nnangles: %d\n", pmy_geo->nangles);
+  if (global_variable::my_rank==0) {
+    printf("\nnangles: %d\n", pmy_geo->nangles);
+  }
 
   // guarantee sum of solid angles is 4 pi
   Real sum_angles = 0.0;
@@ -60,8 +80,10 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   for (int n=0; n<=nang1; ++n) {
     sum_angles += solid_angles_.h_view(n);
   }
-  printf("|sum_angles-four_pi|/four_pi: %24.16e\n",
-         fabs(sum_angles-4.0*M_PI)/(4.0*M_PI));
+  if (global_variable::my_rank==0) {
+    printf("|sum_angles-four_pi|/four_pi: %24.16e\n",
+           fabs(sum_angles-4.0*M_PI)/(4.0*M_PI));
+  }
 
   // check that arc lengths are equivalent after computed separately for each angle
   auto posm = pmy_geo->cart_pos_mid;
@@ -123,59 +145,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   SphericalGrid *pmy_sphere = nullptr;
   pmy_sphere = new SphericalGrid(pmbp, nlevel, 3.0);
 
-  // test computing mass flux with a spherical mesh
-  // NOTE(@pdmullen): GR is enabled, but spin is set to zero.  So spherical radius is
-  // consistent with spherical KS radius
-  auto w0_ = pmbp->phydro->w0;
-  par_for("set_w0", DevExeSpace(),0,nmb1,0,(n3-1),0,(n2-1),0,(n1-1),
-  KOKKOS_LAMBDA(int m, int k, int j, int i) {
-    Real &x1min = size.d_view(m).x1min;
-    Real &x1max = size.d_view(m).x1max;
-    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
-
-    Real &x2min = size.d_view(m).x2min;
-    Real &x2max = size.d_view(m).x2max;
-    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
-
-    Real &x3min = size.d_view(m).x3min;
-    Real &x3max = size.d_view(m).x3max;
-    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
-
-    Real rad = sqrt(SQR(x1v)+SQR(x2v)+SQR(x3v));
-    Real vr = 1.0/SQR(rad);
-
-    w0_(m,IDN,k,j,i) = 1.0;
-    w0_(m,IEN,k,j,i) = 1.0;
-    w0_(m,IVX,k,j,i) = vr*x1v/rad;
-    w0_(m,IVY,k,j,i) = vr*x2v/rad;
-    w0_(m,IVZ,k,j,i) = vr*x3v/rad;
-  });
-
-  int nvars = pmbp->phydro->nhydro + pmbp->phydro->nscalars;
-  pmy_sphere->InterpolateToSphere(nvars, w0_);
-
-  // guarantee mass flux is 4 pi
-  Real mass_flux = 0.0;
-  for (int n=0; n<pmy_sphere->nangles; ++n) {
-    Real &int_dn = pmy_sphere->interp_vals.h_view(n,IDN);
-    Real &int_vx = pmy_sphere->interp_vals.h_view(n,IVX);
-    Real &int_vy = pmy_sphere->interp_vals.h_view(n,IVY);
-    Real &int_vz = pmy_sphere->interp_vals.h_view(n,IVZ);
-    Real theta = acos(pmy_sphere->cart_pos.h_view(n,2));
-    Real phi = atan2(pmy_sphere->cart_pos.h_view(n,1), pmy_sphere->cart_pos.h_view(n,0));
-    Real int_vr = (int_vx*cos(phi)*sin(theta) +
-                   int_vy*sin(phi)*sin(theta) +
-                   int_vz*cos(theta));
-    mass_flux += SQR(pmy_sphere->radius)*pmy_sphere->solid_angles.h_view(n)*int_dn*int_vr;
-  }
-  printf("|mass flux-analytic|/analytic: %24.16e\n",
-         fabs(mass_flux-4.0*M_PI)/(4.0*M_PI));
-
-  // Compute surface area of spherical KS r=2 surface for spin a=0.5
+  // Compute \int sqrt(-gdet) dtheta dphi for spherical KS r=2 surface and spin a=0.5.
   // NOTE(@pdmullen): Notice that in this unit test, the SphericalGrid object was built
   // assuming zero spin (see the input file).  Here, we impose a spin a=0.5.
   // Inherited GeodesicGrid polar positions are assumed to be spherical KS.  Area
-  // calulcation does not used interp_coord
+  // calulcation does not use interp_coord
   Real my_spin = 0.5;
   Real surface_area = 0.0;
   for (int n=0; n<pmy_sphere->nangles; ++n) {
@@ -183,12 +157,19 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
                      SQR(my_spin*cos(pmy_sphere->polar_pos.h_view(n,0))))*
                      pmy_sphere->solid_angles.h_view(n);
   }
-  // analytic surface area for constant rks=2 (spin a)
   Real rks2_area = (4.0/3.0)*M_PI*(SQR(my_spin) + 3.0*SQR(pmy_sphere->radius));
-  printf("|surface_area-analytic|/analytic: %24.16e\n",
-         fabs(surface_area-rks2_area)/(rks2_area));
+  if (global_variable::my_rank==0) {
+    printf("|surface_area-analytic|/analytic: %24.16e\n",
+           fabs(surface_area-rks2_area)/(rks2_area));
+  }
 
-  // test mass flux in CKS
+  // Test mass flux in CKS
+  DvceArray5D<Real> w0_;
+  if (pmbp->phydro != nullptr) {
+    w0_ = pmbp->phydro->w0;
+  } else if (pmbp->pmhd != nullptr) {
+    w0_ = pmbp->pmhd->w0;
+  }
   Real &spin = coord.bh_spin;
   par_for("set_w0_cks", DevExeSpace(),0,nmb1,0,(n3-1),0,(n2-1),0,(n1-1),
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -230,9 +211,10 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     w0_(m,IVZ,k,j,i) = u3 - gupper[0][3]/gupper[0][0] * u0;
   });
 
+  int nvars = pmbp->phydro->nhydro + pmbp->phydro->nscalars;
   pmy_sphere->InterpolateToSphere(nvars, w0_);
 
-  // guarantee mass flux is 4 pi
+  // check that mass flux is 4 pi
   Real gr_flux = 0.0;
   for (int n=0; n<pmy_sphere->nangles; ++n) {
     // extract interpolated primitives
@@ -274,14 +256,103 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
                 SQR(spin*cos(pmy_sphere->polar_pos.h_view(n,0))))*
                 pmy_sphere->solid_angles.h_view(n);
   }
-  printf("|GR flux-analytic|/analytic: %24.16e\n",
-         fabs(gr_flux-4.0*M_PI)/(4.0*M_PI));
+
+#ifdef MPI_PARALLEL_ENABLED
+  MPI_Allreduce(MPI_IN_PLACE, &gr_flux, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+#endif
+
+  if (global_variable::my_rank==0) {
+    printf("|GR flux-analytic|/analytic: %24.16e\n",
+           fabs(gr_flux-4.0*M_PI)/(4.0*M_PI));
+  }
 
   delete pmy_sphere;
 
   return;
 }
 
+
+//----------------------------------------------------------------------------------------
+// Function for returning fluxes through geodesic grid
+
+void GeodesicGridFluxes(HistoryData *pdata, Mesh *pm) {
+  // manually specify primitive variables here to test History infrastructure
+  MeshBlockPack *pmbp = pm->pmb_pack;
+  DvceArray5D<Real> w0_;
+  if (pmbp->phydro != nullptr) {
+    w0_ = pmbp->phydro->w0;
+  } else if (pmbp->pmhd != nullptr) {
+    w0_ = pmbp->pmhd->w0;
+  }
+  auto &indcs = pmbp->pmesh->mb_indcs;
+  auto &size = pmbp->pmb->mb_size;
+  int &ng = indcs.ng;
+  int n1 = indcs.nx1 + 2*ng;
+  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
+  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
+  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
+  int nmb1 = pmbp->nmb_thispack - 1;
+  par_for("set_w0", DevExeSpace(),0,nmb1,0,(n3-1),0,(n2-1),0,(n1-1),
+  KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    Real x1v = CellCenterX(i-is, indcs.nx1, x1min, x1max);
+
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    Real x2v = CellCenterX(j-js, indcs.nx2, x2min, x2max);
+
+    Real &x3min = size.d_view(m).x3min;
+    Real &x3max = size.d_view(m).x3max;
+    Real x3v = CellCenterX(k-ks, indcs.nx3, x3min, x3max);
+
+    Real rad = sqrt(SQR(x1v)+SQR(x2v)+SQR(x3v));
+    Real vr = 1.0/SQR(rad);
+
+    w0_(m,IDN,k,j,i) = 1.0;
+    w0_(m,IEN,k,j,i) = 1.0;
+    w0_(m,IVX,k,j,i) = vr*x1v/rad;
+    w0_(m,IVY,k,j,i) = vr*x2v/rad;
+    w0_(m,IVZ,k,j,i) = vr*x3v/rad;
+  });
+
+  auto &radii = pm->pgen->spherical_grids;
+  int nradii = radii.size();
+  int nvars = pmbp->phydro->nhydro + pmbp->phydro->nscalars;
+  Real mass_flux[3] = {0.0};
+  for (int r=0; r<nradii; ++r) {
+    radii[r]->InterpolateToSphere(nvars, w0_);
+    for (int n=0; n<radii[r]->nangles; ++n) {
+      Real &int_dn = radii[r]->interp_vals.h_view(n,IDN);
+      Real &int_vx = radii[r]->interp_vals.h_view(n,IVX);
+      Real &int_vy = radii[r]->interp_vals.h_view(n,IVY);
+      Real &int_vz = radii[r]->interp_vals.h_view(n,IVZ);
+      Real theta = acos(radii[r]->cart_pos.h_view(n,2));
+      Real phi = atan2(radii[r]->cart_pos.h_view(n,1), radii[r]->cart_pos.h_view(n,0));
+      Real int_vr = (int_vx*cos(phi)*sin(theta) +
+                     int_vy*sin(phi)*sin(theta) +
+                     int_vz*cos(theta));
+      mass_flux[r] += (int_dn*int_vr*
+                       SQR(radii[r]->radius)*radii[r]->solid_angles.h_view(n));
+    }
+  }
+
+  // set number of and names of history variables for hydro
+  pdata->nhist = 3;
+  pdata->label[0] = "mdot2";
+  pdata->label[1] = "mdot3";
+  pdata->label[2] = "mdot4";
+  pdata->hdata[0] = mass_flux[0];
+  pdata->hdata[1] = mass_flux[1];
+  pdata->hdata[2] = mass_flux[2];
+
+  // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
+  for (int n=pdata->nhist; n<NHISTORY_VARIABLES; ++n) {
+    pdata->hdata[n] = 0.0;
+  }
+
+  return;
+}
 
 //----------------------------------------------------------------------------------------
 // Function for returning corresponding Boyer-Lindquist coordinates of point
@@ -297,7 +368,7 @@ static void GetBoyerLindquistCoordinates(Real spin, Real x1, Real x2, Real x3,
     Real r = fmax((sqrt( SQR(rad) - SQR(spin) + sqrt(SQR(SQR(rad)-SQR(spin))
                         + 4.0*SQR(spin)*SQR(x3)) ) / sqrt(2.0)), 1.0);
     *pr = r;
-    *ptheta = acos(x3/r);
+    *ptheta = (fabs(x3/r) < 1.0) ? acos(x3/r) : acos(copysign(1.0, x3));
     *pphi = atan2( (r*x2-spin*x1)/(SQR(r)+SQR(spin)),
                    (spin*x2+r*x1)/(SQR(r)+SQR(spin)) );
   return;

@@ -36,6 +36,10 @@ HistoryOutput::HistoryOutput(OutputParameters op, Mesh *pm) : BaseTypeOutput(op,
   if (pm->pmb_pack->pmhd != nullptr) {
     hist_data.emplace_back(PhysicsModule::MagnetoHydroDynamics);
   }
+
+  if (pm->pgen->user_hist) {
+    hist_data.emplace_back(PhysicsModule::UserDefined);
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -49,12 +53,11 @@ void HistoryOutput::LoadOutputData(Mesh *pm) {
       LoadHydroHistoryData(&data, pm);
     } else if (data.physics == PhysicsModule::MagnetoHydroDynamics) {
       LoadMHDHistoryData(&data, pm);
-    }
-    // user history output
-    if (pm->pgen->user_hist) {
+    } else if (data.physics == PhysicsModule::UserDefined) {
       (pm->pgen->user_hist_func)(&data, pm);
     }
   }
+  return;
 }
 
 //----------------------------------------------------------------------------------------
@@ -96,9 +99,9 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm) {
   const int nmkji = (pm->pmb_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
-  array_sum::GlobalSum sum_this_mb;
+  array_sum::GlobalSum sum_this_mbp;
   Kokkos::parallel_reduce("HistSums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
+  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mbp_sum) {
     // compute n,k,j,i indices of thread
     int m = (idx)/nkji;
     int k = (idx - m*nkji)/nji;
@@ -130,12 +133,12 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm) {
     }
 
     // sum into parallel reduce
-    mb_sum += hvars;
-  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb));
+    mbp_sum += hvars;
+  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mbp));
 
   // store data into hdata array
   for (int n=0; n<pdata->nhist; ++n) {
-    pdata->hdata[n] = sum_this_mb.the_array[n];
+    pdata->hdata[n] = sum_this_mbp.the_array[n];
   }
 
   return;
@@ -186,9 +189,9 @@ void HistoryOutput::LoadMHDHistoryData(HistoryData *pdata, Mesh *pm) {
   const int nmkji = (pm->pmb_pack->nmb_thispack)*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
-  array_sum::GlobalSum sum_this_mb;
+  array_sum::GlobalSum sum_this_mbp;
   Kokkos::parallel_reduce("HistSums",Kokkos::RangePolicy<>(DevExeSpace(), 0, nmkji),
-  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mb_sum) {
+  KOKKOS_LAMBDA(const int &idx, array_sum::GlobalSum &mbp_sum) {
     // compute n,k,j,i indices of thread
     int m = (idx)/nkji;
     int k = (idx - m*nkji)/nji;
@@ -225,12 +228,12 @@ void HistoryOutput::LoadMHDHistoryData(HistoryData *pdata, Mesh *pm) {
     }
 
     // sum into parallel reduce
-    mb_sum += hvars;
-  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mb));
+    mbp_sum += hvars;
+  }, Kokkos::Sum<array_sum::GlobalSum>(sum_this_mbp));
 
   // store data into hdata array
   for (int n=0; n<pdata->nhist; ++n) {
-    pdata->hdata[n] = sum_this_mb.the_array[n];
+    pdata->hdata[n] = sum_this_mbp.the_array[n];
   }
 
   return;
@@ -265,6 +268,9 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin) {
           break;
         case PhysicsModule::MagnetoHydroDynamics:
           fname.append(".mhd");
+          break;
+        case PhysicsModule::UserDefined:
+          fname.append(".user");
           break;
         default:
           break;
