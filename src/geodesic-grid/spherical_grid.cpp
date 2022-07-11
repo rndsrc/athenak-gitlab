@@ -147,10 +147,10 @@ void SphericalGrid::SetInterpolationWeights() {
   auto &iwghts = interp_wghts;
   for (int n=0; n<nangles; ++n) {
     // extract indices
-    int &ii0 = iindcs.d_view(n,0);
-    int &ii1 = iindcs.d_view(n,1);
-    int &ii2 = iindcs.d_view(n,2);
-    int &ii3 = iindcs.d_view(n,3);
+    int &ii0 = iindcs.h_view(n,0);
+    int &ii1 = iindcs.h_view(n,1);
+    int &ii2 = iindcs.h_view(n,2);
+    int &ii3 = iindcs.h_view(n,3);
 
     if (ii0==-1) {  // angle not on this rank
       for (int i=0; i<2*ng; ++i) {
@@ -226,7 +226,7 @@ void SphericalGrid::InterpolateToSphere(int nvars, DvceArray5D<Real> &val) {
     int &ii3 = iindcs.d_view(n,3);
 
     if (ii0==-1) {  // angle not on this rank
-      ivals.d_view(n,v);
+      ivals.d_view(n,v) = 0.0;
     } else {
       Real int_value = 0.0;
       for (int i=0; i<2*ng; i++) {
