@@ -257,7 +257,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
                 pmy_sphere->solid_angles.h_view(n);
   }
 
-#ifdef MPI_PARALLEL_ENABLED
+#if MPI_PARALLEL_ENABLED
   MPI_Allreduce(MPI_IN_PLACE, &gr_flux, 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
 #endif
 
