@@ -24,6 +24,8 @@
 #include "coordinates/cartesian_ks.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "eos/eos.hpp"
+#include "geodesic-grid/geodesic_grid.hpp"
+#include "geodesic-grid/spherical_grid.hpp"
 #include "hydro/hydro.hpp"
 #include "mhd/mhd.hpp"
 
@@ -90,8 +92,9 @@ struct torus_pgen {
 
 } // namespace
 
-// Prototypes for user-defined BCs
+// Prototypes for user-defined BCs and history functions
 void NoInflowTorus(Mesh *pm);
+void MassFluxes(HistoryData *pdata, Mesh *pm);
 
 //----------------------------------------------------------------------------------------
 //! \fn void ProblemGenerator::UserProblem()
@@ -111,6 +114,13 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
 
   user_bcs_func = NoInflowTorus;
+
+  // User defined history function
+  auto &grids = spherical_grids;
+  grids.push_back(std::make_unique<SphericalGrid>(pmbp, 5, 2.0));
+  grids.push_back(std::make_unique<SphericalGrid>(pmbp, 5, 3.0));
+  grids.push_back(std::make_unique<SphericalGrid>(pmbp, 5, 4.0));
+  user_hist_func = MassFluxes;
 
   // Read problem-specific parameters from input file
   // global parameters
@@ -682,10 +692,6 @@ static void CalculateVectorPotentialInTiltedTorus(struct torus_pgen pgen,
     Real vary = y;
     Real sin_vartheta = sqrt(SQR(varx) + SQR(vary));
 
-    Real dvartheta_dtheta =
-        (pgen.cos_psi * sin_theta
-         - pgen.sin_psi * cos_theta * cos_phi) / sin_vartheta;
-    Real dvartheta_dphi = pgen.sin_psi * sin_theta * sin_phi / sin_vartheta;
     Real dvarphi_dtheta = -pgen.sin_psi * sin_phi / SQR(sin_vartheta);
     Real dvarphi_dphi = sin_theta / SQR(sin_vartheta)
         * (pgen.cos_psi * sin_theta -pgen.sin_psi * cos_theta * cos_phi);
@@ -1050,6 +1056,88 @@ void NoInflowTorus(Mesh *pm) {
     auto &bcc0_ = pm->pmb_pack->pmhd->bcc0;
     pm->pmb_pack->pmhd->peos->PrimToCons(w0_,bcc0_,u0_,0,(n1-1),0,(n2-1),ks-ng,ks-1);
     pm->pmb_pack->pmhd->peos->PrimToCons(w0_,bcc0_,u0_,0,(n1-1),0,(n2-1),ke+1,ke+ng);
+  }
+
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+// Function for computing mass fluxes through constant spherical KS radius surfaces
+
+void MassFluxes(HistoryData *pdata, Mesh *pm) {
+  MeshBlockPack *pmbp = pm->pmb_pack;
+  auto &coord = pmbp->pcoord->coord_data;
+  Real &spin = coord.bh_spin;
+
+  int nvars;
+  DvceArray5D<Real> w0_;
+  if (pmbp->phydro != nullptr) {
+    nvars = pmbp->phydro->nhydro + pmbp->phydro->nscalars;
+    w0_ = pmbp->phydro->w0;
+  } else if (pmbp->pmhd != nullptr) {
+    nvars = pmbp->pmhd->nmhd + pmbp->pmhd->nscalars;
+    w0_ = pmbp->pmhd->w0;
+  }
+
+  auto &grids = pm->pgen->spherical_grids;
+  int nradii = grids.size();
+  Real mass_flux[3] = {0.0};
+  for (int g=0; g<nradii; ++g) {
+    grids[g]->InterpolateToSphere(nvars, w0_);
+    for (int n=0; n<grids[g]->nangles; ++n) {
+      Real &int_dn = grids[g]->interp_vals.h_view(n,IDN);
+      Real &int_vx = grids[g]->interp_vals.h_view(n,IVX);
+      Real &int_vy = grids[g]->interp_vals.h_view(n,IVY);
+      Real &int_vz = grids[g]->interp_vals.h_view(n,IVZ);
+
+      // coordinate data
+      Real x1 = grids[g]->interp_coord.h_view(n,0);
+      Real x2 = grids[g]->interp_coord.h_view(n,1);
+      Real x3 = grids[g]->interp_coord.h_view(n,2);
+      Real glower[4][4], gupper[4][4];
+      ComputeMetricAndInverse(x1,x2,x3,false,spin,glower,gupper);
+
+      // compute u^\mu in CKS
+      Real q = glower[1][1]*int_vx*int_vx + glower[2][2]*int_vy*int_vy +
+               glower[3][3]*int_vz*int_vz +
+               2.0*glower[1][2]*int_vx*int_vy + 2.0*glower[1][3]*int_vx*int_vz +
+               2.0*glower[2][3]*int_vy*int_vz;
+      Real alpha = sqrt(-1.0/gupper[0][0]);
+      Real gamma = sqrt(1.0 + q);
+      Real int_u0 = gamma/alpha;
+      Real int_u1 = int_vx - alpha * gamma * gupper[0][1];
+      Real int_u2 = int_vy - alpha * gamma * gupper[0][2];
+      Real int_u3 = int_vz - alpha * gamma * gupper[0][3];
+
+      // transform to find u^r
+      Real a2 = SQR(spin);
+      Real rad2 = SQR(x1)+SQR(x2)+SQR(x3);
+      Real r = grids[g]->radius;
+      Real r2 = SQR(r);
+      Real drdx = r*x1/(2.0*r2 - rad2 + a2);
+      Real drdy = r*x2/(2.0*r2 - rad2 + a2);
+      Real drdz = (r*x3 + a2*x3/r)/(2.0*r2-rad2+a2);
+      Real int_ur = drdx*int_u1 + drdy*int_u2 + drdz*int_u3;
+
+      // compute mass flux
+      Real &theta  = grids[g]->polar_pos.h_view(n,0);
+      Real &domega = grids[g]->solid_angles.h_view(n);
+      mass_flux[g] += int_dn*int_ur*(r2+SQR(spin*cos(theta)))*domega;
+    }
+  }
+
+  // set number of and names of history variables for hydro
+  pdata->nhist = 3;
+  pdata->label[0] = "mdot2";
+  pdata->label[1] = "mdot3";
+  pdata->label[2] = "mdot4";
+  pdata->hdata[0] = mass_flux[0];
+  pdata->hdata[1] = mass_flux[1];
+  pdata->hdata[2] = mass_flux[2];
+
+  // fill rest of the_array with zeros, if nhist < NHISTORY_VARIABLES
+  for (int n=pdata->nhist; n<NHISTORY_VARIABLES; ++n) {
+    pdata->hdata[n] = 0.0;
   }
 
   return;

@@ -327,8 +327,8 @@ void GeodesicGridFluxes(HistoryData *pdata, Mesh *pm) {
       Real &int_vx = radii[r]->interp_vals.h_view(n,IVX);
       Real &int_vy = radii[r]->interp_vals.h_view(n,IVY);
       Real &int_vz = radii[r]->interp_vals.h_view(n,IVZ);
-      Real theta = acos(radii[r]->cart_pos.h_view(n,2));
-      Real phi = atan2(radii[r]->cart_pos.h_view(n,1), radii[r]->cart_pos.h_view(n,0));
+      Real &theta = radii[r]->polar_pos.h_view(n,0);
+      Real &phi = radii[r]->polar_pos.h_view(n,1);
       Real int_vr = (int_vx*cos(phi)*sin(theta) +
                      int_vy*sin(phi)*sin(theta) +
                      int_vz*cos(theta));
