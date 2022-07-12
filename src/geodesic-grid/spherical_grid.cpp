@@ -128,8 +128,8 @@ void SphericalGrid::SetInterpolationIndices() {
   }
 
   // sync dual arrays
-  interp_indcs.template modify<DevExeSpace>();
-  interp_indcs.template sync<HostMemSpace>();
+  interp_indcs.template modify<HostMemSpace>();
+  interp_indcs.template sync<DevExeSpace>();
 
   return;
 }
@@ -195,8 +195,8 @@ void SphericalGrid::SetInterpolationWeights() {
   }
 
   // sync dual arrays
-  interp_wghts.template modify<DevExeSpace>();
-  interp_wghts.template sync<HostMemSpace>();
+  interp_wghts.template modify<HostMemSpace>();
+  interp_wghts.template sync<DevExeSpace>();
 
   return;
 }
