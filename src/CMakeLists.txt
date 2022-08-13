@@ -43,6 +43,7 @@ add_executable(
 
         geodesic-grid/geodesic_grid.cpp
         geodesic-grid/spherical_grid.cpp
+        geodesic-grid/strahlkorper.cpp
 
         hydro/hydro.cpp
         hydro/hydro_fluxes.cpp
