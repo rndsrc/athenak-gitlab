@@ -101,7 +101,7 @@ void BinaryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin) {
   auto &indcs = pm->mb_indcs;
   int cells = indcs.nx1*indcs.nx2*indcs.nx3;
 
-  // il1, il2, il3, level + x1i, x2i, x3i, dx1, dx2, dx3 + data
+  // il1, il2, il3, level + x1min, x1max, x2min, x2max, x3min, x3max + data
   std::size_t data_size = 4*sizeof(int32_t) + 6*sizeof(Real)
                         + (cells*nout_vars)*sizeof(float);
 
