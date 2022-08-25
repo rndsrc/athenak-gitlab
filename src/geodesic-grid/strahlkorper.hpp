@@ -7,7 +7,7 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 //! \file strahlkorper.hpp
-//  \brief definitions for strahlkorper class
+//  \brief definitions for strahlkorper (deformed spherical grid) class
 
 #include "athena.hpp"
 #include "geodesic-grid/geodesic_grid.hpp"
@@ -18,18 +18,29 @@
 
 class Strahlkorper: public SphericalGrid {
  public:
-    // Creates a geodetic grid with nlev levels and radius rad
-    Strahlkorper(MeshBlockPack *pmy_pack, int nlev, Real rad);
-    ~Strahlkorper();
+   // Creates a geodetic grid with nlev levels and radius rad
+   Strahlkorper(MeshBlockPack *pmy_pack, int nlev, Real rad);
+   ~Strahlkorper();
 
-    DualArray1D<Real> pointwise_radius;
-    DualArray3D<Real> basis_functions;
-    int nlevel;
+   DualArray1D<Real> pointwise_radius;
+   DualArray3D<Real> basis_functions;
+   int nlevel;
+   void SetPointwiseRadius(DualArray1D<Real> rad_tmp, Real ctr[3]);  // set indexing for interpolation
+   void EvaluateSphericalHarm();
+   Real Integrate(DualArray1D<Real> integrand);
+   DualArray1D<Real> ThetaDerivative(DualArray1D<Real> scalar_function);
+   DualArray1D<Real> PhiDerivative(DualArray1D<Real> scalar_function);
+   DualArray1D<Real> SpatialToSpectral(DualArray1D<Real> scalar_function);
+
+   std::pair<double,double> SWSphericalHarm(int l, int m, int s, Real theta, Real phi);
+   Real RealSphericalHarm(int l, int m, Real theta, Real phi);
+   Real RealSphericalHarm_dtheta(int l, int m, Real theta, Real phi);
+   Real RealSphericalHarm_dphi(int l, int m, Real theta, Real phi);
+   Real MakeReal(int l, int m, Real theta, Real phi, std::pair<double,double> (*func)(int, int, int, Real, Real));
+   std::pair<double,double> SphericalHarm_dtheta(int l, int m, Real theta, Real phi);
+   std::pair<double,double> SphericalHarm_dphi(int l, int m, Real theta, Real phi);
+
  private:
-    void SetPointwiseRadius(DualArray1D<Real> rad_tmp, Real ctr[3]);  // set indexing for interpolation
-    std::pair<double,double> SWSphericalHarm(int l, int m, int s, Real theta, Real phi);
-    Real MakeReal(std::pair<double,double> (*func)(int, int, int, Real, Real), int l, int m, Real theta, Real phi);
-    void EvaluateSphericalHarm();
 };
 
 #endif // GEODESIC_GRID_SPHERICAL_GRID_HPP_
