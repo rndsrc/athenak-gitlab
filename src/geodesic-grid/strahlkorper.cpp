@@ -9,6 +9,7 @@
 #include <cmath>
 #include <iostream>
 #include <list>
+#include "athena_tensor.hpp"
 
 #include "athena.hpp"
 #include "coordinates/cell_locations.hpp"
@@ -23,7 +24,9 @@
 Strahlkorper::Strahlkorper(MeshBlockPack *ppack, int nlev, Real rad):
     SphericalGrid(ppack,nlev,rad),
     pointwise_radius("pointwise_radius",1),
-    basis_functions("basis_functions",1,1,1) {
+    basis_functions("basis_functions",1,1,1), 
+    tangent_vectors("tangent_vectors",1,1,1),
+    normal_oneforms("normal_oneforms",1,1) {
   
   nlevel = nlev;
   // reallocate and set interpolation coordinates, indices, and weights
@@ -239,22 +242,59 @@ DualArray1D<Real> Strahlkorper::PhiDerivative(DualArray1D<Real> scalar_function)
   return scalar_function_dphi;
 }
 
-/*
-KOKKOS_INLINE_FUNCTION
-int max(int i, int j) {
-  if (i>=j) {
-    return(i);
-  } else {
-    return(j);
+void Strahlkorper::EvaluateTangentVectors() {
+  Kokkos::realloc(tangent_vectors,2,nangles,3);
+  // tangent vectors are theta and phi derivatives of the x,y,z coordinate
+  DualArray1D<Real> spatial_coord;
+  Kokkos::realloc(spatial_coord,nangles);
+
+  // i iterates over x, y, and z
+  for (int i=0; i<3; ++i) {
+    for (int n=0; n<nangles; ++n) {
+      spatial_coord.h_view(n) = interp_coord.h_view(n,i);
+    }
+    DualArray1D<Real> dx;
+    Kokkos::realloc(dx,nangles);
+    
+    // theta component
+    dx = ThetaDerivative(spatial_coord);
+    for (int n=0; n<nangles; ++n) {
+      tangent_vectors.h_view(0,n,i) = dx.h_view(n);
+    }
+    
+    // phi component
+    dx = PhiDerivative(spatial_coord);
+    for (int n=0; n<nangles; ++n) {
+      tangent_vectors.h_view(1,n,i) = dx.h_view(n);
+    }
   }
+
+  // sync dual arrays
+  tangent_vectors.template modify<HostMemSpace>();
+  tangent_vectors.template sync<DevExeSpace>();
 }
 
-KOKKOS_INLINE_FUNCTION
-int min(int i, int j) {
-  if (i<=j) {
-    return(i);
-  } else {
-    return(j);
+
+void Strahlkorper::EvaluateNormalOneForms() {
+  Kokkos::realloc(normal_oneforms,nangles,3);
+
+  // i iterates over x, y, and z components of the one form
+  for (int n=0; n<nangles; ++n) {
+    normal_oneforms.h_view(n,0) = tangent_vectors.h_view(0,n,1)*tangent_vectors.h_view(1,n,2)
+                                - tangent_vectors.h_view(0,n,2)*tangent_vectors.h_view(1,n,1);
+    normal_oneforms.h_view(n,1) = tangent_vectors.h_view(0,n,2)*tangent_vectors.h_view(1,n,0)
+                                - tangent_vectors.h_view(0,n,0)*tangent_vectors.h_view(1,n,2);
+    normal_oneforms.h_view(n,2) = tangent_vectors.h_view(0,n,0)*tangent_vectors.h_view(1,n,1)
+                                - tangent_vectors.h_view(0,n,1)*tangent_vectors.h_view(1,n,0);
   }
+
+  // sync dual arrays
+  normal_oneforms.template modify<HostMemSpace>();
+  normal_oneforms.template sync<DevExeSpace>();
 }
-*/
+
+// Now evaluate normal vectors, indices raised with spatial metric
+
+// void Strahlkorper::EvaluateNormalUnitVectors() {
+//
+// }
