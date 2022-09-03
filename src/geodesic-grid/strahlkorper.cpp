@@ -250,24 +250,66 @@ void Strahlkorper::EvaluateSurfaceJacobianDerivative() {
     Real y = interp_coord.h_view(n,1);
     Real z = interp_coord.h_view(n,2);
     Real r = pointwise_radius.h_view(n);
-    Real x2plusy2 = x*x + y*y;
-    Real sqrt_x2plusy2 = sqrt(x2plusy2);
+
+    Real x2 = x*x;
+    Real y2 = y*y;
+    Real z2 = z*z;
+
+    Real r2 = r*r;
+    Real r3 = r2*r;
+    Real r4 = r3*r;
+    Real rxy2 = x*x + y*y;
+    Real rxy = sqrt(rxy2);
+    Real rxy3 = rxy2*rxy;
+    Real rxy4 = rxy3*rxy;
     //****************** Partial x ********************
     // for x component
-    d_surface_jacobian.h_view(n,0,0,0) = x/r;
-    d_surface_jacobian.h_view(n,0,1,0) = x*z/sqrt_x2plusy2/r/r;
-    d_surface_jacobian.h_view(n,0,2,0) = -y/x2plusy2;
+    d_surface_jacobian.h_view(n,0,0,0) = (r2-x2)/r3;
+    d_surface_jacobian.h_view(n,0,1,0) = (-2*rxy2*x2 + r2*(rxy2-x2))*z/(r4*rxy3);
+    d_surface_jacobian.h_view(n,0,2,0) = 2*x*y/rxy4;
   
     // for y component
-    d_surface_jacobian.h_view(n,0,0,1) = y/r;
-    d_surface_jacobian.h_view(n,0,1,1) = y*z/sqrt_x2plusy2/r/r;
-    d_surface_jacobian.h_view(n,0,2,1) = x/x2plusy2;
+    d_surface_jacobian.h_view(n,0,0,1) = -x*y/r3;
+    d_surface_jacobian.h_view(n,0,1,1) = -(r2 + 2*rxy2)*x*y*z/(r4*rxy3);
+    d_surface_jacobian.h_view(n,0,2,1) = (rxy2 - 2*x2)/rxy4;
 
     // for z component
-    d_surface_jacobian.h_view(n,0,0,2) = z/r;
-    d_surface_jacobian.h_view(n,0,1,2) = -sqrt_x2plusy2/r/r;
+    d_surface_jacobian.h_view(n,0,0,2) = -x*z/r3;
+    d_surface_jacobian.h_view(n,0,1,2) = -x/(r2*rxy)+2*rxy*x/r4;
     d_surface_jacobian.h_view(n,0,2,2) = 0;
+
+    //****************** Partial y ********************
+    // for x component
+    d_surface_jacobian.h_view(n,1,0,0) = -x*y/r3;
+    d_surface_jacobian.h_view(n,1,1,0) = -(r2 + 2*rxy2)*x*y*z/(r4*rxy3);
+    d_surface_jacobian.h_view(n,1,2,0) = -(rxy2 - 2*y2)/rxy4;
+
+    // for y component
+    d_surface_jacobian.h_view(n,1,0,1) = (r2-y2)/r3;
+    d_surface_jacobian.h_view(n,1,1,1) = (-2*rxy2*y2 + r2*(rxy2-y2))*z/(r4*rxy3);
+    d_surface_jacobian.h_view(n,1,2,1) = - 2*x*y/rxy4;
+
+    // for z component
+    d_surface_jacobian.h_view(n,1,0,2) = -y*z/r3;
+    d_surface_jacobian.h_view(n,1,1,2) = -y/(r2*rxy) +2*rxy*y/r4;
+    d_surface_jacobian.h_view(n,1,2,2) = 0;
+
+    //****************** Partial z ********************
+    // for x component
+    d_surface_jacobian.h_view(n,2,0,0) = -x*z/r3;
+    d_surface_jacobian.h_view(n,2,1,0) = x*(r2-2*z2)/(r4*rxy);
+    d_surface_jacobian.h_view(n,2,2,0) = 0;
+
+    // for y component
+    d_surface_jacobian.h_view(n,2,0,1) = -y*z/r3;
+    d_surface_jacobian.h_view(n,2,1,1) = y*(r2-2*z2)/(r4*rxy);
+    d_surface_jacobian.h_view(n,2,2,1) = 0;
+
+    // for z component
+    d_surface_jacobian.h_view(n,2,0,2) = (r2-z2)/r3;
+    d_surface_jacobian.h_view(n,2,1,2) = 2*rxy*z/r4;
+    d_surface_jacobian.h_view(n,2,2,2) = 0;
   }
-  surface_jacobian.template modify<HostMemSpace>();
-  surface_jacobian.template sync<DevExeSpace>();
+  d_surface_jacobian.template modify<HostMemSpace>();
+  d_surface_jacobian.template sync<DevExeSpace>();
 }
