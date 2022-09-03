@@ -20,35 +20,29 @@
 class Strahlkorper: public SphericalGrid {
  public:
    // Creates a geodetic grid with nlev levels and radius rad
-   Strahlkorper(MeshBlockPack *pmy_pack, int nlev, Real rad);
+   Strahlkorper(MeshBlockPack *pmy_pack, int nlev, Real rad, int nfilt);
    ~Strahlkorper();
-
+   
    DualArray1D<Real> pointwise_radius;
    DualArray3D<Real> basis_functions;
    DualArray3D<Real> tangent_vectors;
    DualArray2D<Real> normal_oneforms;
+   DualArray3D<Real> surface_jacobian;
+   DualArray4D<Real> d_surface_jacobian;
 
+   int nfilt;
    int nlevel;
+   void InitializeRadius();
    void SetPointwiseRadius(DualArray1D<Real> rad_tmp, Real ctr[3]);  // set indexing for interpolation
    void EvaluateSphericalHarm();
    void EvaluateTangentVectors();
    void EvaluateNormalOneForms();
-
+   void EvaluateSurfaceJacobian();
+   void EvaluateSurfaceJacobianDerivative();
    Real Integrate(DualArray1D<Real> integrand);
    DualArray1D<Real> ThetaDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> PhiDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> SpatialToSpectral(DualArray1D<Real> scalar_function);
-   // AthenaTensor<Real, TensorSymm::NONE, 3, 1> dtheta_u;     // theta tangent vector 
-   // AthenaTensor<Real, TensorSymm::NONE, 3, 1> dphi_u;     // phi tangent vector 
-   
-
-   std::pair<double,double> SWSphericalHarm(int l, int m, int s, Real theta, Real phi);
-   Real RealSphericalHarm(int l, int m, Real theta, Real phi);
-   Real RealSphericalHarm_dtheta(int l, int m, Real theta, Real phi);
-   Real RealSphericalHarm_dphi(int l, int m, Real theta, Real phi);
-   Real MakeReal(int l, int m, Real theta, Real phi, std::pair<double,double> (*func)(int, int, int, Real, Real));
-   std::pair<double,double> SphericalHarm_dtheta(int l, int m, Real theta, Real phi);
-   std::pair<double,double> SphericalHarm_dphi(int l, int m, Real theta, Real phi);
 
  private:
 };
