@@ -26,7 +26,8 @@ class SphericalGrid: public GeodesicGrid {
     DualArray2D<Real> interp_coord;  // Cartesian coordinates for grid points
     DualArray2D<Real> interp_vals;   // container for data interpolated to sphere
     void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate to sphere
-    DualArray2D<Real> InterpolateTensorsToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 2> &g_dd); // Interpolate rank 2 tensors to sphere
+    DualArray2D<Real> InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 2> &g_dd); // Interpolate rank 2 tensors to sphere
+    DualArray3D<Real> InterpolateToSphere(DualArray6D<Real> &d_g_ddd);
     void SetInterpolationCoordinates();  // set indexing for interpolation
     void SetInterpolationIndices();      // set indexing for interpolation
     void SetInterpolationWeights();      // set weights for interpolation
