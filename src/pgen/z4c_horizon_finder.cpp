@@ -24,30 +24,6 @@
 //----------------------------------------------------------------------------------------
 //! \fn ProblemGenerator::UserProblem_()
 //! \brief Problem Generator for Testing Horizon Finder
-/*
-// Function for inverting 3x3 symmetric matrices
-void SpatialInv(Real const detginv,
-                Real const gxx, Real const gxy, Real const gxz,
-                Real const gyy, Real const gyz, Real const gzz,
-                Real * uxx, Real * uxy, Real * uxz,
-                Real * uyy, Real * uyz, Real * uzz) {
-  *uxx = (-SQR(gyz) + gyy*gzz)*detginv;
-  *uxy = (gxz*gyz  - gxy*gzz)*detginv;
-  *uyy = (-SQR(gxz) + gxx*gzz)*detginv;
-  *uxz = (-gxz*gyy + gxy*gyz)*detginv;
-  *uyz = (gxy*gxz  - gxx*gyz)*detginv;
-  *uzz = (-SQR(gxy) + gxx*gyy)*detginv;
-  return;
-}
-
-// Function for determinant of 3x3 symmetric matrices
-Real SpatialDet(Real const gxx, Real const gxy, Real const gxz,
-                Real const gyy, Real const gyz, Real const gzz) {
-  return - SQR(gxz)*gyy + 2*gxy*gxz*gyz
-         - SQR(gyz)*gxx
-         - SQR(gxy)*gzz +   gxx*gyy*gzz;
-}
-*/
 
 int SYMM2_Ind(int v1, int v2) {
   if (v1==0) {
@@ -100,8 +76,6 @@ DualArray6D<Real> metric_partial(MeshBlockPack *pmbp) {
   size_t scr_size = ScrArray2D<Real>::shmem_size(0,0); // 3D tensor with symm
   par_for_outer("ADM constraints loop",DevExeSpace(),scr_size,scr_level,0,nmb-1,ks,ke,js,je,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
-    // AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 3> dg_ddd;
-    //dg_ddd.NewAthenaScratchTensor(member, scr_level, ncells1);
 
     Real idx[] = {size.d_view(m).idx1, size.d_view(m).idx2, size.d_view(m).idx3};
     // -----------------------------------------------------------------------------------
@@ -112,7 +86,6 @@ DualArray6D<Real> metric_partial(MeshBlockPack *pmbp) {
     for(int a = 0; a < 3; ++a)
     for(int b = a; b < 3; ++b) {
       par_for_inner(member, is, ie, [&](const int i) {
-        // dg_ddd(c,a,b,i) = Dx<NGHOST>(c, idx, adm.g_dd, m,a,b,k,j,i);
         dg_ddd_full.d_view(m,c,SYMM2_Ind(a,b),k,j,i) = Dx<NGHOST>(c, idx, adm.g_dd, m,a,b,k,j,i);
       });
     }
@@ -129,44 +102,14 @@ template DualArray6D<Real> metric_partial<3>(MeshBlockPack *pmbp);
 template DualArray6D<Real> metric_partial<4>(MeshBlockPack *pmbp);
 
 
-void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
-  MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
-  auto &indcs = pmy_mesh_->mb_indcs;
-  auto &size = pmbp->pmb->mb_size;
-
-  if (pmbp->pz4c == nullptr) {
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
-              << "One Puncture test can only be run in Z4c, but no <z4c> block "
-              << "in input file" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  // One Puncture nitial data 
-  pmbp->pz4c->ADMOnePuncture(pmbp, pin);
-  pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
-  switch (indcs.ng) {
-    case 2: pmbp->pz4c->ADMToZ4c<2>(pmbp, pin);
-            break;
-    case 3: pmbp->pz4c->ADMToZ4c<3>(pmbp, pin);
-            break;
-    case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
-            break;
-  }
-  std::cout<<"OnePuncture initialized; Starting Horizon Finder"<<std::endl;
-
-  // load in adm variables
+DualArray1D<Real> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, DualArray6D<Real> dg_ddd) {
+  // Load adm variables
   auto &adm = pmbp->padm->adm;
   auto &g_dd = adm.g_dd;
   auto &K_dd = adm.K_dd;
 
-  // Initialize a surface with radius of 2 centered at the origin
-
-  int nlev = 10;
-  bool rotate_sphere = true;
-  bool fluxes = true;
-
-  Strahlkorper *S = nullptr;
-  S = new Strahlkorper(pmbp, nlev, 2,25);
+  // Strahlkorper *S = nullptr;
+  // S = new Strahlkorper(pmbp, nlev, 2,25);
   // Real ctr[3] = {0,0,0};
   // DualArray1D<Real> rad_tmp;
   int nangles = S->nangles;
@@ -267,10 +210,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     }
   }
 
-  // Evaluate partial derivatives of the metric over the entire domain
-  // 6 dimensional array, nmb, 3, 6, ncells3, ncells2, ncells1
-  auto dg_ddd = metric_partial<2>(pmbp);
-
   // interpolate dg_ddd to surface
   auto dg_ddd_surf = S->InterpolateToSphere(dg_ddd);
 
@@ -362,9 +301,70 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       }
     }
   }
+  return H;
+}
 
+DualArray1D<Real> AnalyticSurfaceNullExpansion(Strahlkorper *S) {
+  int nangles = S->nangles;
+  DualArray1D<Real> H;
+  Kokkos::realloc(H,nangles);
+  auto r = S->pointwise_radius;
+  for(int n=0; n<nangles; ++n) {
+    Real denominator = 2*r.h_view(n)+1;
+    H.h_view(n) = 8*r.h_view(n)*(2*r.h_view(n)-1)/(denominator*denominator*denominator);
+  }
+  return H;
+}
+
+void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
+  MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
+  auto &indcs = pmy_mesh_->mb_indcs;
+  auto &size = pmbp->pmb->mb_size;
+
+  if (pmbp->pz4c == nullptr) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+              << "One Puncture test can only be run in Z4c, but no <z4c> block "
+              << "in input file" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // One Puncture nitial data 
+  pmbp->pz4c->ADMOnePuncture(pmbp, pin);
+  pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
+  switch (indcs.ng) {
+    case 2: pmbp->pz4c->ADMToZ4c<2>(pmbp, pin);
+            break;
+    case 3: pmbp->pz4c->ADMToZ4c<3>(pmbp, pin);
+            break;
+    case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
+            break;
+  }
+  std::cout<<"OnePuncture initialized; Starting Horizon Finder"<<std::endl;
+
+  // load in adm variables
+  auto &adm = pmbp->padm->adm;
+  auto &z4c = pmbp->pz4c->z4c;
+  auto &g_dd = adm.g_dd;
+  auto &K_dd = adm.K_dd;
+  // Evaluate partial derivatives of the metric over the entire domain
+  // 6 dimensional array, nmb, 3, 6, ncells3, ncells2, ncells1
+  //DualArray6D<Real> *dg_ddd = nullptr;
+  auto dg_ddd = metric_partial<2>(pmbp);
+
+  // Initialize a surface with radius of 2 centered at the origin
+
+  int nlev = 10;
+  bool rotate_sphere = true;
+  bool fluxes = true;
+
+  Strahlkorper *S = nullptr;
+  S = new Strahlkorper(pmbp, nlev, 18,25);
+  
+  // Surface Null Expansion, Gundlach 1997 eqn 9
+  DualArray1D<Real> H = SurfaceNullExpansion(pmbp,S,dg_ddd);
+  // DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
   Real H_integrated = S->Integrate(H);
-  std::cout << "Surface Null Expansion" << H_integrated << std::endl;
+  std::cout << "Surface Null Expansion: " << H_integrated << std::endl;
 
   return;
 }
