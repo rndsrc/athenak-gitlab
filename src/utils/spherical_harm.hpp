@@ -17,6 +17,7 @@ double fac(int i) {
 }
 
 //Calculate spin-weighted spherical harmonics using Wigner-d matrix notation see e.g. Eq II.7, II.8 in 0709.0093
+KOKKOS_INLINE_FUNCTION
 std::pair<double,double> SWSphericalHarm(int l, int m, int s, Real theta, Real phi) {
   Real wignerd = 0;
   int k1,k2,k;
@@ -31,6 +32,7 @@ std::pair<double,double> SWSphericalHarm(int l, int m, int s, Real theta, Real p
 }
 
 // theta derivative of the s=0 spherical harmonics
+KOKKOS_INLINE_FUNCTION
 std::pair<double,double> SphericalHarm_dtheta(int l, int m, Real theta, Real phi) {
   std::pair<double,double> value;
   if (l==m) {
@@ -47,6 +49,8 @@ std::pair<double,double> SphericalHarm_dtheta(int l, int m, Real theta, Real phi
 }
 
 // phi derivative of the s=0 spherical harmonics
+
+KOKKOS_INLINE_FUNCTION
 std::pair<double,double> SphericalHarm_dphi(int l, int m, Real theta, Real phi) {
   std::pair<double,double> value;
   std::pair<double,double> value2 = SWSphericalHarm(l,m,0,theta,phi);
@@ -55,6 +59,7 @@ std::pair<double,double> SphericalHarm_dphi(int l, int m, Real theta, Real phi) 
   return value;
 }
 
+KOKKOS_INLINE_FUNCTION
 Real RealSphericalHarm(int l, int m, Real theta, Real phi) {
   double value;
   if (m==0) {
@@ -67,6 +72,7 @@ Real RealSphericalHarm(int l, int m, Real theta, Real phi) {
   return value;
 }
 
+KOKKOS_INLINE_FUNCTION
 Real RealSphericalHarm_dtheta(int l, int m, Real theta, Real phi) {
   double value;
   if (m==0) {
@@ -79,6 +85,7 @@ Real RealSphericalHarm_dtheta(int l, int m, Real theta, Real phi) {
   return value;
 }
 
+KOKKOS_INLINE_FUNCTION
 Real RealSphericalHarm_dphi(int l, int m, Real theta, Real phi) {
   double value;
   if (m==0) {
