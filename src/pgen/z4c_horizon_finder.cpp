@@ -304,6 +304,7 @@ DualArray1D<Real> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, Dua
   return H;
 }
 
+// Analytical surface null expansion for Schwarzschild in isotropic coordinate, testing only
 DualArray1D<Real> AnalyticSurfaceNullExpansion(Strahlkorper *S) {
   int nangles = S->nangles;
   DualArray1D<Real> H;
@@ -353,19 +354,58 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   // Initialize a surface with radius of 2 centered at the origin
 
-  int nlev = 10;
+  int nlev = 20;
+  int nfilt = 25;
   bool rotate_sphere = true;
   bool fluxes = true;
-
+  Real radius = 0.51;
   Strahlkorper *S = nullptr;
-  S = new Strahlkorper(pmbp, nlev, 18,25);
-  
+  S = new Strahlkorper(pmbp, nlev, radius,nfilt);
+  Real ctr[3] = {0.,0.,0.};
   // Surface Null Expansion, Gundlach 1997 eqn 9
-  DualArray1D<Real> H = SurfaceNullExpansion(pmbp,S,dg_ddd);
-  // DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
+  // DualArray1D<Real> H = SurfaceNullExpansion(pmbp,S,dg_ddd);
+  DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
+  
   Real H_integrated = S->Integrate(H);
-  std::cout << "Surface Null Expansion: " << H_integrated << std::endl;
+  std::cout << "Initial Norm of H: " << H_integrated << std::endl;
 
+  // H-flow loop, take A = B = 1, rho = 1
+  auto H_spectral = S->SpatialToSpectral(H);
+  for (int itr=0; itr<10; ++itr) {
+    // auto pointwise_radius = S->pointwise_radius;
+    auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
+
+    DualArray1D<Real> r_spectral_np1;
+    Kokkos::realloc(r_spectral_np1,nfilt);
+
+    for (int i=0; i<nfilt; ++i) {
+      int l = (int) sqrt(i);
+      r_spectral_np1.h_view(i) =  r_spectral.h_view(i) - 1/(1+10*l*(l+1))*H_spectral.h_view(i);
+      std::cout << r_spectral_np1.h_view(i) << std::endl;
+    }
+
+    auto r_np1 = S->SpectralToSpatial(r_spectral_np1);
+
+    // reset radius
+    S->SetPointwiseRadius(r_np1,&ctr[3]);
+
+    // reevaluate H
+    DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
+    H_integrated = S->Integrate(H);
+
+    std::cout << "Itr " << itr+1 << "   Norm of H: " << H_integrated << std::endl;
+  }
+  
+
+
+  //for (int i=0;i<nfilt;++i) {
+  //  std::cout << "Surface Null Expansion: " << H_spectral.h_view(i) << std::endl;
+  //}
+  // DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
+
+
+
+  // still need to write out the loop for fast flow.
   return;
 }
 

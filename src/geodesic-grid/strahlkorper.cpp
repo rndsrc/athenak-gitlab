@@ -132,6 +132,17 @@ DualArray1D<Real> Strahlkorper::SpatialToSpectral(DualArray1D<Real> scalar_funct
   return spectral;
 }
 
+DualArray1D<Real> Strahlkorper::SpectralToSpatial(DualArray1D<Real> scalar_spectrum) {
+  DualArray1D<Real> scalar_function;
+  Kokkos::realloc(scalar_function,nangles);
+  for (int i=0; i<nfilt;++i) {
+    for (int n=0; n<nangles; ++n) {
+      scalar_function.h_view(n) += scalar_spectrum.h_view(i)*basis_functions.h_view(0,i,n);
+    }
+  }
+  return scalar_function;
+}
+
 DualArray1D<Real> Strahlkorper::ThetaDerivative(DualArray1D<Real> scalar_function) {
   // first find spectral representation
   DualArray1D<Real> spectral;

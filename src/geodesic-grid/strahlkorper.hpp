@@ -43,6 +43,7 @@ class Strahlkorper: public SphericalGrid {
    DualArray1D<Real> ThetaDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> PhiDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> SpatialToSpectral(DualArray1D<Real> scalar_function);
+   DualArray1D<Real> SpectralToSpatial(DualArray1D<Real> scalar_spectrum);
 
  private:
 };
