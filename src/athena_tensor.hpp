@@ -675,7 +675,7 @@ __device__ __host__ AthenaSurfaceTensor();
     return data_(idxmap_[a][b], i);
   }
   KOKKOS_INLINE_FUNCTION
-  void NewAthenaSurfaceTensor(const TeamMember_t & member, int scr_level, int nx) {
+  void NewAthenaSurfaceTensor(int nx) {
     Kokkos::realloc(data_, ndof_,nx);
   }
   KOKKOS_INLINE_FUNCTION
@@ -748,7 +748,7 @@ __device__ __host__ AthenaSurfaceTensor();
     return data_(idxmap_[a][b][c], i);
   }
   KOKKOS_INLINE_FUNCTION
-  void NewAthenaSurfaceTensor(const TeamMember_t & member, int scr_level, int nx) {
+  void NewAthenaSurfaceTensor(int nx) {
     Kokkos::realloc(data_, ndof_,nx);
   }
   KOKKOS_INLINE_FUNCTION
@@ -832,7 +832,7 @@ __device__ __host__ AthenaSurfaceTensor();
     return data_(idxmap_[a][b][c][d], i);
   }
   KOKKOS_INLINE_FUNCTION
-  void NewAthenaSurfaceTensor(const TeamMember_t & member, int scr_level, int nx) {
+  void NewAthenaSurfaceTensor(int nx) {
     Kokkos::realloc(data_, ndof_,nx);
   }
   KOKKOS_INLINE_FUNCTION

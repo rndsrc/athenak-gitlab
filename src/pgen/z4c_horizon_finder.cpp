@@ -101,146 +101,137 @@ template DualArray6D<Real> metric_partial<2>(MeshBlockPack *pmbp);
 template DualArray6D<Real> metric_partial<3>(MeshBlockPack *pmbp);
 template DualArray6D<Real> metric_partial<4>(MeshBlockPack *pmbp);
 
-
-DualArray1D<Real> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, DualArray6D<Real> dg_ddd) {
+AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, DualArray6D<Real> dg_ddd) {
   // Load adm variables
   auto &adm = pmbp->padm->adm;
   auto &g_dd = adm.g_dd;
   auto &K_dd = adm.K_dd;
 
-  // Strahlkorper *S = nullptr;
-  // S = new Strahlkorper(pmbp, nlev, 2,25);
-  // Real ctr[3] = {0,0,0};
-  // DualArray1D<Real> rad_tmp;
   int nangles = S->nangles;
   auto surface_jacobian = S->surface_jacobian;
   auto d_surface_jacobian = S->d_surface_jacobian;
 
-  // Kokkos::realloc(rad_tmp,nangles);
+  // *****************  Step 4 of Schnetter 2002  *******************
 
-  // Container for surface tensors
-  DualArray2D<Real> g_dd_surf;
-  DualArray2D<Real> K_dd_surf;
+  // Interpolate g_dd, K_dd, and dg_ddd onto the surface
+  // Still need to check the tensor interpolator!
 
-  // Athena Tensor structure cannot easily adapt to the Strahlkorper Class. 
-  // For now using DualArrays for Tensors and keeping track of the indices.
-  // HostArray3D<Real> surf_tensors;
-  // AthenaHostTensor<Real,TensorSymm::SYM2, 1, 2> g_dd_surf2;
-  // AthenaHostTensor<Real,TensorSymm::SYM2, 1, 2> K_dd_surf2;
-  // Kokkos::realloc(surf_tensors,    nmb, (N_Z4c), ncells3, ncells2, ncells1);
+  std::cout << "Here 2" << std::endl;
 
-  Kokkos::realloc(g_dd_surf,nangles,6); // xx, xy, xz, yy, yz, zz
-  Kokkos::realloc(K_dd_surf,nangles,6);
-
-  // Interpolate g_dd and K_dd onto the surface
-  g_dd_surf =  S->InterpolateToSphere(g_dd);
-  K_dd_surf =  S->InterpolateToSphere(K_dd);
+  auto g_dd_surf =  S->InterpolateToSphere(g_dd);
+  auto K_dd_surf =  S->InterpolateToSphere(K_dd);
+  auto dg_ddd_surf = S->InterpolateToSphere(dg_ddd); // change this into the new surface tensor notation
+  std::cout << "Here 3" << std::endl;
 
 
-  // Evaluate Derivatives of F = r - h(theta,phi) in spherical components
-  DualArray2D<Real> dF_d_surf;
-  Kokkos::realloc(dF_d_surf,nangles,3);
+  // Calculating g_uu on the sphere
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> g_uu_surf;
+  g_uu_surf.NewAthenaSurfaceTensor(nangles);
+
+  for(int n=0; n<nangles; ++n) {
+    Real detg = SpatialDet(g_dd_surf(0,0,n), g_dd_surf(0,1,n), g_dd_surf(0,2,n),
+                           g_dd_surf(1,1,n), g_dd_surf(1,2,n), g_dd_surf(2,2,n));
+    SpatialInv(1.0/detg,
+            g_dd_surf(0,0,n), g_dd_surf(0,1,n), g_dd_surf(0,2,n),
+            g_dd_surf(1,1,n), g_dd_surf(1,2,n), g_dd_surf(2,2,n),
+            &g_uu_surf(0,0,n), &g_uu_surf(0,1,n), &g_uu_surf(0,2,n),
+            &g_uu_surf(1,1,n), &g_uu_surf(1,2,n), &g_uu_surf(2,2,n));
+  }
+
+  // Christoffel symbols of the second kind on the surface, saved as rank3 tensor
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> Gamma_udd_surf;
+  Gamma_udd_surf.NewAthenaSurfaceTensor(nangles);
+
+  for(int n=0; n<nangles; ++n) {
+    for(int i=0; i<3; ++i)
+    for(int j=0; i<3; ++i)
+    for(int k=j; i<3; ++i) { // symmetric in j and k
+      Gamma_udd_surf(i,j,k,n) = 0;
+      for(int s=0; i<3; ++i) {
+        Gamma_udd_surf(i,j,k,n) += 0.5*g_uu_surf(i,s,n) * (dg_ddd_surf(j,k,s,n)
+                                  +dg_ddd_surf(k,s,j,n)-dg_ddd_surf(s,j,k,n));
+      }
+    }
+  }
+
+  // *****************  Step 6 of Schnetter 2002  *******************
+  // Evaluate Derivatives of F = r - h(theta,phi)
+  // First in spherical components _sb stands for spherical basis
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,1> dF_d_surf_sb;
+  dF_d_surf_sb.NewAthenaSurfaceTensor(nangles);
 
   DualArray1D<Real> place_holder_for_partial_theta;
   DualArray1D<Real> place_holder_for_partial_phi;
   Kokkos::realloc(place_holder_for_partial_theta,nangles);
   Kokkos::realloc(place_holder_for_partial_phi,nangles);
 
+  // still need to check on these derivatives on sphere!
   place_holder_for_partial_theta = S->ThetaDerivative(S->pointwise_radius);
   place_holder_for_partial_phi = S->PhiDerivative(S->pointwise_radius);
-
   for(int n=0; n<nangles; ++n) {
     // radial derivatives
-    dF_d_surf.h_view(n,0) = 1;
+    dF_d_surf_sb(0,n) = 1;
     // theta and phi derivatives
-    dF_d_surf.h_view(n,1) = place_holder_for_partial_theta.h_view(n);
-    dF_d_surf.h_view(n,2) = place_holder_for_partial_phi.h_view(n);
+    dF_d_surf_sb(1,n) = place_holder_for_partial_theta.h_view(n);
+    dF_d_surf_sb(2,n) = place_holder_for_partial_phi.h_view(n);
   }
 
   // Evaluate Second Derivatives of F in spherical components
-  DualArray2D<Real> ddF_dd_surf;
-  Kokkos::realloc(ddF_dd_surf,nangles,6); // rr, rt, rp, tt, tp, pp
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> ddF_dd_surf_sb;
+  ddF_dd_surf_sb.NewAthenaSurfaceTensor(nangles);
 
   DualArray1D<Real> place_holder_for_second_partials;
   Kokkos::realloc(place_holder_for_second_partials,nangles);
 
   // all second derivatives w.r.t. r vanishes as dr_F = 1
   for(int n=0; n<nangles; ++n) {
-    ddF_dd_surf.h_view(n,0) = 0;
-    ddF_dd_surf.h_view(n,1) = 0;
-    ddF_dd_surf.h_view(n,2) = 0;
+    ddF_dd_surf_sb(0,0,n) = 0;
+    ddF_dd_surf_sb(0,1,n) = 0;
+    ddF_dd_surf_sb(0,2,n) = 0;
   }
   // tt
   place_holder_for_second_partials = S->ThetaDerivative(place_holder_for_partial_theta);
   for(int n=0; n<nangles; ++n) {
-    ddF_dd_surf.h_view(n,3) = place_holder_for_second_partials.h_view(n);
+    ddF_dd_surf_sb(1,1,n) = place_holder_for_second_partials.h_view(n);
   }
   // tp
   place_holder_for_second_partials = S->PhiDerivative(place_holder_for_partial_theta);
   for(int n=0; n<nangles; ++n) {
-    ddF_dd_surf.h_view(n,4) = place_holder_for_second_partials.h_view(n);
+    ddF_dd_surf_sb(1,2,n) = place_holder_for_second_partials.h_view(n);
   }
   // pp
   place_holder_for_second_partials = S->PhiDerivative(place_holder_for_partial_phi);
   for(int n=0; n<nangles; ++n) {
-    ddF_dd_surf.h_view(n,5) = place_holder_for_second_partials.h_view(n);
-  }
-  // Calculating g_uu on the sphere
-  DualArray2D<Real> g_uu_surf;
-  Kokkos::realloc(g_uu_surf,nangles,6); // xx, xy, xz, yy, yz, zz
-  for(int n=0; n<nangles; ++n) {
-    Real detg = SpatialDet(g_dd_surf.h_view(n,0), g_dd_surf.h_view(n,1), g_dd_surf.h_view(n,2),
-                           g_dd_surf.h_view(n,3), g_dd_surf.h_view(n,4), g_dd_surf.h_view(n,5));
-    SpatialInv(1.0/detg,
-            g_dd_surf.h_view(n,0), g_dd_surf.h_view(n,1), g_dd_surf.h_view(n,2),
-            g_dd_surf.h_view(n,3), g_dd_surf.h_view(n,4), g_dd_surf.h_view(n,5),
-            &g_uu_surf.h_view(n,0), &g_uu_surf.h_view(n,1), &g_uu_surf.h_view(n,2),
-            &g_uu_surf.h_view(n,3), &g_uu_surf.h_view(n,4), &g_uu_surf.h_view(n,5));
+    ddF_dd_surf_sb(2,2,n) = place_holder_for_second_partials.h_view(n);
   }
 
-  // Covariant derivatives of F in cartesian basis
-  DualArray2D<Real> delta_F_d_surf;
-  Kokkos::realloc(delta_F_d_surf,nangles,3);
+  // Convert to derivatives of F to cartesian basis
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,1> dF_d_surf;
+  dF_d_surf.NewAthenaSurfaceTensor(nangles);
+
+  // check the Surface Jacobian
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3;++i){
-      delta_F_d_surf.h_view(n,i) = 0;
+      dF_d_surf(i,n) = 0;
       for(int u=0; u<3;++u) {
-        delta_F_d_surf.h_view(n,i) += surface_jacobian.h_view(n,u,i)*dF_d_surf.h_view(n,u);
-      }
-    }
-  }
-
-  // interpolate dg_ddd to surface
-  auto dg_ddd_surf = S->InterpolateToSphere(dg_ddd);
-
-  // Place holder for Christoffel symbols of the second kind interpolated to the surface
-  DualArray3D<Real> Gamma_udd_surf;
-  Kokkos::realloc(Gamma_udd_surf,nangles,3,6);
-  for(int n=0; n<nangles; ++n) {
-    for(int i=0; i<3; ++i)
-    for(int j=0; i<3; ++i)
-    for(int k=0; i<3; ++i) {
-      Gamma_udd_surf.h_view(n,i,SYMM2_Ind(j,k)) = 0;
-      for(int s=0; i<3; ++i) {
-        Gamma_udd_surf.h_view(n,i,SYMM2_Ind(j,k)) += 0.5*g_uu_surf.h_view(n,SYMM2_Ind(i,s)) * (dg_ddd_surf.h_view(n,j,SYMM2_Ind(k,s))
-                                                    +dg_ddd_surf.h_view(n,k,SYMM2_Ind(s,j))-dg_ddd_surf.h_view(n,s,SYMM2_Ind(j,k)));
+        dF_d_surf(i,n) += surface_jacobian.h_view(n,u,i)*dF_d_surf_sb(u,n);
       }
     }
   }
 
   // Second Covariant derivatives of F in cartesian basis
-  DualArray3D<Real> deltadelta_F_dd_surf;
-  Kokkos::realloc(deltadelta_F_dd_surf,nangles,3,3);
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> ddF_dd_surf;
+  ddF_dd_surf.NewAthenaSurfaceTensor(nangles);
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
-        deltadelta_F_dd_surf.h_view(n,i,j) = 0;
+        ddF_dd_surf(i,j,n) = 0;
         for(int v=0; v<3;++v) {
-          deltadelta_F_dd_surf.h_view(n,i,j) += d_surface_jacobian.h_view(n,i,v,j)*dF_d_surf.h_view(n,v);
-          deltadelta_F_dd_surf.h_view(n,i,j) += -Gamma_udd_surf.h_view(n,v,SYMM2_Ind(i,j))*delta_F_d_surf.h_view(n,v); 
+          ddF_dd_surf(i,j,n) += d_surface_jacobian.h_view(n,i,v,j)*dF_d_surf_sb(v,n);
+          ddF_dd_surf(i,j,n) += -Gamma_udd_surf(v,i,j,n)*dF_d_surf(v,n); 
           for(int u=0; u<3;++u) {
-            deltadelta_F_dd_surf.h_view(n,i,j) += surface_jacobian.h_view(n,v,j)*surface_jacobian.h_view(n,u,i)
-                                                  *ddF_dd_surf.h_view(n,SYMM2_Ind(u,v));
+            ddF_dd_surf(i,j,n) += surface_jacobian.h_view(n,v,j)*surface_jacobian.h_view(n,u,i)
+                                                  *ddF_dd_surf_sb(u,v,n);
           }
         }
       }
@@ -250,69 +241,79 @@ DualArray1D<Real> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, Dua
   // These are all the infrastructure needed for evaluating the null expansion!
 
   // auxiliary variable delta_F_abs, Gundlach 1997 eqn 8 
-  DualArray1D<Real> delta_F_abs;
-  Kokkos::realloc(delta_F_abs,nangles);
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> delta_F_abs;
+  delta_F_abs.NewAthenaSurfaceTensor(nangles);
+
+  // DualArray1D<Real> delta_F_abs;
+  // Kokkos::realloc(delta_F_abs,nangles);
   for(int n=0; n<nangles; ++n) {
     Real delta_F_sqr = 0;
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
-        delta_F_sqr += g_uu_surf.h_view(n,SYMM2_Ind(i,j))*delta_F_d_surf.h_view(n,i)
-                                *delta_F_d_surf.h_view(n,j);
+        delta_F_sqr += g_uu_surf(i,j,n)*dF_d_surf(i,n)
+                                *dF_d_surf(j,n);
       }
     }
-    delta_F_abs.h_view(n) = sqrt(delta_F_sqr);
+    delta_F_abs(n) = sqrt(delta_F_sqr);
   }
 
   // contravariant form of delta_F
-  DualArray2D<Real> delta_F_u_surf;
-  Kokkos::realloc(delta_F_u_surf,nangles,3);
+
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,1> dF_u_surf;
+  dF_u_surf.NewAthenaSurfaceTensor(nangles);
+
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3;++i) {
-      delta_F_u_surf.h_view(n,i) = 0;
+      dF_u_surf(i,n) = 0;
       for(int j=0; j<3;++j) {
-        delta_F_u_surf.h_view(n,i) += g_uu_surf.h_view(n,SYMM2_Ind(i,j))*delta_F_d_surf.h_view(n,j);
+        dF_u_surf(i,n) += g_uu_surf(i,j,n)*dF_d_surf(j,n);
       }
     }
   }
 
 
-  // Surface inverse metric, Gundlach 1997 eqn 9
-  DualArray2D<Real> m_uu_surf;
-  Kokkos::realloc(m_uu_surf,nangles,6);
+  // Surface inverse metric (in cartesian coordinate), Gundlach 1997 eqn 9
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> m_uu_surf;
+  m_uu_surf.NewAthenaSurfaceTensor(nangles);
+  // DualArray2D<Real> m_uu_surf;
+  // Kokkos::realloc(m_uu_surf,nangles,6);
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
-        m_uu_surf.h_view(n,SYMM2_Ind(i,j)) = g_uu_surf.h_view(n,SYMM2_Ind(i,j))
-                                        - delta_F_u_surf.h_view(n,i)*delta_F_u_surf.h_view(n,j)
-                                        /delta_F_abs.h_view(n)/delta_F_abs.h_view(n);
+        m_uu_surf(i,j,n) = g_uu_surf(i,j,n)
+                - dF_u_surf(i,n)*dF_u_surf(j,n)
+                /delta_F_abs(n)/delta_F_abs(n);
       }
     }
   }
 
   // Surface Null Expansion, Gundlach 1997 eqn 9
-  DualArray1D<Real> H;
-  Kokkos::realloc(H,nangles);
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
+  H.NewAthenaSurfaceTensor(nangles);
+
   for(int n=0; n<nangles; ++n) {
-    H.h_view(n) = 0;
+    H(n) = 0;
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
-        H.h_view(n) += m_uu_surf.h_view(n,SYMM2_Ind(i,j))*(deltadelta_F_dd_surf.h_view(n,i,j)
-                        /delta_F_abs.h_view(n)-K_dd_surf.h_view(n,SYMM2_Ind(i,j)));
+        H(n) += m_uu_surf(i,j,n)*(ddF_dd_surf(i,j,n)
+                        /delta_F_abs(n)-K_dd_surf(i,j,n));
       }
     }
   }
+
   return H;
 }
 
 // Analytical surface null expansion for Schwarzschild in isotropic coordinate, testing only
-DualArray1D<Real> AnalyticSurfaceNullExpansion(Strahlkorper *S) {
+AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AnalyticSurfaceNullExpansion(Strahlkorper *S) {
   int nangles = S->nangles;
-  DualArray1D<Real> H;
-  Kokkos::realloc(H,nangles);
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
+  H.NewAthenaSurfaceTensor(nangles);
+
   auto r = S->pointwise_radius;
   for(int n=0; n<nangles; ++n) {
     Real denominator = 2*r.h_view(n)+1;
-    H.h_view(n) = 8*r.h_view(n)*(2*r.h_view(n)-1)/(denominator*denominator*denominator);
+    H(n) = 8*r.h_view(n)*(2*r.h_view(n)-1)/(denominator*denominator*denominator);
   }
   return H;
 }
@@ -355,23 +356,26 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // Initialize a surface with radius of 2 centered at the origin
 
   int nlev = 20;
-  int nfilt = 25;
+  int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = 0.51;
+  Real radius = 1;
   Strahlkorper *S = nullptr;
   S = new Strahlkorper(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
   // Surface Null Expansion, Gundlach 1997 eqn 9
   // DualArray1D<Real> H = SurfaceNullExpansion(pmbp,S,dg_ddd);
-  DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
-  
+  std::cout << "Here" << std::endl;
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd);
+  std::cout << "Here 2" << std::endl;
+
+  // Template this integration function over DualArray1D and Tensor of rank 0
   Real H_integrated = S->Integrate(H);
   std::cout << "Initial Norm of H: " << H_integrated << std::endl;
 
   // H-flow loop, take A = B = 1, rho = 1
   auto H_spectral = S->SpatialToSpectral(H);
-  for (int itr=0; itr<10; ++itr) {
+  for (int itr=0; itr<0; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
@@ -390,7 +394,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     S->SetPointwiseRadius(r_np1,&ctr[3]);
 
     // reevaluate H
-    DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
+    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd);
     H_integrated = S->Integrate(H);
 
     std::cout << "Itr " << itr+1 << "   Norm of H: " << H_integrated << std::endl;
@@ -408,6 +412,3 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // still need to write out the loop for fast flow.
   return;
 }
-
-
-

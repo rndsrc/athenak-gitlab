@@ -253,16 +253,15 @@ void SphericalGrid::InterpolateToSphere(int nvars, DvceArray5D<Real> &val) {
 //! \fn void SphericalGrid::InterpolateToSphere
 //! \brief interpolate Cartesian Tensor data to surface of sphere
 
-DualArray2D<Real> SphericalGrid::InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 2> &g_dd) {
+AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> SphericalGrid::InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 2> &g_dd) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int &ng = indcs.ng;
   int nang1 = nangles - 1;
   int nvar1 = 5;
 
-  // reallocate container
-  DualArray2D<Real> tensor_on_sphere;
-  Kokkos::realloc(tensor_on_sphere,nangles,6);
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> tensor_on_sphere;
+  tensor_on_sphere.NewAthenaSurfaceTensor(nangles);
 
   auto &iindcs = interp_indcs;
   auto &iwghts = interp_wghts;
@@ -288,9 +287,8 @@ DualArray2D<Real> SphericalGrid::InterpolateToSphere(AthenaTensor<Real, TensorSy
       v2 = 2;
     }
 
-
     if (ii0==-1) {  // angle not on this rank
-      ivals.d_view(n,v) = 0.0;
+      ivals(v1,v2,n) = 0.0;
     } else {
       Real int_value = 0.0;
       for (int i=0; i<2*ng; i++) {
@@ -301,13 +299,10 @@ DualArray2D<Real> SphericalGrid::InterpolateToSphere(AthenaTensor<Real, TensorSy
           }
         }
       }
-      ivals.d_view(n,v) = int_value;
+      ivals(v1,v2,n) = int_value;
+      // std::cout << n << "   " << v1 << "  " << v2 << std::endl;
     }
   });
-
-  // sync dual arrays
-  tensor_on_sphere.template modify<DevExeSpace>();
-  tensor_on_sphere.template sync<HostMemSpace>();
 
   return tensor_on_sphere;
 }
@@ -317,7 +312,7 @@ DualArray2D<Real> SphericalGrid::InterpolateToSphere(AthenaTensor<Real, TensorSy
 //! \fn void SphericalGrid::InterpolateToSphere
 //! \brief interpolate Rank3 tensors to surface of sphere
 
-DualArray3D<Real> SphericalGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) {
+AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> SphericalGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int &ng = indcs.ng;
@@ -326,8 +321,10 @@ DualArray3D<Real> SphericalGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) 
   int nvar2 = 6;
 
   // reallocate container
-  DualArray3D<Real> tensor_on_sphere;
-  Kokkos::realloc(tensor_on_sphere,nangles,3,6);
+
+  AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> tensor_on_sphere;
+
+  tensor_on_sphere.NewAthenaSurfaceTensor(nangles);
 
   auto &iindcs = interp_indcs;
   auto &iwghts = interp_wghts;
@@ -339,8 +336,22 @@ DualArray3D<Real> SphericalGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) 
     int &ii2 = iindcs.d_view(n,2);
     int &ii3 = iindcs.d_view(n,3);
 
+    // Tensor indices
+    int v1;
+    int v2;
+    if (v<=2) {
+      v1 = 0;
+      v2 = v;
+    } else if (v<=4) {
+      v1 = 1;
+      v2 = v-2;
+    } else {
+      v1 = 2;
+      v2 = 2;
+    }
+
     if (ii0==-1) {  // angle not on this rank
-      ivals.d_view(n,u,v) = 0.0;
+      ivals(u,v1,v2,n) = 0.0;
     } else {
       Real int_value = 0.0;
       for (int i=0; i<2*ng; i++) {
@@ -351,13 +362,9 @@ DualArray3D<Real> SphericalGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) 
           }
         }
       }
-      ivals.d_view(n,u,v) = int_value;
+      ivals(u,v1,v2,n) = int_value;
     }
   });
-
-  // sync dual arrays
-  tensor_on_sphere.template modify<DevExeSpace>();
-  tensor_on_sphere.template sync<HostMemSpace>();
 
   return tensor_on_sphere;
 }

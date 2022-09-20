@@ -40,9 +40,11 @@ class Strahlkorper: public SphericalGrid {
    void EvaluateSurfaceJacobian();
    void EvaluateSurfaceJacobianDerivative();
    Real Integrate(DualArray1D<Real> integrand);
+   Real Integrate(AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> integrand);
    DualArray1D<Real> ThetaDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> PhiDerivative(DualArray1D<Real> scalar_function);
    DualArray1D<Real> SpatialToSpectral(DualArray1D<Real> scalar_function);
+   DualArray1D<Real> SpatialToSpectral(AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> scalar_function);
    DualArray1D<Real> SpectralToSpatial(DualArray1D<Real> scalar_spectrum);
 
  private:

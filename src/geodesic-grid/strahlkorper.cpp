@@ -116,6 +116,15 @@ Real Strahlkorper::Integrate(DualArray1D<Real> integrand) {
   return value;
 }
 
+// Integrate tensors of rank 0
+Real Strahlkorper::Integrate(AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> integrand) {
+  Real value = 0.;
+  for (int n=0; n<nangles; ++n) {
+    value += integrand(n)*solid_angles.h_view(n);
+  }
+  return value;
+}
+
 // calculate spectral representation, maybe change into inline function later
 DualArray1D<Real> Strahlkorper::SpatialToSpectral(DualArray1D<Real> scalar_function) {
   DualArray1D<Real> spectral;
@@ -126,6 +135,21 @@ DualArray1D<Real> Strahlkorper::SpatialToSpectral(DualArray1D<Real> scalar_funct
   for (int i=0; i<nfilt; ++i) {
     for (int n=0; n<nangles; ++n) {
       integrand.h_view(n) = scalar_function.h_view(n)*basis_functions.h_view(0,i,n);
+    }
+    spectral.h_view(i) = Integrate(integrand);
+  }
+  return spectral;
+}
+
+DualArray1D<Real> Strahlkorper::SpatialToSpectral(AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> scalar_function) {
+  DualArray1D<Real> spectral;
+  DualArray1D<Real> integrand;
+  Kokkos::realloc(spectral,nfilt);
+  Kokkos::realloc(integrand,nangles);
+
+  for (int i=0; i<nfilt; ++i) {
+    for (int n=0; n<nangles; ++n) {
+      integrand.h_view(n) = scalar_function(n)*basis_functions.h_view(0,i,n);
     }
     spectral.h_view(i) = Integrate(integrand);
   }
