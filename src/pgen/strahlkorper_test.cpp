@@ -67,63 +67,56 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     u0(m,IDN,k,j,i) = 1.0 + 0.2*std::sin(5.0*M_PI*(x1v))*std::sin(3.0*M_PI*(x2v))*std::sin(3.0*M_PI*(x3v));
   });
 
-  int nlev = 10;
+  int nlev = 20;
   bool rotate_sphere = true;
   bool fluxes = true;
-
+  int nfilt = 16;
+  Real radius = 1;
   Strahlkorper *S = nullptr;
+  S = new Strahlkorper(pmbp, nlev, radius,nfilt);
+
   Real center[3] = {0.0};
-  S = new Strahlkorper(pmbp, nlev, .2);
   Real ctr[3] = {0,0,0};
   DualArray1D<Real> rad_tmp;
   int nangles = S->nangles;
   Kokkos::realloc(rad_tmp,nangles);
 
-  for (int n=0; n<nangles; ++n) {
-    Real &theta = S->polar_pos.h_view(n,0);
-    Real &phi = S->polar_pos.h_view(n,1);
-    rad_tmp.h_view(n) = .2 + 0.1*sin(theta);
+
+  DualArray1D<Real> sintheta;
+  Kokkos::realloc(sintheta,nangles);
+  DualArray1D<Real> sinthetap1;
+  Kokkos::realloc(sinthetap1,nangles);
+  DualArray1D<Real> costheta;
+  Kokkos::realloc(costheta,nangles);
+  for(int n=0; n<nangles; ++n) {
+    sintheta.h_view(n) = sin(S->polar_pos.h_view(n,0));
+    sinthetap1.h_view(n) = sin(S->polar_pos.h_view(n,0));
+    costheta.h_view(n) = cos(S->polar_pos.h_view(n,0));
   }
-  S->SetPointwiseRadius(rad_tmp,ctr);
 
-  // set to constant radius
-  S->InterpolateToSphere(1,u0);
-
-  
-  // evaluate and test spherical harmonics
-  S->EvaluateSphericalHarm();
-
-  // test integration on unit sphere
-  DualArray1D<Real> ones;
-  Kokkos::realloc(ones,nangles);
-
-  for (int n=0; n<nangles; ++n) {
-    ones.h_view(n) = 1;
+  DualArray1D<Real> sinthetap1_over_sintheta;
+  Kokkos::realloc(sinthetap1_over_sintheta,nangles);
+  for(int n=0; n<nangles; ++n) {
+    sinthetap1_over_sintheta.h_view(n) = sinthetap1.h_view(n)/sintheta.h_view(n);
   }
-  // test spectral representation
-  DualArray1D<Real> ones_spec;
-  Kokkos::realloc(ones_spec,4*nlev*nlev);
-  ones_spec = S->SpatialToSpectral(ones);
+  auto sinthetap1_dtheta = S->ThetaDerivative(sinthetap1_over_sintheta);
 
-  // test derivative
-  DualArray1D<Real> ones_dtheta;
-  DualArray1D<Real> ones_dphi;
-
-  Kokkos::realloc(ones_dtheta,nangles);
-  Kokkos::realloc(ones_dphi,nangles);
-
-  ones_dtheta = S->ThetaDerivative(ones);
-  // ones_dphi = S->PhiDerivative(ones);
-
-  // DualArray1D<> theta;
-  // Kokkos::realloc(theta,nangles);
-
-  Real area = S->Integrate(ones);
-  std::cout << "area is " << area/M_PI << std::endl;
+  for(int n=0; n<nangles; ++n) {
+    sinthetap1_dtheta.h_view(n) *= sintheta.h_view(n);
+    sinthetap1_dtheta.h_view(n) += costheta.h_view(n)/sintheta.h_view(n)*sinthetap1.h_view(n);
+  }
 
   std::cout << S->nangles << std::endl;
   
 
+  std::ofstream spherical_grid_output;
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build2/spherical_grid_output.txt", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output << S->polar_pos.h_view(i,0) << "\t" << S->polar_pos.h_view(i,1) << "\t" << sinthetap1_dtheta.h_view(i) << "\t" << costheta.h_view(i) << "\t" << S->basis_functions.h_view(0,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output.close();
+
+  /*
   int test_ind = 462;
 
   Real &x1min = size.d_view(0).x1min;
@@ -142,14 +135,14 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   std::cout << "interpolated value  " << interp_value << std::endl;
   std::cout << "analytical value  " << ana_value << std::endl;
   std::cout << "residual  " << fabs(interp_value-ana_value)/ana_value << std::endl;
-  /*
+  
   int ll = (int) sqrt(37);
   int mm = (int) (37-ll*ll-ll);
   std::pair<double,double> A = S->SWSphericalHarm(ll,mm,0,1.2,0.);
   std::cout << A.first << "\t" << A.second << std::endl;;
-  */
+  
   std::ofstream spherical_grid_output;
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_spherical_grid/build/spherical_grid_output.txt", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build2/spherical_grid_output.txt", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << S->interp_coord.h_view(i,0) << "\t" << S->interp_coord.h_view(i,1) << "\t" << S->interp_coord.h_view(i,2) << "\t"
     << "\t" << S->polar_pos.h_view(i,0) << "\t" << S->polar_pos.h_view(i,1) << "\t" << S->basis_functions.h_view(0,352,i) << "\t" << ones_dtheta.h_view(i) << "\n";// << ones_dphi.h_view(i) <<"\n";
@@ -157,7 +150,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   spherical_grid_output.close();
   
   std::ofstream spectral_rep;
-  spectral_rep.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_spherical_grid/build/spectral_rep.txt", std::ios_base::app);
+  spectral_rep.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build2/spectral_rep.txt", std::ios_base::app);
   for (int i=0;i<4*nlev*nlev;++i) {
     int l = (int) sqrt(i);
     int m = (int) (i-l*l-l);
@@ -165,14 +158,37 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
   spherical_grid_output.close();
   
-  /*
-  std::ofstream spectral_basis;
-  spectral_basis.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_spherical_grid/build/spectral_rep.txt", std::ios_base::app);
-  for (int i=0;i<4*nlev*nlev;++i) {
-
-    spectral_basis << S->.h_view(i) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  for (int n=0; n<nangles; ++n) {
+    Real &theta = S->polar_pos.h_view(n,0);
+    Real &phi = S->polar_pos.h_view(n,1);
+    rad_tmp.h_view(n) = .2 + 0.1*sin(theta);
   }
-  spherical_grid_output.close();
+  S->SetPointwiseRadius(rad_tmp,ctr);
+  
+  // set to constant radius
+  // S->InterpolateToSphere(1,u0);
+
+  // test integration on unit sphere
+  DualArray1D<Real> ones;
+  Kokkos::realloc(ones,nangles);
+
+  for (int n=0; n<nangles; ++n) {
+    ones.h_view(n) = 1;
+  }
+  // test spectral representation
+  DualArray1D<Real> ones_spec;
+  Kokkos::realloc(ones_spec,nfilt);
+  ones_spec = S->SpatialToSpectral(ones);
+  auto one_recovered = S->SpectralToSpatial(ones_spec);
+  // test derivative
+  DualArray1D<Real> ones_dtheta;
+  DualArray1D<Real> ones_dphi;
+
+  Kokkos::realloc(ones_dtheta,nangles);
+  Kokkos::realloc(ones_dphi,nangles);
+
+  ones_dtheta = S->ThetaDerivative(ones);
+  // ones_dphi = S->PhiDerivative(ones);
   */
   return;
 }

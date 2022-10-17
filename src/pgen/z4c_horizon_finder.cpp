@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <fstream>
 
 #include "parameter_input.hpp"
 #include "athena.hpp"
@@ -17,7 +18,7 @@
 #include "mesh/mesh.hpp"
 #include "z4c/z4c.hpp"
 #include "adm/adm.hpp"
-#include "geodesic-grid/strahlkorper.hpp"
+#include "geodesic-grid/gauss_legendre.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "utils/finite_diff.hpp"
 
@@ -101,7 +102,7 @@ template DualArray6D<Real> metric_partial<2>(MeshBlockPack *pmbp);
 template DualArray6D<Real> metric_partial<3>(MeshBlockPack *pmbp);
 template DualArray6D<Real> metric_partial<4>(MeshBlockPack *pmbp);
 
-AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPack *pmbp, Strahlkorper *S, DualArray6D<Real> dg_ddd) {
+AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPack *pmbp, GaussLegendreGrid *S, DualArray6D<Real> dg_ddd) {
   // Load adm variables
   auto &adm = pmbp->padm->adm;
   auto &g_dd = adm.g_dd;
@@ -116,13 +117,12 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
   // Interpolate g_dd, K_dd, and dg_ddd onto the surface
   // Still need to check the tensor interpolator!
 
-  std::cout << "Here 2" << std::endl;
-
   auto g_dd_surf =  S->InterpolateToSphere(g_dd);
   auto K_dd_surf =  S->InterpolateToSphere(K_dd);
-  auto dg_ddd_surf = S->InterpolateToSphere(dg_ddd); // change this into the new surface tensor notation
-  std::cout << "Here 3" << std::endl;
+  auto dg_ddd_surf = S->InterpolateToSphere(dg_ddd);
 
+  // all seems to be behaving correctly and improve upon higher resolution! (so far, still needs to find where the nan occurs!)
+  // a little bit loss of precision at the pole, needs to be careful!
 
   // Calculating g_uu on the sphere
   AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> g_uu_surf;
@@ -137,17 +137,48 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
             &g_uu_surf(0,0,n), &g_uu_surf(0,1,n), &g_uu_surf(0,2,n),
             &g_uu_surf(1,1,n), &g_uu_surf(1,2,n), &g_uu_surf(2,2,n));
   }
+  std::ofstream spherical_grid_output2;
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/cart_pos.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << S->cart_pos.h_view(i,0) << "\t" << S->cart_pos.h_view(i,1) << "\t" << S->cart_pos.h_view(i,2) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
+
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/polar_pos.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << S->polar_pos.h_view(i,0) << "\t" << S->polar_pos.h_view(i,1) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
+
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/metric_on_sphere.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << g_dd_surf(0,0,i) << "\t" << g_dd_surf(0,1,i) << "\t" << g_dd_surf(0,2,i) << "\t" << g_dd_surf(1,1,i) << "\t" << g_dd_surf(1,2,i)<< "\t" << g_dd_surf(2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
+
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/metric_uu_on_sphere.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << g_uu_surf(0,0,i) << "\t" << g_uu_surf(0,1,i) << "\t" << g_uu_surf(0,2,i) << "\t" << g_uu_surf(1,1,i) << "\t" << g_uu_surf(1,2,i)<< "\t" << g_uu_surf(2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
+
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/interp_indcs.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << S->interp_indcs.h_view(i,0) << "\t" << S->interp_indcs.h_view(i,1) << "\t" << S->interp_indcs.h_view(i,2) << "\t" << S->interp_indcs.h_view(i,3) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
 
   // Christoffel symbols of the second kind on the surface, saved as rank3 tensor
   AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> Gamma_udd_surf;
   Gamma_udd_surf.NewAthenaSurfaceTensor(nangles);
 
+  std::cout << "here" << std::endl;
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3; ++i)
-    for(int j=0; i<3; ++i)
-    for(int k=j; i<3; ++i) { // symmetric in j and k
+    for(int j=0; j<3; ++j)
+    for(int k=j; k<3; ++k) {
       Gamma_udd_surf(i,j,k,n) = 0;
-      for(int s=0; i<3; ++i) {
+      for(int s=0; s<3; ++s) {
         Gamma_udd_surf(i,j,k,n) += 0.5*g_uu_surf(i,s,n) * (dg_ddd_surf(j,k,s,n)
                                   +dg_ddd_surf(k,s,j,n)-dg_ddd_surf(s,j,k,n));
       }
@@ -165,9 +196,10 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
   Kokkos::realloc(place_holder_for_partial_theta,nangles);
   Kokkos::realloc(place_holder_for_partial_phi,nangles);
 
-  // still need to check on these derivatives on sphere!
-  place_holder_for_partial_theta = S->ThetaDerivative(S->pointwise_radius);
+  place_holder_for_partial_theta = S->ThetaDerivative(S->pointwise_radius); // these should vanish!
   place_holder_for_partial_phi = S->PhiDerivative(S->pointwise_radius);
+
+
   for(int n=0; n<nangles; ++n) {
     // radial derivatives
     dF_d_surf_sb(0,n) = 1;
@@ -211,7 +243,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
 
   // check the Surface Jacobian
   for(int n=0; n<nangles; ++n) {
-    for(int i=0; i<3;++i){
+    for(int i=0; i<3;++i) {
       dF_d_surf(i,n) = 0;
       for(int u=0; u<3;++u) {
         dF_d_surf(i,n) += surface_jacobian.h_view(n,u,i)*dF_d_surf_sb(u,n);
@@ -228,7 +260,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
         ddF_dd_surf(i,j,n) = 0;
         for(int v=0; v<3;++v) {
           ddF_dd_surf(i,j,n) += d_surface_jacobian.h_view(n,i,v,j)*dF_d_surf_sb(v,n);
-          ddF_dd_surf(i,j,n) += -Gamma_udd_surf(v,i,j,n)*dF_d_surf(v,n); 
+          ddF_dd_surf(i,j,n) += -Gamma_udd_surf(v,i,j,n)*dF_d_surf(v,n);
           for(int u=0; u<3;++u) {
             ddF_dd_surf(i,j,n) += surface_jacobian.h_view(n,v,j)*surface_jacobian.h_view(n,u,i)
                                                   *ddF_dd_surf_sb(u,v,n);
@@ -238,9 +270,13 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     }
   }
 
+  // Test that ddF_dd_surf agrees with analytic; maybe first look at the Christoffel symbols?
+
+
+
   // These are all the infrastructure needed for evaluating the null expansion!
 
-  // auxiliary variable delta_F_abs, Gundlach 1997 eqn 8 
+  // auxiliary variable delta_F_abs, Gundlach 1997 eqn 8
   AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> delta_F_abs;
   delta_F_abs.NewAthenaSurfaceTensor(nangles);
 
@@ -256,7 +292,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     }
     delta_F_abs(n) = sqrt(delta_F_sqr);
   }
-
+  
   // contravariant form of delta_F
 
   AthenaSurfaceTensor<Real,TensorSymm::NONE,3,1> dF_u_surf;
@@ -271,12 +307,10 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     }
   }
 
-
   // Surface inverse metric (in cartesian coordinate), Gundlach 1997 eqn 9
   AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> m_uu_surf;
   m_uu_surf.NewAthenaSurfaceTensor(nangles);
-  // DualArray2D<Real> m_uu_surf;
-  // Kokkos::realloc(m_uu_surf,nangles,6);
+
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
@@ -296,7 +330,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
         H(n) += m_uu_surf(i,j,n)*(ddF_dd_surf(i,j,n)
-                        /delta_F_abs(n)-K_dd_surf(i,j,n));
+                        /delta_F_abs(n)-K_dd_surf(i,j,n));// *delta_F_abs(n); // last term added to give mean curvature flow
       }
     }
   }
@@ -305,7 +339,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
 }
 
 // Analytical surface null expansion for Schwarzschild in isotropic coordinate, testing only
-AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AnalyticSurfaceNullExpansion(Strahlkorper *S) {
+AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AnalyticSurfaceNullExpansion(GaussLegendreGrid *S) {
   int nangles = S->nangles;
   AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
   H.NewAthenaSurfaceTensor(nangles);
@@ -341,6 +375,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
             break;
   }
+
   std::cout<<"OnePuncture initialized; Starting Horizon Finder"<<std::endl;
 
   // load in adm variables
@@ -351,29 +386,72 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // Evaluate partial derivatives of the metric over the entire domain
   // 6 dimensional array, nmb, 3, 6, ncells3, ncells2, ncells1
   //DualArray6D<Real> *dg_ddd = nullptr;
-  auto dg_ddd = metric_partial<2>(pmbp);
+  DualArray6D<Real> dg_ddd;
+
+  switch (indcs.ng) {
+    case 2: dg_ddd = metric_partial<2>(pmbp);
+            break;
+    case 3: dg_ddd = metric_partial<3>(pmbp);
+            break;
+    case 4: dg_ddd = metric_partial<4>(pmbp);
+            break;
+  }
 
   // Initialize a surface with radius of 2 centered at the origin
 
-  int nlev = 20;
+  int nlev = 10;
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = 1;
-  Strahlkorper *S = nullptr;
-  S = new Strahlkorper(pmbp, nlev, radius,nfilt);
+  Real radius = .6;
+  GaussLegendreGrid *S = nullptr;
+  S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
+  
   // Surface Null Expansion, Gundlach 1997 eqn 9
-  // DualArray1D<Real> H = SurfaceNullExpansion(pmbp,S,dg_ddd);
-  std::cout << "Here" << std::endl;
-  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd);
-  std::cout << "Here 2" << std::endl;
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
 
   // Template this integration function over DualArray1D and Tensor of rank 0
   Real H_integrated = S->Integrate(H);
   std::cout << "Initial Norm of H: " << H_integrated << std::endl;
 
-  // H-flow loop, take A = B = 1, rho = 1
+
+
+  // dump initial radius
+  std::ofstream spherical_grid_output;
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/radius.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output << S->pointwise_radius.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output.close();
+
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/H.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output << H(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output.close();
+
+
+  DualArray1D<Real> rad_tmp;
+  Kokkos::realloc(rad_tmp,S->nangles);
+  for (int j=0; j<5;++j) {
+    for (int n=0; n<S->nangles; ++n) {
+      rad_tmp.h_view(n) = .3 + 0.1*j;
+  }
+  S->SetPointwiseRadius(rad_tmp,ctr);
+  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H2 = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
+  Real H_integrated2 = S->Integrate(H2)/4/M_PI/(.3 + 0.1*j)/(.3 + 0.1*j);
+  Real denominator = 2*(0.3+0.1*j)+1;
+  Real H_analytic = 8*(0.3+0.1*j)*(2*(0.3+0.1*j)-1)/(denominator*denominator*denominator);
+  std::cout << 0.3+0.1*j << "\t" << H_integrated2 << "\t" << H_analytic << std::endl;
+  }
+
+
+
+  // H-flow Jacobi loop, take A = 1; B = 0; rho = 1
+  Real A = 1;
+  Real B = 0;
+
   auto H_spectral = S->SpatialToSpectral(H);
   for (int itr=0; itr<0; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
@@ -384,8 +462,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
     for (int i=0; i<nfilt; ++i) {
       int l = (int) sqrt(i);
-      r_spectral_np1.h_view(i) =  r_spectral.h_view(i) - 1/(1+10*l*(l+1))*H_spectral.h_view(i);
-      std::cout << r_spectral_np1.h_view(i) << std::endl;
+      std::cout << r_spectral.h_view(i) << std::endl;
+      r_spectral_np1.h_view(i) =  r_spectral.h_view(i) - A/(1+B*l*(l+1))*H_spectral.h_view(i);
     }
 
     auto r_np1 = S->SpectralToSpatial(r_spectral_np1);
@@ -393,22 +471,20 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     // reset radius
     S->SetPointwiseRadius(r_np1,&ctr[3]);
 
-    // reevaluate H
-    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd);
-    H_integrated = S->Integrate(H);
+    
+    spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/radius.out", std::ios_base::app);
+    for (int i=0;i<S->nangles;++i) {
+      spherical_grid_output << S->pointwise_radius.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
+    }
+    spherical_grid_output.close();
 
+    // reevaluate H
+    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
+
+    H_integrated = S->Integrate(H);
+  
     std::cout << "Itr " << itr+1 << "   Norm of H: " << H_integrated << std::endl;
   }
-  
 
-
-  //for (int i=0;i<nfilt;++i) {
-  //  std::cout << "Surface Null Expansion: " << H_spectral.h_view(i) << std::endl;
-  //}
-  // DualArray1D<Real> H = AnalyticSurfaceNullExpansion(S);
-
-
-
-  // still need to write out the loop for fast flow.
   return;
 }

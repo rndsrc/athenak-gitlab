@@ -61,6 +61,7 @@ add_executable(
         geodesic-grid/geodesic_grid.cpp
         geodesic-grid/spherical_grid.cpp
         geodesic-grid/strahlkorper.cpp
+        geodesic-grid/gauss_legendre.cpp
 
         mhd/mhd.cpp
         mhd/mhd_corner_e.cpp
