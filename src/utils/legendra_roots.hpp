@@ -29,7 +29,7 @@ double Pn(int n, double x){
 }
 
 /*Lagrange terms*/
-double Li(int n, double x[n], int i, double X){
+double Li(int n, std::vector<double> x, int i, double X){
     int j;
     double prod=1;
     for(j=0;j<=n;j++){
@@ -41,7 +41,7 @@ double Li(int n, double x[n], int i, double X){
 }
 
 /*Function definition to perform integration by Simpson's 1/3rd Rule */
-double Ci(int i, int n, double x[n], double a, double b, int N){
+double Ci(int i, int n, std::vector<double> x, double a, double b, int N){
   double h,integral,X,sum=0;
   int j,k;
   h=(b-a)/N;
@@ -94,7 +94,7 @@ std::vector<std::vector<Real>> RootsAndWeights(int n) {
   //Array to store the roots and weights of Legendre polynomials
   std::vector<std::vector<Real>> roots_weights(2, std::vector<Real>(n));
   
-  double xi[n];
+  std::vector<double> xi;
 
   //window(Step-size) for bisection method
   double h=0.01;
@@ -109,7 +109,7 @@ std::vector<std::vector<Real>> RootsAndWeights(int n) {
     root=Bisection(n,Pn,x,x+h,1e-14,1000000); 
 
     if(root!=999){
-      xi[i] = root;
+      xi.push_back(root);
       roots_weights[0][i]=root;
       i++;
     }
@@ -121,37 +121,3 @@ std::vector<std::vector<Real>> RootsAndWeights(int n) {
   }
   return roots_weights;
 }
-
-/*
-int main(){
-    int i=0;
-    int n;      // order/terms 
-    printf("Enter the value of n(data-points):\n");
-    scanf("%d",&n);
-    //Array to store the roots of Legendre polynomials
-    double xi[n];
-    //window(Step-size) for bisection method
-    double h=0.01;
-    //dummy variable for bisection method
-    double x;
-    //dummy variable where the root is returned after bisection routine
-    double root;
-    printf("\n\nThe roots (xi's) are:\n_____________________________________________________\nAccuracy: 10^(-15)\n\n");
-    for(x=-1.0;x<=1.0;x=x+h){
-        //set the accuracy to approx. 10^-15 but there is also a limit on maxSteps. (Modify these acc. to your needs)
-        root=Bisection(n,Pn,x,x+h,0.0000000000000001,1000000); 
-        if(root!=999){
-            xi[i]=root;
-            printf("x[%d] = %17.16lf\n",i+1,root);
-            i++;
-        }
-    }
-    printf("_____________________________________________________\n");
-    printf("\n\nThe weights (ci's) are:\n_____________________________________________________\nAccuracy: 10^(-13)\n\n");
-    for(i=0;i<n;i++){
-        //(Modify the number of sub-intervals according to your needs)
-        printf("c[%d] = %17.16lf\n",i+1,Ci(i,n,xi,-1,1,1000000));
-    }
-    return 0;
-}
-*/

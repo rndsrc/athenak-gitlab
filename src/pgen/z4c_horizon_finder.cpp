@@ -139,38 +139,38 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
   }
 
   std::ofstream spherical_grid_output2;
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/cart_pos.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/cart_pos.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << S->cart_pos.h_view(i,0) << "\t" << S->cart_pos.h_view(i,1) << "\t" << S->cart_pos.h_view(i,2) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output2.close();
 
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/polar_pos.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/polar_pos.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << S->polar_pos.h_view(i,0) << "\t" << S->polar_pos.h_view(i,1) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output2.close();
 
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/metric_on_sphere.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/metric_on_sphere.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << g_dd_surf(0,0,i) << "\t" << g_dd_surf(0,1,i) << "\t" << g_dd_surf(0,2,i) << "\t" << g_dd_surf(1,1,i) << "\t" << g_dd_surf(1,2,i)<< "\t" << g_dd_surf(2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output2.close();
 
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/metric_uu_on_sphere.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/metric_uu_on_sphere.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << g_uu_surf(0,0,i) << "\t" << g_uu_surf(0,1,i) << "\t" << g_uu_surf(0,2,i) << "\t" << g_uu_surf(1,1,i) << "\t" << g_uu_surf(1,2,i)<< "\t" << g_uu_surf(2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output2.close();
 
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/interp_indcs.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/interp_indcs.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << S->interp_indcs.h_view(i,0) << "\t" << S->interp_indcs.h_view(i,1) << "\t" << S->interp_indcs.h_view(i,2) << "\t" << S->interp_indcs.h_view(i,3) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output2.close();
 
 
-  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/dg_on_sphere.out", std::ios_base::app);
+  spherical_grid_output2.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/dg_on_sphere.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output2 << dg_ddd_surf(0,0,0,i) << "\t" << dg_ddd_surf(0,0,1,i) << "\t" << dg_ddd_surf(0,0,2,i) << "\t" << dg_ddd_surf(0,1,1,i) << "\t" << dg_ddd_surf(0,1,2,i)<< "\t" << dg_ddd_surf(0,2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
   }
@@ -339,7 +339,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
         H(n) += m_uu_surf(i,j,n)*(ddF_dd_surf(i,j,n)
-                        /delta_F_abs(n)-K_dd_surf(i,j,n));// *delta_F_abs(n); // last term added to give mean curvature flow
+                        /delta_F_abs(n)-K_dd_surf(i,j,n))*delta_F_abs(n); // last term added to give mean curvature flow
       }
     }
   }
@@ -412,7 +412,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = .5;
+  Real radius = .6;
   GaussLegendreGrid *S = nullptr;
   S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
@@ -426,32 +426,12 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   std::ofstream spherical_grid_output;
 
-/*
-  DualArray1D<Real> rad_tmp;
-  Kokkos::realloc(rad_tmp,S->nangles);
-  for (int j=0; j<5;++j) {
-    for (int n=0; n<S->nangles; ++n) {
-      rad_tmp.h_view(n) = .3 + 0.1*j;
-    }
-    S->SetPointwiseRadius(rad_tmp,ctr);
-    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H2 = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
-    Real H_integrated2 = S->Integrate(H2)/4/M_PI/(.3 + 0.1*j)/(.3 + 0.1*j);
-    Real denominator = 2*(0.3+0.1*j)+1;
-    Real H_analytic = 8*(0.3+0.1*j)*(2*(0.3+0.1*j)-1)/(denominator*denominator*denominator);
-    std::cout << 0.3+0.1*j << "\t" << H_integrated2 << "\t" << H_analytic << std::endl;
-    spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/H.out", std::ios_base::app);
-    for (int i=0;i<S->nangles;++i) {
-      spherical_grid_output << H(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
-    }
-    spherical_grid_output.close();
-  }
-*/
   // H-flow Jacobi loop, take A = 1; B = 0; rho = 1
-  Real A = 1;
+  Real A = 0.1;
   Real B = 0;
 
   auto H_spectral = S->SpatialToSpectral(H);
-  for (int itr=0; itr<10; ++itr) {
+  for (int itr=0; itr<50; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
@@ -470,7 +450,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     S->SetPointwiseRadius(r_np1,&ctr[3]);
 
     
-    spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/radius.out", std::ios_base::app);
+    spherical_grid_output.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/radius.out", std::ios_base::app);
     for (int i=0;i<S->nangles;++i) {
       spherical_grid_output << S->pointwise_radius.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
     }
