@@ -137,6 +137,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
             &g_uu_surf(0,0,n), &g_uu_surf(0,1,n), &g_uu_surf(0,2,n),
             &g_uu_surf(1,1,n), &g_uu_surf(1,2,n), &g_uu_surf(2,2,n));
   }
+
   std::ofstream spherical_grid_output2;
   spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/cart_pos.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
@@ -168,6 +169,13 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
   }
   spherical_grid_output2.close();
 
+
+  spherical_grid_output2.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/dg_on_sphere.out", std::ios_base::app);
+  for (int i=0;i<S->nangles;++i) {
+    spherical_grid_output2 << dg_ddd_surf(0,0,0,i) << "\t" << dg_ddd_surf(0,0,1,i) << "\t" << dg_ddd_surf(0,0,2,i) << "\t" << dg_ddd_surf(0,1,1,i) << "\t" << dg_ddd_surf(0,1,2,i)<< "\t" << dg_ddd_surf(0,2,2,i) << "\n";// << ones_dphi.h_view(i) <<"\n";
+  }
+  spherical_grid_output2.close();
+
   // Christoffel symbols of the second kind on the surface, saved as rank3 tensor
   AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> Gamma_udd_surf;
   Gamma_udd_surf.NewAthenaSurfaceTensor(nangles);
@@ -184,6 +192,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
       }
     }
   }
+
 
   // *****************  Step 6 of Schnetter 2002  *******************
   // Evaluate Derivatives of F = r - h(theta,phi)
@@ -403,7 +412,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = .6;
+  Real radius = .5;
   GaussLegendreGrid *S = nullptr;
   S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
@@ -415,45 +424,34 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real H_integrated = S->Integrate(H);
   std::cout << "Initial Norm of H: " << H_integrated << std::endl;
 
-
-
-  // dump initial radius
   std::ofstream spherical_grid_output;
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/radius.out", std::ios_base::app);
-  for (int i=0;i<S->nangles;++i) {
-    spherical_grid_output << S->pointwise_radius.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
-  }
-  spherical_grid_output.close();
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/H.out", std::ios_base::app);
-  for (int i=0;i<S->nangles;++i) {
-    spherical_grid_output << H(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
-  }
-  spherical_grid_output.close();
-
-
+/*
   DualArray1D<Real> rad_tmp;
   Kokkos::realloc(rad_tmp,S->nangles);
   for (int j=0; j<5;++j) {
     for (int n=0; n<S->nangles; ++n) {
       rad_tmp.h_view(n) = .3 + 0.1*j;
+    }
+    S->SetPointwiseRadius(rad_tmp,ctr);
+    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H2 = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
+    Real H_integrated2 = S->Integrate(H2)/4/M_PI/(.3 + 0.1*j)/(.3 + 0.1*j);
+    Real denominator = 2*(0.3+0.1*j)+1;
+    Real H_analytic = 8*(0.3+0.1*j)*(2*(0.3+0.1*j)-1)/(denominator*denominator*denominator);
+    std::cout << 0.3+0.1*j << "\t" << H_integrated2 << "\t" << H_analytic << std::endl;
+    spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/build/H.out", std::ios_base::app);
+    for (int i=0;i<S->nangles;++i) {
+      spherical_grid_output << H(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
+    }
+    spherical_grid_output.close();
   }
-  S->SetPointwiseRadius(rad_tmp,ctr);
-  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H2 = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
-  Real H_integrated2 = S->Integrate(H2)/4/M_PI/(.3 + 0.1*j)/(.3 + 0.1*j);
-  Real denominator = 2*(0.3+0.1*j)+1;
-  Real H_analytic = 8*(0.3+0.1*j)*(2*(0.3+0.1*j)-1)/(denominator*denominator*denominator);
-  std::cout << 0.3+0.1*j << "\t" << H_integrated2 << "\t" << H_analytic << std::endl;
-  }
-
-
-
+*/
   // H-flow Jacobi loop, take A = 1; B = 0; rho = 1
   Real A = 1;
   Real B = 0;
 
   auto H_spectral = S->SpatialToSpectral(H);
-  for (int itr=0; itr<0; ++itr) {
+  for (int itr=0; itr<10; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
