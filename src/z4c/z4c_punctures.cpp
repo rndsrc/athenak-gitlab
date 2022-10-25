@@ -47,6 +47,7 @@ void Z4c::ADMOnePuncture(MeshBlockPack *pmbp, ParameterInput *pin) {
   par_for_outer("pgen one puncture",
   DevExeSpace(),scr_size,scr_level,0,nmb-1,ksg,keg,jsg,jeg,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {
+    std::cout << m << "\t" << k << "\t" << j << std::endl;
     Real &x1min = size.d_view(m).x1min;
     Real &x1max = size.d_view(m).x1max;
     int nx1 = indcs.nx1;
@@ -61,20 +62,22 @@ void Z4c::ADMOnePuncture(MeshBlockPack *pmbp, ParameterInput *pin) {
     int nx3 = indcs.nx3;
     Real x3v = CellCenterX(k-ks, nx3, x3min, x3max);
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 0> r;
-    r.NewAthenaScratchTensor(member, scr_level, nx1);
+    r.NewAthenaScratchTensor(member, scr_level, ncells1);
 
     par_for_inner(member, isg, ieg, [&](const int i) {
       Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
       r(i) = std::sqrt(std::pow(x3v,2) + std::pow(x2v,2) + std::pow(x1v,2));
     });
-
+    std::cout << "here Minkowski" << std::endl;
     // Minkowski spacetime
     for(int a = 0; a < 3; ++a)
     for(int b = a; b < 3; ++b) {
       par_for_inner(member, isg, ieg, [&](const int i) {
         adm.g_dd(m,a,b,k,j,i) = (a == b ? 1. : 0.);
+        std::cout << a << "\t" << b << "\t" << i << std::endl;
       });
     }
+    std::cout << "here?" <<std::endl;
     // admK_dd is automatically set to 0 when is initialized as Kokkos View
 
     // ADMOnePuncture

@@ -180,7 +180,6 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
   AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> Gamma_udd_surf;
   Gamma_udd_surf.NewAthenaSurfaceTensor(nangles);
 
-  std::cout << "here" << std::endl;
   for(int n=0; n<nangles; ++n) {
     for(int i=0; i<3; ++i)
     for(int j=0; j<3; ++j)
@@ -372,9 +371,12 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
               << "in input file" << std::endl;
     exit(EXIT_FAILURE);
   }
+  std::cout << "here" << std::endl;
 
   // One Puncture nitial data 
   pmbp->pz4c->ADMOnePuncture(pmbp, pin);
+  std::cout << "here2" << std::endl;
+
   pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
   switch (indcs.ng) {
     case 2: pmbp->pz4c->ADMToZ4c<2>(pmbp, pin);
@@ -384,6 +386,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
             break;
   }
+  std::cout << "here" << std::endl;
 
   std::cout<<"OnePuncture initialized; Starting Horizon Finder"<<std::endl;
 

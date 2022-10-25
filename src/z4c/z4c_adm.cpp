@@ -45,6 +45,7 @@ namespace z4c {
 // the Gamma's that can only be set in the interior of the MeshBlock.
 template <int NGHOST>
 void Z4c::ADMToZ4c(MeshBlockPack *pmbp, ParameterInput *pin) {
+  
   // capture variables for the kernel
   auto &indcs = pmbp->pmesh->mb_indcs;
   auto &size = pmbp->pmb->mb_size;
@@ -69,6 +70,7 @@ void Z4c::ADMToZ4c(MeshBlockPack *pmbp, ParameterInput *pin) {
   Kokkos::Profiling::pushRegion("Region1");
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1)*2     // 0 tensors
                   + ScrArray2D<Real>::shmem_size(6,ncells1);  // 2D tensor with symm
+  
   par_for_outer("initialize z4c fields",DevExeSpace(),scr_size,scr_level,0,nmb-1,ksg,keg,jsg,jeg,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j) {  
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 0> detg;
