@@ -338,7 +338,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> SurfaceNullExpansion(MeshBlockPac
     for(int i=0; i<3;++i) {
       for(int j=0; j<3;++j) {
         H(n) += m_uu_surf(i,j,n)*(ddF_dd_surf(i,j,n)
-                        /delta_F_abs(n)-K_dd_surf(i,j,n))*delta_F_abs(n); // last term added to give mean curvature flow
+                        /delta_F_abs(n)-K_dd_surf(i,j,n));// *delta_F_abs(n); // last term added to give mean curvature flow
       }
     }
   }
@@ -415,7 +415,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = .5;
+  Real radius = .50002;
   GaussLegendreGrid *S = nullptr;
   S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
@@ -430,11 +430,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   std::ofstream spherical_grid_output;
 
   // H-flow Jacobi loop, take A = 1; B = 0; rho = 1
-  Real A = 0.1;
-  Real B = 0;
+  Real A = 1;
+  Real B = 10;
 
   auto H_spectral = S->SpatialToSpectral(H);
-  for (int itr=0; itr<1; ++itr) {
+  for (int itr=0; itr<500; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
@@ -450,9 +450,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     auto r_np1 = S->SpectralToSpatial(r_spectral_np1);
 
     // reset radius
-    S->SetPointwiseRadius(r_np1,&ctr[3]);
+    S->SetPointwiseRadius(r_np1,ctr);
 
-    
     spherical_grid_output.open ("/home/hzhu/Desktop/research/gr/athenak_versions/athenak/build/radius.out", std::ios_base::app);
     for (int i=0;i<S->nangles;++i) {
       spherical_grid_output << S->pointwise_radius.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
