@@ -79,7 +79,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   con.H.InitWithShallowSlice(u_con, I_CON_H);
   con.M.InitWithShallowSlice(u_con, I_CON_M);
   con.Z.InitWithShallowSlice(u_con, I_CON_Z);
-  con.M_d.InitWithShallowSlice(u_con, I_CON_Mx, I_CON_Mz);
+  con.M_d.InitWithShallowSlice(u_con, I_CON_Mx, I_CON_Mz+1);
 
   // Matter commented out
   //mat.rho.InitWithShallowSlice(u_mat, I_MAT_rho);
@@ -87,24 +87,22 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   //mat.S_dd.InitWithShallowSlice(u_mat, I_MAT_Sxx, I_MAT_Szz);
 
   z4c.alpha.InitWithShallowSlice (u0, I_Z4c_alpha);
-  z4c.beta_u.InitWithShallowSlice(u0, I_Z4c_betax, I_Z4c_betaz);
+  z4c.beta_u.InitWithShallowSlice(u0, I_Z4c_betax, I_Z4c_betaz+1);
   z4c.chi.InitWithShallowSlice   (u0, I_Z4c_chi);
   z4c.Khat.InitWithShallowSlice  (u0, I_Z4c_Khat);
   z4c.Theta.InitWithShallowSlice (u0, I_Z4c_Theta);
-  z4c.Gam_u.InitWithShallowSlice (u0, I_Z4c_Gamx, I_Z4c_Gamz);
-  z4c.g_dd.InitWithShallowSlice  (u0, I_Z4c_gxx, I_Z4c_gzz);
-  z4c.A_dd.InitWithShallowSlice  (u0, I_Z4c_Axx, I_Z4c_Azz);
+  z4c.Gam_u.InitWithShallowSlice (u0, I_Z4c_Gamx, I_Z4c_Gamz+1);
+  z4c.g_dd.InitWithShallowSlice  (u0, I_Z4c_gxx, I_Z4c_gzz+1);
+  z4c.A_dd.InitWithShallowSlice  (u0, I_Z4c_Axx, I_Z4c_Azz+1);
   
   rhs.alpha.InitWithShallowSlice (u_rhs, I_Z4c_alpha);
-  rhs.beta_u.InitWithShallowSlice(u_rhs, I_Z4c_betax, I_Z4c_betaz);
+  rhs.beta_u.InitWithShallowSlice(u_rhs, I_Z4c_betax, I_Z4c_betaz+1);
   rhs.chi.InitWithShallowSlice   (u_rhs, I_Z4c_chi);
   rhs.Khat.InitWithShallowSlice  (u_rhs, I_Z4c_Khat);
   rhs.Theta.InitWithShallowSlice (u_rhs, I_Z4c_Theta);
-  rhs.Gam_u.InitWithShallowSlice (u_rhs, I_Z4c_Gamx, I_Z4c_Gamz);
-  rhs.g_dd.InitWithShallowSlice  (u_rhs, I_Z4c_gxx, I_Z4c_gzz);
-  rhs.A_dd.InitWithShallowSlice  (u_rhs, I_Z4c_Axx, I_Z4c_Azz);
-  
-  
+  rhs.Gam_u.InitWithShallowSlice (u_rhs, I_Z4c_Gamx, I_Z4c_Gamz+1);
+  rhs.g_dd.InitWithShallowSlice  (u_rhs, I_Z4c_gxx, I_Z4c_gzz+1);
+  rhs.A_dd.InitWithShallowSlice  (u_rhs, I_Z4c_Axx, I_Z4c_Azz+1);
   
   opt.chi_psi_power = pin->GetOrAddReal("z4c", "chi_psi_power", -4.0);
   opt.chi_div_floor = pin->GetOrAddReal("z4c", "chi_div_floor", -1000.0);

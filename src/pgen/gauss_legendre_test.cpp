@@ -80,14 +80,14 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
   // check grid
   std::ofstream spherical_grid_output;
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/polar_pos.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/polar_pos.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << S->polar_pos.h_view(i,0) << "\t" << S->polar_pos.h_view(i,1) << "\t" << S->int_weights.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output.close();
 
   // check Cartesain coords
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/cart_pos.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/cart_pos.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << S->cart_pos.h_view(i,0) << "\t" << S->cart_pos.h_view(i,1) << "\t" << S->cart_pos.h_view(i,2) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
@@ -118,19 +118,19 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   auto sinph_dtheta = S->ThetaDerivative(sinphi);
   auto sinph_dphi = S->PhiDerivative(sinphi);
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/one_deriv.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/one_deriv.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << one_dtheta.h_view(i) << "\t" << one_dphi.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output.close();
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/sinth_deriv.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/sinth_deriv.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << sinth_dtheta.h_view(i) << "\t" << sinth_dphi.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
   spherical_grid_output.close();
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/sinph_deriv.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/sinph_deriv.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << sinph_dtheta.h_view(i) << "\t" << sinph_dphi.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
@@ -148,7 +148,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
   S->SetPointwiseRadius(rad_tmp,ctr);
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/cart_pos_reseted.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/cart_pos_reseted.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << S->cart_pos.h_view(i,0) << "\t" << S->cart_pos.h_view(i,1) << "\t" << S->cart_pos.h_view(i,2) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }
@@ -169,7 +169,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
 
 
-  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test/interp_res.out", std::ios_base::app);
+  spherical_grid_output.open ("/Users/hawking/Desktop/research/gr/athenak_versions/athenak_z4c_horizon/gauss_legendre_test2/interp_res.out", std::ios_base::app);
   for (int i=0;i<S->nangles;++i) {
     spherical_grid_output << S->interp_vals.h_view(i,0) - analytic_value.h_view(i) <<  "\n";// << ones_dphi.h_view(i) <<"\n";
   }

@@ -371,11 +371,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
               << "in input file" << std::endl;
     exit(EXIT_FAILURE);
   }
-  std::cout << "here" << std::endl;
+  // std::cout << "here" << std::endl;
 
   // One Puncture nitial data 
   pmbp->pz4c->ADMOnePuncture(pmbp, pin);
-  std::cout << "here2" << std::endl;
+  // std::cout << "here2" << std::endl;
 
   pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
   switch (indcs.ng) {
@@ -386,7 +386,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
             break;
   }
-  std::cout << "here" << std::endl;
+  // std::cout << "here" << std::endl;
 
   std::cout<<"OnePuncture initialized; Starting Horizon Finder"<<std::endl;
 
@@ -415,7 +415,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = .6;
+  Real radius = .5;
   GaussLegendreGrid *S = nullptr;
   S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
   Real ctr[3] = {0.,0.,0.};
@@ -434,7 +434,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real B = 0;
 
   auto H_spectral = S->SpatialToSpectral(H);
-  for (int itr=0; itr<50; ++itr) {
+  for (int itr=0; itr<1; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
@@ -443,7 +443,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
     for (int i=0; i<nfilt; ++i) {
       int l = (int) sqrt(i);
-      std::cout << r_spectral.h_view(i) << std::endl;
+      // std::cout << r_spectral.h_view(i) << std::endl;
       r_spectral_np1.h_view(i) =  r_spectral.h_view(i) - A/(1+B*l*(l+1))*H_spectral.h_view(i);
     }
 
