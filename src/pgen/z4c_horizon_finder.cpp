@@ -492,7 +492,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nfilt = 16;
   bool rotate_sphere = true;
   bool fluxes = true;
-  Real radius = .52;
+  Real radius = .8;
   int maxit = 100;
   GaussLegendreGrid *S = nullptr;
   S = new GaussLegendreGrid(pmbp, nlev, radius,nfilt);
@@ -515,9 +515,10 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real A = alpha/(nfilt*(nfilt+1))+beta;
   Real B = beta/alpha;
 
-  auto H_spectral = S->SpatialToSpectral(H);
   for (int itr=0; itr<maxit; ++itr) {
     // auto pointwise_radius = S->pointwise_radius;
+    auto H_spectral = S->SpatialToSpectral(H);
+
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
     DualArray1D<Real> r_spectral_np1;
@@ -541,13 +542,18 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     spherical_grid_output.close();
 
     // reevaluate H
-    AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
+    H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
 
     H_integrated = S->Integrate(H);
   
-    std::cout << "Itr " << itr+1 << "   Norm of H: " << H_integrated << "\t" << "Radius: " << S->pointwise_radius.h_view(0) << std::endl;
-
+    std::cout << "Itr " << itr+1 << "   Norm of H: " << std::abs(H_integrated) << "\t" << "Radius: " << S->pointwise_radius.h_view(0) << "\t" 
+    << "H spectral 0th: "<< H_spectral.h_view(0) <<std::endl;
+    if (std::abs(H_integrated)<=1e-5) {
+      std::cout << "target residual achieved in " << itr+1 << " iterations; terminating horizon finder..." << std::endl;
+      break;
+    }
   }
+
   delete S;
   return;
 }
