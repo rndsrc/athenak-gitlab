@@ -808,6 +808,7 @@ TaskStatus TurbulenceDriver::InitializeModes(Driver *pdrive, int stage) {
   } else {
     s = m1/2./m0 + sqrt(m1*m1/4./m0/m0 + dedt/m0);
   }
+  if( m0 ==0.) s=0;
 
   par_for("force_norm", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -974,7 +975,7 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
 	auto ut = 1. + ux*ux + uy*uy + uz*uz;
 	ut = sqrt(ut);
 
-	auto Fv_avg = (t1*ux + t2 * uy + t3 * uz)/ut/t0;
+	auto Fv_avg = den*(t1*ux + t2 * uy + t3 * uz)/ut/t0;
 
         u0(m, IEN, k,j,i) -= Fv_avg;
       }
