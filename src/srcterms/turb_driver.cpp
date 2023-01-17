@@ -846,6 +846,7 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
   }
 
   DvceArray5D<Real> u0,u0_;
+  DvceArray5D<Real> w0;
   if (pmy_pack->phydro != nullptr) u0 = (pmy_pack->phydro->u0);
   if (pmy_pack->pmhd != nullptr) u0 = (pmy_pack->pmhd->u0);
   bool flag_twofl = false;
@@ -853,6 +854,12 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
     u0 = (pmy_pack->phydro->u0);
     u0_ = (pmy_pack->pmhd->u0);
     flag_twofl = true;
+  }
+
+  bool flag_relativistic = pmy_pack->pcoord->is_special_relativistic;
+  if(flag_relativistic){
+    if (pmy_pack->phydro != nullptr) w0 = (pmy_pack->phydro->w0);
+    if (pmy_pack->pmhd != nullptr) w0 = (pmy_pack->pmhd->w0);
   }
 
   auto force_ = force;
@@ -882,6 +889,22 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
         u0_(m,IM1,k,j,i) += den*v1*dt;
         u0_(m,IM2,k,j,i) += den*v2*dt;
         u0_(m,IM3,k,j,i) += den*v3*dt;
+      }
+
+      if(flag_relativistic){
+
+        // Compute Lorenz factor
+	
+	auto & ux = w0(m, IVX, k,j,i);
+	auto & uy = w0(m, IVY, k,j,i);
+	auto & uz = w0(m, IVZ, k,j,i);
+
+	auto ut = 1. + ux*ux + uy*uy + uz*uz;
+	ut = sqrt(ut);
+
+	auto Fv = (v1*ux + v2 * uy + v3 * uz)/ut;
+
+        u0(m, IEN, k,j,i) += Fv*den*dt;
       }
     }
   );
@@ -938,6 +961,22 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
         u0_(m,IM1,k,j,i) -= den*t1/t0;
         u0_(m,IM2,k,j,i) -= den*t2/t0;
         u0_(m,IM3,k,j,i) -= den*t3/t0;
+      }
+
+      if(flag_relativistic){
+
+        // Compute Lorenz factor
+	
+	auto & ux = w0(m, IVX, k,j,i);
+	auto & uy = w0(m, IVY, k,j,i);
+	auto & uz = w0(m, IVZ, k,j,i);
+
+	auto ut = 1. + ux*ux + uy*uy + uz*uz;
+	ut = sqrt(ut);
+
+	auto Fv_avg = (t1*ux + t2 * uy + t3 * uz)/ut/t0;
+
+        u0(m, IEN, k,j,i) -= Fv_avg;
       }
     }
   );
