@@ -26,6 +26,7 @@
 struct EOS_Data {
   Real gamma;        // ratio of specific heats for ideal gas
   Real iso_cs;       // isothermal sound speed
+  Real iso_cs_rel_lim;       // isothermal sound speed (relativistic limit)
   bool is_ideal;     // flag to denote ideal gas EOS
   bool use_e, use_t; // use internal energy density (e) or temperature (t) as primitive
   Real dfloor, pfloor, tfloor;  // density, pressure, and temperature floors
@@ -36,6 +37,15 @@ struct EOS_Data {
   KOKKOS_INLINE_FUNCTION
   Real IdealGasPressure(const Real eint) const {
     return ((gamma-1.0)*eint);
+  }
+
+  // RELATIVISTIC ISOTHERMAL GAS PRESSURE: converts primitive variable (either internal energy density e
+  // or temperature e/d) into pressure.
+  KOKKOS_INLINE_FUNCTION
+  Real IsothermalRelGasPressure(const Real d) const {
+    Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
+    Real eps = temperature/SQR(iso_cs_rel_lim);
+    return d*eps*iso_cs_rel_lim;
   }
 
   // NON-RELATIVISTIC IDEAL GAS HYDRO: inlined sound speed function
@@ -79,7 +89,7 @@ struct EOS_Data {
   KOKKOS_INLINE_FUNCTION
   void IdealSRHydroSoundSpeeds(const Real d, const Real p, const Real ux, const Real lor,
                                Real& l_p, Real& l_m) const {
-    Real cs2 = gamma*p / (d + gamma*p/(gamma - 1.0));  // (DZB 73)
+    Real cs2 = (is_ideal) ? gamma*p / (d + gamma*p/(gamma - 1.0)) : iso_cs*iso_cs;  // (DZB 73)
     Real v2 = 1.0 - 1.0/(lor*lor);
     auto const p1 = (ux/lor) * (1.0 - cs2);
     auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*(ux/lor))) / lor;
@@ -98,9 +108,9 @@ struct EOS_Data {
                             const Real b_sq, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
     Real w = d + gamma*p/(gamma - 1.0);
-    Real cs_sq = gamma*p/w;                            // (DZB 73)
-    Real va_sq = b_sq / (b_sq + w);                    // (DZB 73)
-    Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;       // (DZB 72)
+    Real cs_sq = (is_ideal) ? gamma*p/w : iso_cs*iso_cs; // (DZB 73)
+    Real va_sq = b_sq / (b_sq + w);                      // (DZB 73)
+    Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;         // (DZB 72)
 
     Real v2 = 1.0 - 1.0/(lor*lor);
     auto const p1 = (ux/lor) * (1.0 - cms_sq);
@@ -130,7 +140,7 @@ struct EOS_Data {
     const Real discriminant_tol = -1.0e-10;  // values between this and 0 are considered 0
 
     // Calculate comoving sound speed
-    Real cs_sq = gamma * p / (d + gamma*p/(gamma - 1.0));
+    Real cs_sq = (is_ideal) ? gamma * p / (d + gamma*p/(gamma - 1.0)) : iso_cs*iso_cs;
 
     // Set sound speeds in appropriate coordinates
     Real a = SQR(u0) - (g00 + SQR(u0)) * cs_sq;
@@ -173,7 +183,7 @@ struct EOS_Data {
                             const Real g11, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
     Real w = d + gamma*p/(gamma - 1.0);
-    Real cs_sq = gamma * p / w;
+    Real cs_sq = (is_ideal) ? gamma * p / w : iso_cs*iso_cs;
     Real va_sq = b_sq / (b_sq + w);
     Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;
 
@@ -305,6 +315,46 @@ class IdealGRHydro : public EquationOfState {
 };
 
 //----------------------------------------------------------------------------------------
+//! \class IsothermalSRHydro
+//! \brief Derived class for ideal gas EOS in special relativistic Hydro
+
+class IsothermalSRHydro : public EquationOfState {
+ public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  IsothermalSRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
+                  const bool only_testfloors,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+};
+
+//----------------------------------------------------------------------------------------
+//! \class IsothermalGRHydro
+//! \brief Derived class for ideal gas EOS in general relativistic Hydro
+
+class IsothermalGRHydro : public EquationOfState {
+ public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  IsothermalGRHydro(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
+                  const bool only_testfloors,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Real> &cons,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+};
+
+//----------------------------------------------------------------------------------------
 //! \class IsothermalMHD
 //! \brief Derived class for isothermal EOS in nonrelativistic MHD
 
@@ -378,6 +428,48 @@ class IdealGRMHD : public EquationOfState {
   using EquationOfState::PrimToCons;
 
   IdealGRMHD(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
+                  DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
+                  const bool only_testfloors,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc,
+                  DvceArray5D<Real> &cons, const int il, const int iu,
+                  const int jl, const int ju, const int kl, const int ku) override;
+};
+
+//----------------------------------------------------------------------------------------
+//! \class IsothermalSRMHD
+//! \brief Derived class for isothermal EOS in special relativistic MHD
+
+class IsothermalSRMHD : public EquationOfState {
+ public:
+  // Following suppress warnings that hydro versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  IsothermalSRMHD(MeshBlockPack *pp, ParameterInput *pin);
+  void ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
+                  DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
+                  const bool only_testfloors,
+                  const int il, const int iu, const int jl, const int ju,
+                  const int kl, const int ku) override;
+  void PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5D<Real> &bcc,
+                  DvceArray5D<Real> &cons, const int il, const int iu,
+                  const int jl, const int ju, const int kl, const int ku) override;
+};
+
+//----------------------------------------------------------------------------------------
+//! \class IsothermalGRMHD
+//! \brief Derived class for ideal gas EOS in general relativistic MHD
+
+class IsothermalGRMHD : public EquationOfState {
+ public:
+  // Following suppress warnings that MHD versions are not over-ridden
+  using EquationOfState::ConsToPrim;
+  using EquationOfState::PrimToCons;
+
+  IsothermalGRMHD(MeshBlockPack *pp, ParameterInput *pin);
   void ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Real> &b,
                   DvceArray5D<Real> &prim, DvceArray5D<Real> &bcc,
                   const bool only_testfloors,

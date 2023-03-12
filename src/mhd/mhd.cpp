@@ -64,11 +64,10 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
 
   // isothermal EOS
   } else if (eqn_of_state.compare("isothermal") == 0) {
-    if (pmy_pack->pcoord->is_special_relativistic ||
-        pmy_pack->pcoord->is_general_relativistic) {
-      std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-                << "<mhd> eos = isothermal cannot be used with SR/GR" << std::endl;
-      std::exit(EXIT_FAILURE);
+    if (pmy_pack->pcoord->is_special_relativistic) {
+      peos = new IsothermalSRMHD(ppack, pin);
+    } else if (pmy_pack->pcoord->is_general_relativistic) {
+      peos = new IsothermalGRMHD(ppack, pin);
     } else {
       peos = new IsothermalMHD(ppack, pin);
       nmhd = 4;

@@ -97,14 +97,21 @@ TaskStatus MHD::NewTimeStep(Driver *pdriver, int stage) {
 
         Real v2 = SQR(ux) + SQR(uy) + SQR(uz);
         Real lor = sqrt(1.0 + v2);
-        // FIXME ERM: Ideal fluid for now
-        Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
+	Real p;
+        if(eos.is_ideal){
+          p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
+	}else{
+          p = eos.IsothermalRelGasPressure(w0_(m,IDN,k,j,i));
+	}
         // Calculate 4-magnetic field in left state
         Real b_0 = bcc1*ux + bcc2*uy + bcc3*uz;
         Real b_1 = (bcc1 + b_0 * ux) / lor;
         Real b_2 = (bcc2 + b_0 * uy) / lor;
         Real b_3 = (bcc3 + b_0 * uz) / lor;
         Real b_sq = -SQR(b_0) + SQR(b_1) + SQR(b_2) + SQR(b_3);
+
+	// Note: The ideal sound speed routines handle isothermal EOSs
+	// internally.
 
         Real lm, lp;
         eos.IdealSRMHDFastSpeeds(wd, p, ux, lor, b_sq, lp, lm);
