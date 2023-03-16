@@ -119,16 +119,18 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
     pl = eos.IdealGasPressure(wl.e);
     pr = eos.IdealGasPressure(wr.e);
 
-    wgas_l = wl_idn + gamma_prime * pl;  // total enthalpy in L-state
-    wgas_r = wr_idn + gamma_prime * pr;  // total enthalpy in R-state
+    const Real gamma_prime = eos.gamma/(eos.gamma - 1.0);
+
+    wgas_l = wl.d + gamma_prime * pl;  // total enthalpy in L-state
+    wgas_r = wr.d + gamma_prime * pr;  // total enthalpy in R-state
   }else{
     Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
     Real eps = temperature/SQR(eos.iso_cs_rel_lim);
-    pl = wl_idn*temperature;
-    pr = wr_idn*temperature;
+    pl = wl.d*temperature;
+    pr = wr.d*temperature;
 
-    wgas_l = wl_idn*(1.+ eps) + pl;
-    wgas_r = wr_idn*(1.+ eps) + pr;
+    wgas_l = wl.d*(1.+ eps) + pl;
+    wgas_r = wr.d*(1.+ eps) + pr;
   }
 
   // Calculate left wavespeeds

@@ -64,16 +64,16 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
       wl_ipr = eos.IdealGasPressure(wl(IEN,i));
       wr_ipr = eos.IdealGasPressure(wr(IEN,i));
 
-      wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
-      wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+      wgas_l = rho_l + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = rho_r + gamma_prime * wr_ipr;  // total enthalpy in R-state
     }else{
       Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
       Real eps = temperature/SQR(eos.iso_cs_rel_lim);
-      wl_ipr = wl_idn*temperature;
-      wr_ipr = wr_idn*temperature;
+      wl_ipr = rho_l*temperature;
+      wr_ipr = rho_r*temperature;
 
-      wgas_l = wl_idn*(1.+ eps) + wl_ipr;
-      wgas_r = wr_idn*(1.+ eps) + wr_ipr;
+      wgas_l = rho_l*(1.+ eps) + wl_ipr;
+      wgas_r = rho_r*(1.+ eps) + wr_ipr;
     }
 
     // Extract normal magnetic field

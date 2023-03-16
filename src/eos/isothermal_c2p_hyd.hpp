@@ -119,7 +119,7 @@ void SingleP2C_IsothermalGRHyd(const Real glower[][4], const Real gupper[][4],
   Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
   Real eps = temperature/SQR(iso_cs_rel_lim);
 
-  Real wgas_u0 = (1. + eps* (1. + SQR(iso_cs_rel_lim)) * w.d* u0;
+  Real wgas_u0 = (1. + eps* (1. + SQR(iso_cs_rel_lim))) * w.d* u0;
 
   // set conserved quantities
   u.d  = w.d * u0;

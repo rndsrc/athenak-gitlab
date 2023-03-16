@@ -155,7 +155,7 @@ void IsothermalSRMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Re
         w_in.bz = u.bz;
 
         HydCons1D u_out;
-        SingleP2C_IsothermalSRMHD(w_in, eos.iso_cs2, eos.iso_cs2_rel_lim, u_out);
+        SingleP2C_IsothermalSRMHD(w_in, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
         cons(m,IDN,k,j,i) = u_out.d;
         cons(m,IM1,k,j,i) = u_out.mx;
         cons(m,IM2,k,j,i) = u_out.my;
@@ -217,7 +217,7 @@ void IsothermalSRMHD::PrimToCons(const DvceArray5D<Real> &prim, const DvceArray5
 
     // call p2c function
     HydCons1D u;
-    SingleP2C_IsothermalSRMHD(w, gamma, iso_cs, iso_cs_rel_lim, u);
+    SingleP2C_IsothermalSRMHD(w, iso_cs, iso_cs_rel_lim, u);
 
     // store conserved state in 3D array
     cons(m,IDN,k,j,i) = u.d;

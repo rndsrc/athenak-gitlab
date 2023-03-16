@@ -11,7 +11,7 @@
 #include "athena.hpp"
 #include "mhd/mhd.hpp"
 #include "eos.hpp"
-#include "eos/ispthermal_c2p_mhd.hpp"
+#include "eos/isothermal_c2p_mhd.hpp"
 
 #include "coordinates/coordinates.hpp"
 #include "coordinates/cartesian_ks.hpp"

@@ -55,7 +55,6 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
       peos = new IsothermalHydro(ppack, pin);
     }
       nhydro = 4;
-    }
   // EOS string not recognized
   } else {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl

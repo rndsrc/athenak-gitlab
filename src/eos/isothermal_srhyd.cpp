@@ -126,7 +126,7 @@ void IsothermalSRHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &p
 
       // reset conserved variables if floor, ceiling, or failure encountered
       if (dfloor_used || vceiling_used || c2p_failure) {
-        SingleP2C_IsothermalSRHyd(w, eos.iso_cs2, eos.iso_cs2_rel_lim, u);
+        SingleP2C_IsothermalSRHyd(w, eos.iso_cs, eos.iso_cs_rel_lim, u);
         cons(m,IDN,k,j,i) = u.d;
         cons(m,IM1,k,j,i) = u.mx;
         cons(m,IM2,k,j,i) = u.my;
@@ -181,7 +181,7 @@ void IsothermalSRHydro::PrimToCons(const DvceArray5D<Real> &prim, DvceArray5D<Re
 
     // call p2c function
     HydCons1D u;
-    SingleP2C_IsothermalSRHyd(w, gamma, iso_cs, iso_cs_rel_lim, u);
+    SingleP2C_IsothermalSRHyd(w,iso_cs, iso_cs_rel_lim, u);
 
     // store conserved state in 3D array
     cons(m,IDN,k,j,i) = u.d;
