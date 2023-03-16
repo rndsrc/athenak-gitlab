@@ -60,8 +60,23 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     Real &wr_ibz=br(ibz,i);
 
     Real wl_ipr, wr_ipr;
-    wl_ipr = eos.IdealGasPressure(wl(IEN,i));
-    wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+    Real wgas_l, wgas_r;
+
+    if(eos.is_ideal){
+      wl_ipr = eos.IdealGasPressure(wl(IEN,i));
+      wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+
+      wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    }else{
+      Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+      Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+      wl_ipr = wl_idn*temperature;
+      wr_ipr = wr_idn*temperature;
+
+      wgas_l = wl_idn*(1.+ eps) + wl_ipr;
+      wgas_r = wr_idn*(1.+ eps) + wr_ipr;
+    }
 
     // reference to longitudinal field
     Real &bxi = bx(m,k,j,i);
@@ -206,17 +221,17 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Calculate difference du =  U_R - U_l in conserved quantities (rho u^0 and T^0_\mu)
     MHDCons1D du;
-    Real wtot_r = wr_idn + gamma_prime * wr_ipr + bsq_r;
+    Real wtot_r = wgas_r + bsq_r;
     Real ptot_r = wr_ipr + 0.5*bsq_r;
     Real qa = wtot_r * uur[0];
-    Real wtot_l = wl_idn + gamma_prime * wl_ipr + bsq_l;
+    Real wtot_l = wgas_l + bsq_l;
     Real ptot_l = wl_ipr + 0.5*bsq_l;
     Real qb = wtot_l * uul[0];
     du.d  = (wr_idn*uur[0]) - (wl_idn*uul[0]);
     du.mx = (qa*ulr[ivx] - bur[0]*blr[ivx]) - (qb*ull[ivx] - bul[0]*bll[ivx]);
     du.my = (qa*ulr[ivy] - bur[0]*blr[ivy]) - (qb*ull[ivy] - bul[0]*bll[ivy]);
     du.mz = (qa*ulr[ivz] - bur[0]*blr[ivz]) - (qb*ull[ivz] - bul[0]*bll[ivz]);
-    du.e  = (qa*ulr[0] - bur[0]*blr[0] + ptot_r) - (qb*ull[0] - bul[0]*bll[0] + ptot_l);
+    if(eos.is_ideal) du.e  = (qa*ulr[0] - bur[0]*blr[0] + ptot_r) - (qb*ull[0] - bul[0]*bll[0] + ptot_l);
     du.by = (bur[ivy]*uur[0] - bur[0]*uur[ivy]) - (bul[ivy]*uul[0] - bul[0]*uul[ivy]);
     du.bz = (bur[ivz]*uur[0] - bur[0]*uur[ivz]) - (bul[ivz]*uul[0] - bul[0]*uul[ivz]);
 
@@ -227,7 +242,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     fl.mx = qa * ull[ivx] - bul[ivx] * bll[ivx] + ptot_l;
     fl.my = qa * ull[ivy] - bul[ivx] * bll[ivy];
     fl.mz = qa * ull[ivz] - bul[ivx] * bll[ivz];
-    fl.e  = qa * ull[0]   - bul[ivx] * bll[0];
+    if(eos.is_ideal) fl.e  = qa * ull[0]   - bul[ivx] * bll[0];
     fl.by = bul[ivy] * uul[ivx] - bul[ivx] * uul[ivy];
     fl.bz = bul[ivz] * uul[ivx] - bul[ivx] * uul[ivz];
 
@@ -238,7 +253,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     fr.mx = qa * ulr[ivx] - bur[ivx] * blr[ivx] + ptot_r;
     fr.my = qa * ulr[ivy] - bur[ivx] * blr[ivy];
     fr.mz = qa * ulr[ivz] - bur[ivx] * blr[ivz];
-    fr.e  = qa * ulr[0]   - bur[ivx] * blr[0];
+    if(eos.is_ideal) fr.e  = qa * ulr[0]   - bur[ivx] * blr[0];
     fr.by = bur[ivy] * uur[ivx] - bur[ivx] * uur[ivy];
     fr.bz = bur[ivz] * uur[ivx] - bur[ivx] * uur[ivz];
 
@@ -250,7 +265,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     flux_hll.mx = (lambda_r*fl.mx - lambda_l*fr.mx + qa*du.mx) * qb;
     flux_hll.my = (lambda_r*fl.my - lambda_l*fr.my + qa*du.my) * qb;
     flux_hll.mz = (lambda_r*fl.mz - lambda_l*fr.mz + qa*du.mz) * qb;
-    flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
+    if(eos.is_ideal) flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
     flux_hll.by = (lambda_r*fl.by - lambda_l*fr.by + qa*du.by) * qb;
     flux_hll.bz = (lambda_r*fl.bz - lambda_l*fr.bz + qa*du.bz) * qb;
 
@@ -269,13 +284,15 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     flx(m,ivx,k,j,i) = flux_interface->mx;
     flx(m,ivy,k,j,i) = flux_interface->my;
     flx(m,ivz,k,j,i) = flux_interface->mz;
-    flx(m,IEN,k,j,i) = flux_interface->e;
+    if(eos.is_ideal){
+      flx(m,IEN,k,j,i) = flux_interface->e;
+      // We evolve tau = T^t_t + D
+      flx(m,IEN,k,j,i) += flx(m,IDN,k,j,i);
+    }
 
     ey(m,k,j,i) = -flux_interface->by;
     ez(m,k,j,i) =  flux_interface->bz;
 
-    // We evolve tau = T^t_t + D
-    flx(m,IEN,k,j,i) += flx(m,IDN,k,j,i);
   });
 
   return;

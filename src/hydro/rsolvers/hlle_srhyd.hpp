@@ -51,19 +51,29 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     Real &wr_ivy=wr(ivy,i);
     Real &wr_ivz=wr(ivz,i);
 
-    Real wl_ipr, wr_ipr;
-    wl_ipr = eos.IdealGasPressure(wl(IEN,i));
-    wr_ipr = eos.IdealGasPressure(wr(IEN,i));
-
     Real u2l = SQR(wl_ivz) + SQR(wl_ivy) + SQR(wl_ivx);
     Real u2r = SQR(wr_ivz) + SQR(wr_ivy) + SQR(wr_ivx);
-
     Real u0l  = sqrt(1.0 + u2l);  // Lorentz factor in L-state
     Real u0r  = sqrt(1.0 + u2r);  // Lorentz factor in R-state
 
-    // FIXME ERM: Ideal fluid for now
-    Real wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
-    Real wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    Real wl_ipr, wr_ipr;
+    Real wgas_l, wgas_r;
+
+    if(eos.is_ideal){
+      wl_ipr = eos.IdealGasPressure(wl(IEN,i));
+      wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+
+      wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    }else{
+      Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+      Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+      wl_ipr = wl_idn*temperature;
+      wr_ipr = wr_idn*temperature;
+
+      wgas_l = wl_idn*(1.+ eps) + wl_ipr;
+      wgas_r = wr_idn*(1.+ eps) + wr_ipr;
+    }
 
     // Calculate wavespeeds in left state (MB 23)
     Real lp_l, lm_l;
@@ -88,7 +98,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     du.mx = wr_ivx*qa  - wl_ivx*qb;
     du.my = wr_ivy*qa  - wl_ivy*qb;
     du.mz = wr_ivz*qa  - wl_ivz*qb;
-    du.e  = er - el;
+    if(eos.is_ideal) du.e  = er - el;
 
     // Calculate fluxes in L region (MB 2,3)
     HydCons1D fl, fr;
@@ -97,7 +107,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     fl.mx = qa * wl_ivx + wl_ipr;
     fl.my = qa * wl_ivy;
     fl.mz = qa * wl_ivz;
-    fl.e  = qa * u0l;
+    if(eos.is_ideal) fl.e  = qa * u0l;
 
     // Calculate fluxes in R region (MB 2,3)
     qa = wgas_r * wr_ivx;
@@ -105,7 +115,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     fr.mx = qa * wr_ivx + wr_ipr;
     fr.my = qa * wr_ivy;
     fr.mz = qa * wr_ivz;
-    fr.e  = qa * u0r;
+    if(eos.is_ideal) fr.e  = qa * u0r;
 
     // Calculate fluxes in HLL region (MB 11)
     HydCons1D flux_hll;
@@ -115,7 +125,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     flux_hll.mx = (lambda_r*fl.mx - lambda_l*fr.mx + qa*du.mx) * qb;
     flux_hll.my = (lambda_r*fl.my - lambda_l*fr.my + qa*du.my) * qb;
     flux_hll.mz = (lambda_r*fl.mz - lambda_l*fr.mz + qa*du.mz) * qb;
-    flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
+    if(eos.is_ideal) flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
 
     // Determine region of wavefan
     HydCons1D *flux_interface;
@@ -132,10 +142,11 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     flx(m,ivx,k,j,i) = flux_interface->mx;
     flx(m,ivy,k,j,i) = flux_interface->my;
     flx(m,ivz,k,j,i) = flux_interface->mz;
-    flx(m,IEN,k,j,i) = flux_interface->e;
-
-    // We evolve tau = E - D
-    flx(m,IEN,k,j,i) -= flx(m,IDN,k,j,i);
+    if(eos.is_ideal){
+      flx(m,IEN,k,j,i) = flux_interface->e;
+      // We evolve tau = E - D
+      flx(m,IEN,k,j,i) -= flx(m,IDN,k,j,i);
+    }
   });
 
   return;

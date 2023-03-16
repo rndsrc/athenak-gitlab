@@ -41,6 +41,10 @@ add_executable(
         eos/ideal_grhyd.cpp
         eos/ideal_srmhd.cpp
         eos/ideal_grmhd.cpp
+        eos/isothermal_srhyd.cpp
+        eos/isothermal_grhyd.cpp
+        eos/isothermal_srmhd.cpp
+        eos/isothermal_grmhd.cpp
 
         geodesic-grid/geodesic_grid.cpp
         geodesic-grid/spherical_grid.cpp

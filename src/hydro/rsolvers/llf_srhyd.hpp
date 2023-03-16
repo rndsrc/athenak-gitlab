@@ -37,8 +37,10 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos,
     wri.vy = wr(ivy,i);
     wri.vz = wr(ivz,i);
 
-    wli.e = wl(IEN,i);
-    wri.e = wr(IEN,i);
+    if (eos.is_ideal) {
+      wli.e = wl(IEN,i);
+      wri.e = wr(IEN,i);
+    }
 
     // Call LLF solver on single interface state
     HydCons1D flux;
@@ -49,7 +51,9 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos,
     flx(m,ivx,k,j,i) = flux.mx;
     flx(m,ivy,k,j,i) = flux.my;
     flx(m,ivz,k,j,i) = flux.mz;
-    flx(m,IEN,k,j,i) = flux.e;
+    if(eos.is_ideal){
+      flx(m,IEN,k,j,i) = flux.e;
+    }
   });
 
   return;

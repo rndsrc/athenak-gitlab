@@ -15,24 +15,6 @@ enum BoundaryFace {undef=-1, inner_x1, outer_x1, inner_x2, outer_x2, inner_x3, o
 // identifiers for boundary conditions
 enum class BoundaryFlag {undef=-1,block, reflect, inflow, outflow, diode, user, periodic};
 
-// identifiers for status of MPI boundary communications
-enum class BoundaryCommStatus {undef=-1, waiting, sent, received};
-
-//----------------------------------------------------------------------------------------
-//! \fn int CreateMPITag(int lid, int bufid)
-//  \brief calculate an MPI tag for boundary buffer communications
-//  MPI tag = lid (remaining bits) + bufid (6 bits)
-//  Note the convention in Athena++ is lid and bufid are both for the *receiving* process
-//
-// WARNING (KGF): Generating unsigned integer bitfields from signed integer types and
-// converting output to signed integer tags (required by MPI) may lead to unsafe
-// conversions (and overflows from built-in types and MPI_TAG_UB).  Note, the MPI standard
-// requires signed int tag, with MPI_TAG_UB>= 2^15-1 = 32,767 (inclusive)
-
-static int CreateMPITag(int lid, int bufid) {
-  return (lid<<6) | bufid;
-}
-
 #include <algorithm>
 #include <vector>
 
@@ -40,6 +22,16 @@ static int CreateMPITag(int lid, int bufid) {
 #include "mesh/mesh.hpp"
 #include "coordinates/coordinates.hpp"
 #include "tasklist/task_list.hpp"
+
+//----------------------------------------------------------------------------------------
+//! \fn int CreateBvals_MPI_Tag(int lid, int bufid)
+//! \brief calculate an MPI tag for boundary buffer communications.  Note maximum size of
+//! lid that can be encoded is set by (NUM_BITS_LID) macro.
+//! The convention in Athena++ is lid and bufid are both for the *receiving* process.
+//! The MPI standard requires signed int tag, with MPI_TAG_UB>=2^15-1 = 32,767 (inclusive)
+static int CreateBvals_MPI_Tag(int lid, int bufid) {
+  return (bufid << (NUM_BITS_LID)) | lid;
+}
 
 //----------------------------------------------------------------------------------------
 //! \struct BufferIndcs
@@ -69,13 +61,13 @@ struct BoundaryBuffer {
   // Maximum number of data elements (bie-bis+1) across 3 components of above
   int isame_ndat, icoar_ndat, ifine_ndat, iflxs_ndat, iflxc_ndat;
 
-  // 3D Views that store buffer data on device
+  // 2D Views that store buffer data on device, dimensioned (nmb, ndata)
   DvceArray2D<Real> vars, flux;
 
-  // following two 1D arrays only accessed from host, so can use STL vector
-  std::vector<BoundaryCommStatus> vars_stat, flux_stat;
 #if MPI_PARALLEL_ENABLED
-  std::vector<MPI_Request> vars_req, flux_req;
+  // Using STL vector causes problems with some GPU compilers, even those these vectors
+  // are only ever accessed on host, so just use plain C array
+  MPI_Request *vars_req, *flux_req;
 #endif
 
   // function to allocate memory for buffers for variables and their fluxes
@@ -98,6 +90,7 @@ class MeshBlockPack;
 class BoundaryValues {
  public:
   BoundaryValues(MeshBlockPack *ppack, ParameterInput *pin);
+  ~BoundaryValues();
 
   // data for all 56 buffers in most general 3D case. Not all elements used in most cases.
   // However each BoundaryBuffer is lightweight, so the convenience of fixed array
@@ -115,14 +108,14 @@ class BoundaryValues {
   //functions
   virtual void InitSendIndices(BoundaryBuffer &buf, int x, int y, int z, int a, int b)=0;
   virtual void InitRecvIndices(BoundaryBuffer &buf, int x, int y, int z, int a, int b)=0;
-  virtual TaskStatus InitFluxRecv(const int nvar)=0;
-  virtual TaskStatus ClearFluxRecv()=0;
-  virtual TaskStatus ClearFluxSend()=0;
-
   void InitializeBuffers(const int nvar);
+
   TaskStatus InitRecv(const int nvar);
+  virtual TaskStatus InitFluxRecv(const int nvar)=0;
   TaskStatus ClearRecv();
   TaskStatus ClearSend();
+  TaskStatus ClearFluxRecv();
+  TaskStatus ClearFluxSend();
 
   // BCs associated with various physics modules
   static void HydroBCs(MeshBlockPack *pp, DualArray2D<Real> uin, DvceArray5D<Real> u0);
@@ -145,8 +138,6 @@ class BoundaryValuesCC : public BoundaryValues {
   void InitSendIndices(BoundaryBuffer &buf, int o1, int o2,int o3,int f1,int f2) override;
   void InitRecvIndices(BoundaryBuffer &buf, int o1, int o2,int o3,int f1,int f2) override;
   TaskStatus InitFluxRecv(const int nvar) override;
-  TaskStatus ClearFluxRecv() override;
-  TaskStatus ClearFluxSend() override;
 
   TaskStatus PackAndSendCC(DvceArray5D<Real> &a, DvceArray5D<Real> &ca);
   TaskStatus RecvAndUnpackCC(DvceArray5D<Real> &a, DvceArray5D<Real> &ca);
@@ -168,8 +159,6 @@ class BoundaryValuesFC : public BoundaryValues {
   void InitSendIndices(BoundaryBuffer &buf, int o1, int o2,int o3,int f1,int f2) override;
   void InitRecvIndices(BoundaryBuffer &buf, int o1, int o2,int o3,int f1,int f2) override;
   TaskStatus InitFluxRecv(const int nvar) override;
-  TaskStatus ClearFluxRecv() override;
-  TaskStatus ClearFluxSend() override;
 
   TaskStatus PackAndSendFC(DvceFaceFld4D<Real> &b, DvceFaceFld4D<Real> &cb);
   TaskStatus RecvAndUnpackFC(DvceFaceFld4D<Real> &b, DvceFaceFld4D<Real> &cb);

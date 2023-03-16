@@ -91,16 +91,27 @@ void SingleStateLLF_SRHyd(const HydPrim1D &wl, const HydPrim1D &wr, const EOS_Da
 
   Real u0l  = sqrt(1.0 + SQR(wl.vz) + SQR(wl.vy) + SQR(wl.vx)); // Lorentz fact in L
   Real u0r  = sqrt(1.0 + SQR(wr.vz) + SQR(wr.vy) + SQR(wr.vx)); // Lorentz fact in R
-  // FIXME ERM: Ideal fluid for now
-  Real wgas_l = wl.d + eos.gamma * wl.e;  // total enthalpy in L-state
-  Real wgas_r = wr.d + eos.gamma * wr.e;  // total enthalpy in R-state
+								
+  Real pl, pr;
+  Real wgas_l, wgas_r;
+  if(eos.is_ideal){
+    wgas_l = wl.d + eos.gamma * wl.e;  // total enthalpy in L-state
+    wgas_r = wr.d + eos.gamma * wr.e;  // total enthalpy in R-state
+    pl = eos.IdealGasPressure(wl.e);
+    pr = eos.IdealGasPressure(wr.e);
+  }else{
+    Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+
+    wgas_l = wl.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in L-state
+    wgas_r = wr.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in R-state
+    pl = eos.IsothermalRelGasPressure(wl.d);
+    pr = eos.IsothermalRelGasPressure(wr.d);
+  }
 
   // Compute wave speeds in L,R states (see Toro eq. 10.43)
-  Real pl = eos.IdealGasPressure(wl.e);
   Real lp_l, lm_l;
   eos.IdealSRHydroSoundSpeeds(wl.d, pl, wl.vx, u0l, lp_l, lm_l);
 
-  Real pr = eos.IdealGasPressure(wr.e);
   Real lp_r, lm_r;
   eos.IdealSRHydroSoundSpeeds(wr.d, pr, wr.vx, u0r, lp_r, lm_r);
 
@@ -116,7 +127,7 @@ void SingleStateLLF_SRHyd(const HydPrim1D &wl, const HydPrim1D &wr, const EOS_Da
   fsum.mx = qa*wl.vx + qb*wr.vx + (pl + pr);
   fsum.my = qa*wl.vy + qb*wr.vy;
   fsum.mz = qa*wl.vz + qb*wr.vz;
-  fsum.e  = qa*u0l + qb*u0r;
+  if(eos.is_ideal) fsum.e  = qa*u0l + qb*u0r;
 
   // Compute difference dU = U_R - U_L multiplied by max wave speed
   HydCons1D du;
@@ -128,17 +139,17 @@ void SingleStateLLF_SRHyd(const HydPrim1D &wl, const HydPrim1D &wr, const EOS_Da
   du.mx = a*( qa*wr.vx -  qb*wl.vx);
   du.my = a*( qa*wr.vy -  qb*wl.vy);
   du.mz = a*( qa*wr.vz -  qb*wl.vz);
-  du.e  = a*(er - el);
+  if(eos.is_ideal) du.e  = a*(er - el);
 
   // Compute the LLF flux at the interface
   flux.d  = 0.5*(fsum.d  - du.d );
   flux.mx = 0.5*(fsum.mx - du.mx);
   flux.my = 0.5*(fsum.my - du.my);
   flux.mz = 0.5*(fsum.mz - du.mz);
-  flux.e  = 0.5*(fsum.e  - du.e );
+  if(eos.is_ideal) flux.e  = 0.5*(fsum.e  - du.e );
 
   // We evolve tau = E - D
-  flux.e -= flux.d;
+  if(eos.is_ideal) flux.e -= flux.d;
 
   return;
 }
@@ -169,8 +180,13 @@ void SingleStateLLF_GRHyd(const HydPrim1D wl, const HydPrim1D wr,
   const Real &wr_ivz=wr.vz;
 
   Real wl_ipr, wr_ipr;
-  wl_ipr = eos.IdealGasPressure(wl.e);
-  wr_ipr = eos.IdealGasPressure(wr.e);
+  if(eos.is_ideal){
+    wl_ipr = eos.IdealGasPressure(wl.e);
+    wr_ipr = eos.IdealGasPressure(wr.e);
+  }else{
+    wl_ipr = eos.IsothermalRelGasPressure(wl.d);
+    wr_ipr = eos.IsothermalRelGasPressure(wr.d);
+  }
 
   // Extract components of metric
   Real glower[4][4], gupper[4][4];
@@ -246,15 +262,23 @@ void SingleStateLLF_GRHyd(const HydPrim1D wl, const HydPrim1D wr,
 
   // Calculate difference du =  U_R - U_l in conserved quantities (rho u^0 and T^0_\mu)
   HydCons1D du;
-  Real wgas_l = wl_idn + gamma_prime * wl_ipr;
-  Real wgas_r = wr_idn + gamma_prime * wr_ipr;
+  Real wgas_l, wgas_r;
+  if(eos.is_ideal){
+    wgas_l = wl_idn + gamma_prime * wl_ipr;
+    wgas_r = wr_idn + gamma_prime * wr_ipr;
+  }else{
+    Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+    wgas_l = wl.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in L-state
+    wgas_r = wr.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in R-state
+  }
+
   Real qa = wgas_r * uur[0];
   Real qb = wgas_l * uul[0];
   du.d  = wr_idn * uur[0] - wl_idn * uul[0];
   du.mx = qa * ulr[ivx] - qb * ull[ivx];
   du.my = qa * ulr[ivy] - qb * ull[ivy];
   du.mz = qa * ulr[ivz] - qb * ull[ivz];
-  du.e  = qa * ulr[0] - qb * ull[0] + wr_ipr - wl_ipr;
+  if(eos.is_ideal) du.e  = qa * ulr[0] - qb * ull[0] + wr_ipr - wl_ipr;
 
   // Calculate fluxes in L region (rho u^i and T^i_\mu, where i = ivx)
   HydCons1D fl;
@@ -263,7 +287,7 @@ void SingleStateLLF_GRHyd(const HydPrim1D wl, const HydPrim1D wr,
   fl.mx = qa * ull[ivx] + wl_ipr;
   fl.my = qa * ull[ivy];
   fl.mz = qa * ull[ivz];
-  fl.e  = qa * ull[0];
+  if(eos.is_ideal) fl.e  = qa * ull[0];
 
   // Calculate fluxes in R region (rho u^i and T^i_\mu, where i = ivx)
   HydCons1D fr;
@@ -272,17 +296,17 @@ void SingleStateLLF_GRHyd(const HydPrim1D wl, const HydPrim1D wr,
   fr.mx = qa * ulr[ivx] + wr_ipr;
   fr.my = qa * ulr[ivy];
   fr.mz = qa * ulr[ivz];
-  fr.e  = qa * ulr[0];
+  if(eos.is_ideal) fr.e  = qa * ulr[0];
 
   // Compute the LLF flux at the interface
   flux.d  = 0.5 * (fl.d  + fr.d  - lambda * du.d);
   flux.mx = 0.5 * (fl.mx + fr.mx - lambda * du.mx);
   flux.my = 0.5 * (fl.my + fr.my - lambda * du.my);
   flux.mz = 0.5 * (fl.mz + fr.mz - lambda * du.mz);
-  flux.e  = 0.5 * (fl.e  + fr.e  - lambda * du.e);
+  if(eos.is_ideal) flux.e  = 0.5 * (fl.e  + fr.e  - lambda * du.e);
 
   // We evolve tau = T^t_t + D
-  flux.e  += flux.d;
+  if(eos.is_ideal) flux.e  += flux.d;
   return;
 }
 
