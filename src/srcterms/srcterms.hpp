@@ -56,6 +56,7 @@ class SourceTerms {
 
   // cooling rate used with relativistic cooling
   Real crate_rel;
+  Real cpower_rel;
 
   // beam source
   Real dii_dt;

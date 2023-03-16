@@ -83,6 +83,7 @@ void SourceTerms::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_d
     Real gamma = eos_data.gamma;
     Real gm1 = gamma - 1.0;
     Real cooling_rate = crate_rel;
+    Real cooling_power = cpower_rel;
 
     // find smallest (e/cooling_rate) in each cell
     Kokkos::parallel_reduce("srcterms_cooling_newdt",
@@ -117,7 +118,7 @@ void SourceTerms::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_d
 	// The following should be approximately correct
 
        // add a tiny number
-       Real cooling_heating = FLT_MIN + fabs(w0(m,IDN,k,j,i) * ut* pow((temp*cooling_rate), 1.));
+       Real cooling_heating = FLT_MIN + fabs(w0(m,IDN,k,j,i) * ut* pow((temp*cooling_rate), cooling_power));
 
        min_dt = fmin((eint/cooling_heating), min_dt);
     }, Kokkos::Min<Real>(dtnew));

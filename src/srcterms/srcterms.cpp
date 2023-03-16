@@ -74,6 +74,7 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
   if (rel_cooling) {
     source_terms_enabled = true;
     crate_rel = pin->GetReal(block,"crate_rel");
+    cpower_rel = pin->GetOrAddReal(block,"cpower_rel", 1.);
   }
 }
 
@@ -281,6 +282,7 @@ void SourceTerms::AddRelCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
   Real gamma = eos_data.gamma;
   Real gm1 = gamma - 1.0;
   Real cooling_rate = crate_rel;
+  Real cooling_power = cpower_rel;
 
   par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
   KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
@@ -299,10 +301,10 @@ void SourceTerms::AddRelCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
 	auto ut = 1. + ux*ux + uy*uy + uz*uz;
 	ut = sqrt(ut);
 
-    u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ut* pow((temp*cooling_rate), 1.);
-    u0(m,IM1,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ux* pow((temp*cooling_rate), 1.);
-    u0(m,IM2,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uy* pow((temp*cooling_rate), 1.);
-    u0(m,IM3,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uz* pow((temp*cooling_rate), 1.);
+    u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ut* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM1,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ux* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM2,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uy* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM3,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uz* pow((temp*cooling_rate), cooling_power);
                         
   });
   return;
