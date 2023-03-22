@@ -68,6 +68,14 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
     source_terms_enabled = true;
     dii_dt = pin->GetReal(block, "dii_dt");
   }
+
+  // (5) cooling (relativistic)
+  rel_cooling = pin->GetOrAddBoolean(block,"rel_cooling",false);
+  if (rel_cooling) {
+    source_terms_enabled = true;
+    crate_rel = pin->GetReal(block,"crate_rel");
+    cpower_rel = pin->GetOrAddReal(block,"cpower_rel", 1.);
+  }
 }
 
 //----------------------------------------------------------------------------------------
@@ -254,6 +262,50 @@ void SourceTerms::AddISMCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &
 
     u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) *
                         (w0(m,IDN,k,j,i) * lambda_cooling - gamma_heating);
+  });
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void SourceTerms::AddRelCooling()
+//! \brief Add explict relativistic cooling in the energy and momentum equations.
+// NOTE source terms must all be computed using primitive (w0) and NOT conserved (u0) vars
+
+void SourceTerms::AddRelCooling(DvceArray5D<Real> &u0, const DvceArray5D<Real> &w0,
+                                const EOS_Data &eos_data, const Real bdt) {
+  auto &indcs = pmy_pack->pmesh->mb_indcs;
+  int is = indcs.is, ie = indcs.ie;
+  int js = indcs.js, je = indcs.je;
+  int ks = indcs.ks, ke = indcs.ke;
+  int nmb1 = pmy_pack->nmb_thispack - 1;
+  Real use_e = eos_data.use_e;
+  Real gamma = eos_data.gamma;
+  Real gm1 = gamma - 1.0;
+  Real cooling_rate = crate_rel;
+  Real cooling_power = cpower_rel;
+
+  par_for("cooling", DevExeSpace(), 0, nmb1, ks, ke, js, je, is, ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+    // temperature in cgs unit
+    Real temp = 1.0;
+    if (use_e) {
+      temp = w0(m,IEN,k,j,i)/w0(m,IDN,k,j,i)*gm1;
+    } else {
+      temp = w0(m,ITM,k,j,i);
+    }
+
+	auto & ux = w0(m, IVX, k,j,i);
+	auto & uy = w0(m, IVY, k,j,i);
+	auto & uz = w0(m, IVZ, k,j,i);
+
+	auto ut = 1. + ux*ux + uy*uy + uz*uz;
+	ut = sqrt(ut);
+
+    u0(m,IEN,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ut* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM1,k,j,i) -= bdt * w0(m,IDN,k,j,i) * ux* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM2,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uy* pow((temp*cooling_rate), cooling_power);
+    u0(m,IM3,k,j,i) -= bdt * w0(m,IDN,k,j,i) * uz* pow((temp*cooling_rate), cooling_power);
+                        
   });
   return;
 }

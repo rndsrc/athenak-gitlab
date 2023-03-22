@@ -1,5 +1,5 @@
-#ifndef EOS_IDEAL_C2P_HYD_HPP_
-#define EOS_IDEAL_C2P_HYD_HPP_
+#ifndef EOS_ISO_C2P_HYD_HPP_
+#define EOS_ISO_C2P_HYD_HPP_
 //========================================================================================
 // AthenaXXX astrophysical plasma code
 // Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team

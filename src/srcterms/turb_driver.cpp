@@ -20,6 +20,11 @@
 #include "driver/driver.hpp"
 #include "utils/random.hpp"
 #include "turb_driver.hpp"
+#include "eos/eos.hpp"
+#include "eos/ideal_c2p_hyd.hpp"
+#include "eos/ideal_c2p_mhd.hpp"
+#include "eos/isothermal_c2p_hyd.hpp"
+#include "eos/isothermal_c2p_mhd.hpp"
 
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures and parameters
@@ -808,6 +813,7 @@ TaskStatus TurbulenceDriver::InitializeModes(Driver *pdrive, int stage) {
   } else {
     s = m1/2./m0 + sqrt(m1*m1/4./m0/m0 + dedt/m0);
   }
+  if( m0 ==0.) s=0;
 
   par_for("force_norm", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
@@ -845,14 +851,29 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
     gcorr = std::sqrt(1.0-fcorr*fcorr);
   }
 
+  EquationOfState *peos;
+
   DvceArray5D<Real> u0,u0_;
+  DvceArray5D<Real> w0;
+  DvceFaceFld4D<Real>* bcc0;
+
+
   if (pmy_pack->phydro != nullptr) u0 = (pmy_pack->phydro->u0);
+  if (pmy_pack->phydro != nullptr) peos = (pmy_pack->phydro->peos);
   if (pmy_pack->pmhd != nullptr) u0 = (pmy_pack->pmhd->u0);
+  if (pmy_pack->pmhd != nullptr) bcc0 = &(pmy_pack->pmhd->b0);
+  if (pmy_pack->pmhd != nullptr) peos = pmy_pack->pmhd->peos;
   bool flag_twofl = false;
   if (pmy_pack->pionn != nullptr) {
     u0 = (pmy_pack->phydro->u0);
     u0_ = (pmy_pack->pmhd->u0);
     flag_twofl = true;
+  }
+
+  bool flag_relativistic = pmy_pack->pcoord->is_special_relativistic;
+  if(flag_relativistic){
+    if (pmy_pack->phydro != nullptr) w0 = (pmy_pack->phydro->w0);
+    if (pmy_pack->pmhd != nullptr) w0 = (pmy_pack->pmhd->w0);
   }
 
   auto force_ = force;
@@ -866,6 +887,9 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
     }
   );
 
+
+  auto &eos = peos->eos_data;
+
   par_for("push", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real v1 = force_(m,0,k,j,i);
@@ -873,6 +897,22 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
       Real v3 = force_(m,2,k,j,i);
 
       Real den = u0(m,IDN,k,j,i);
+      if(flag_relativistic){
+
+        // Compute Lorenz factor
+	
+	auto & ux = w0(m, IVX, k,j,i);
+	auto & uy = w0(m, IVY, k,j,i);
+	auto & uz = w0(m, IVZ, k,j,i);
+
+	auto ut = 1. + ux*ux + uy*uy + uz*uz;
+	ut = sqrt(ut);
+	den/=ut;
+
+	auto Fv = (v1*ux + v2 * uy + v3 * uz)/ut;
+
+        if(eos.is_ideal) u0(m, IEN, k,j,i) += Fv*den*dt;
+      }
       u0(m,IM1,k,j,i) += den*v1*dt;
       u0(m,IM2,k,j,i) += den*v2*dt;
       u0(m,IM3,k,j,i) += den*v3*dt;
@@ -883,12 +923,313 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
         u0_(m,IM2,k,j,i) += den*v2*dt;
         u0_(m,IM3,k,j,i) += den*v3*dt;
       }
+
     }
   );
 
   const int nmkji = nmb*nx3*nx2*nx1;
   const int nkji = nx3*nx2*nx1;
   const int nji  = nx2*nx1;
+
+
+  // Relativistic case will require a Lorentz transformation
+  if (flag_relativistic){
+
+
+if (pmy_pack->pmhd != nullptr){
+
+   auto &b = *bcc0;
+   auto &eos= peos->eos_data;
+
+  par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+
+
+	    // load single state conserved variables
+	    MHDCons1D u;
+	    u.d  = u0(m,IDN,k,j,i);
+	    u.mx = u0(m,IM1,k,j,i);
+	    u.my = u0(m,IM2,k,j,i);
+	    u.mz = u0(m,IM3,k,j,i);
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
+
+	    u.bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
+	    u.by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
+	    u.bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
+
+	    // Compute (S^i S_i) (eqn C2)
+	    Real s2 = SQR(u.mx) + SQR(u.my) + SQR(u.mz);
+	    Real b2 = SQR(u.bx) + SQR(u.by) + SQR(u.bz);
+	    Real rpar = (u.bx*u.mx +  u.by*u.my +  u.bz*u.mz)/u.d;
+
+	    // call c2p function
+	    // (inline function in ideal_c2p_mhd.hpp file)
+	    HydPrim1D w;
+	    bool dfloor_used=false, efloor_used=false;
+	    bool vceiling_used=false, c2p_failure=false;
+	    int iter_used=0;
+	    if(eos.is_ideal){
+	    SingleC2P_IdealSRMHD(u, eos, s2, b2, rpar, w,
+				 dfloor_used, efloor_used, c2p_failure, iter_used);
+	    }else{
+	    SingleC2P_IsothermalSRMHD(u, eos, s2, b2, rpar, w,
+				 dfloor_used, c2p_failure, iter_used);
+	    }
+	    // apply velocity ceiling if necessary
+	    Real lor = sqrt(1.0+SQR(w.vx)+SQR(w.vy)+SQR(w.vz));
+	    if (lor > eos.gamma_max) {
+	      vceiling_used = true;
+	      Real factor = sqrt((SQR(eos.gamma_max)-1.0)/(SQR(lor)-1.0));
+	      w.vx *= factor;
+	      w.vy *= factor;
+	      w.vz *= factor;
+	    }
+
+
+	// Temporarily store primitives in conserved state
+
+	u0(m,IDN,k,j,i) = w.d;
+	u0(m,IM1,k,j,i) = w.vx;
+	u0(m,IM2,k,j,i) = w.vy;
+	u0(m,IM3,k,j,i) = w.vz;
+	if(eos.is_ideal) u0(m,IEN,k,j,i) = w.e;
+
+    }
+  );
+} else{
+
+   auto &eos= peos->eos_data;
+
+  par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+
+
+	    // load single state conserved variables
+	    HydCons1D u;
+	    u.d  = u0(m,IDN,k,j,i);
+	    u.mx = u0(m,IM1,k,j,i);
+	    u.my = u0(m,IM2,k,j,i);
+	    u.mz = u0(m,IM3,k,j,i);
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
+
+	    // Compute (S^i S_i) (eqn C2)
+	    Real s2 = SQR(u.mx) + SQR(u.my) + SQR(u.mz);
+
+	    // call c2p function
+	    // (inline function in ideal_c2p_mhd.hpp file)
+	    HydPrim1D w;
+	    bool dfloor_used=false, efloor_used=false;
+	    bool vceiling_used=false, c2p_failure=false;
+	    int iter_used=0;
+	    if(eos.is_ideal){
+	    SingleC2P_IdealSRHyd(u, eos, s2, w,
+				 dfloor_used, efloor_used, c2p_failure, iter_used);
+	    }else{
+	    SingleC2P_IsothermalSRHyd(u, eos, s2, w,
+				 dfloor_used, c2p_failure, iter_used);
+	    }
+	    // apply velocity ceiling if necessary
+	    Real lor = sqrt(1.0+SQR(w.vx)+SQR(w.vy)+SQR(w.vz));
+	    if (lor > eos.gamma_max) {
+	      vceiling_used = true;
+	      Real factor = sqrt((SQR(eos.gamma_max)-1.0)/(SQR(lor)-1.0));
+	      w.vx *= factor;
+	      w.vy *= factor;
+	      w.vz *= factor;
+	    }
+
+	u0(m,IDN,k,j,i) = w.d;
+	u0(m,IM1,k,j,i) = w.vx;
+	u0(m,IM2,k,j,i) = w.vy;
+	u0(m,IM3,k,j,i) = w.vz;
+	if(eos.is_ideal) u0(m,IEN,k,j,i) = w.e;
+
+    }
+  );
+}
+
+  // remove net momentum
+  Real t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
+  Kokkos::parallel_reduce("net_mom_3", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
+    KOKKOS_LAMBDA(const int &idx, Real &sum_t0, Real &sum_t1,
+                                  Real &sum_t2, Real &sum_t3) {
+      // compute n,k,j,i indices of thread
+      int m = (idx)/nkji;
+      int k = (idx - m*nkji)/nji;
+      int j = (idx - m*nkji - k*nji)/nx1;
+      int i = (idx - m*nkji - k*nji - j*nx1) + is;
+      k += ks;
+      j += js;
+
+      auto u_t = sqrt(1.
+			+u0(m,IVX,k,j,i)*u0(m,IVX,k,j,i)
+			+u0(m,IVY,k,j,i)*u0(m,IVY,k,j,i)
+			+u0(m,IVZ,k,j,i)*u0(m,IVZ,k,j,i));
+			
+
+      Real den = u0(m,IDN,k,j,i)*u_t;
+      Real mom1 = den*u0(m,IVX,k,j,i);
+      Real mom2 = den*u0(m,IVY,k,j,i);
+      Real mom3 = den*u0(m,IVZ,k,j,i);
+
+      sum_t0 += den;
+      sum_t1 += mom1;
+      sum_t2 += mom2;
+      sum_t3 += mom3;
+    }, Kokkos::Sum<Real>(t0), Kokkos::Sum<Real>(t1),
+       Kokkos::Sum<Real>(t2), Kokkos::Sum<Real>(t3)
+  );
+
+  #if MPI_PARALLEL_ENABLED
+  Real m[4], gm[4];
+  m[0] = t0;  m[1] = t1;  m[2] = t2;  m[3] = t3;
+  MPI_Allreduce(m, gm, 4, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  t0 = gm[0];  t1 = gm[1];  t2 = gm[2];  t3 = gm[3];
+  #endif
+
+  // Compute average velocity
+
+  auto uA_x = t1/t0;
+  auto uA_y = t2/t0;
+  auto uA_z = t3/t0;
+
+  auto uA_0 = sqrt(1. + uA_x*uA_x + uA_y*uA_y + uA_z*uA_z);
+  auto betaA = sqrt(uA_x*uA_x + uA_y*uA_y + uA_z*uA_z)/uA_0;
+
+  auto vx = uA_x/uA_0;
+  auto vy = uA_y/uA_0;
+  auto vz = uA_z/uA_0;
+
+
+// LIMIT temp
+
+
+
+if (pmy_pack->pmhd != nullptr){
+
+   auto &b = *bcc0;
+   auto &eos= peos->eos_data;
+
+  par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+
+       if(eos.is_ideal)  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
+
+
+	    // load single state conserved variables
+	    MHDPrim1D u;
+	    u.d  = u0(m,IDN,k,j,i);
+	    u.vx = u0(m,IM1,k,j,i);
+	    u.vy = u0(m,IM2,k,j,i);
+	    u.vz = u0(m,IM3,k,j,i);
+            u.e = 0.;
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
+
+	    u.bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
+	    u.by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
+	    u.bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
+
+	    HydCons1D u_out;
+	    if(eos.is_ideal){
+	      SingleP2C_IdealSRMHD(u, eos.gamma, u_out);
+	    }else{
+	      SingleP2C_IsothermalSRMHD(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+	    }
+
+        Real en = u_out.d + u_out.e;
+	Real sx = u_out.mx;
+	Real sy = u_out.my;
+	Real sz = u_out.mz;
+
+	Real dens = u_out.d;
+
+	auto &w = u;
+	
+	Real lorentz = sqrt(1.+w.vx*w.vx + w.vy*w.vy + w.vz*w.vz);
+	Real beta = sqrt(w.vx*w.vx + w.vy*w.vy + w.vz*w.vz)/lorentz;
+
+	
+	u0(m,IDN,k,j,i) = dens; // *uA_0*(1.-beta*betaA);
+
+	// Does not require knowledge of v
+
+        if(eos.is_ideal){
+		u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
+		u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+	}
+
+	u0(m, IM1,k,j,i) = sx+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vx;
+	u0(m, IM2,k,j,i) = sy+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vy;
+	u0(m, IM3,k,j,i) = sz+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vz;
+
+	u0(m, IM1,k,j,i) -= uA_0*en*vx;
+	u0(m, IM2,k,j,i) -= uA_0*en*vy;
+	u0(m, IM3,k,j,i) -= uA_0*en*vz;
+
+    }
+  );
+} else{
+
+   auto &eos= peos->eos_data;
+
+  par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+    KOKKOS_LAMBDA(int m, int k, int j, int i) {
+
+       if(eos.is_ideal)  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
+
+	    // load single state conserved variables
+	    HydPrim1D u;
+	    u.d  = u0(m,IDN,k,j,i);
+	    u.vx = u0(m,IM1,k,j,i);
+	    u.vy = u0(m,IM2,k,j,i);
+	    u.vz = u0(m,IM3,k,j,i);
+	    u.e = 0.;
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
+
+	    HydCons1D u_out;
+	    if(eos.is_ideal){
+	      SingleP2C_IdealSRHyd(u, eos.gamma, u_out);
+	    }else{
+	      SingleP2C_IsothermalSRHyd(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+	    }
+
+        Real en = u_out.d + u_out.e;
+	Real sx = u_out.mx;
+	Real sy = u_out.my;
+	Real sz = u_out.mz;
+
+	Real dens = u_out.d;
+
+	auto &w = u;
+	
+	Real lorentz = sqrt(1.+w.vx*w.vx + w.vy*w.vy + w.vz*w.vz);
+	Real beta = sqrt(w.vx*w.vx + w.vy*w.vy + w.vz*w.vz)/lorentz;
+
+	
+	u0(m,IDN,k,j,i) = dens; //*uA_0*(1.-beta*betaA);
+
+	// Does not require knowledge of v
+      
+        if(eos.is_ideal){
+		u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
+		u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+	}
+
+	u0(m, IM1,k,j,i) = sx+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vx;
+	u0(m, IM2,k,j,i) = sy+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vy;
+	u0(m, IM3,k,j,i) = sz+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vz;
+
+	u0(m, IM1,k,j,i) -= uA_0*en*vx;
+	u0(m, IM2,k,j,i) -= uA_0*en*vy;
+	u0(m, IM3,k,j,i) -= uA_0*en*vz;
+
+    }
+  );
+}
+
+  }else{
+
+
   // remove net momentum
   Real t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
   Kokkos::parallel_reduce("net_mom_3", Kokkos::RangePolicy<>(DevExeSpace(),0,nmkji),
@@ -929,7 +1270,25 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
 
   par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
+
       Real den = u0(m,IDN,k,j,i);
+
+      if(flag_relativistic){
+
+	auto & ux = w0(m, IVX, k,j,i);
+	auto & uy = w0(m, IVY, k,j,i);
+	auto & uz = w0(m, IVZ, k,j,i);
+
+	auto ut = 1. + ux*ux + uy*uy + uz*uz;
+	ut = sqrt(ut);
+
+	den/=ut;
+
+	auto Fv_avg = den*(t1*ux + t2 * uy + t3 * uz)/ut/t0;
+
+        u0(m, IEN, k,j,i) -= Fv_avg;
+
+      }
       u0(m,IM1,k,j,i) -= den*t1/t0;
       u0(m,IM2,k,j,i) -= den*t2/t0;
       u0(m,IM3,k,j,i) -= den*t3/t0;
@@ -939,8 +1298,12 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
         u0_(m,IM2,k,j,i) -= den*t2/t0;
         u0_(m,IM3,k,j,i) -= den*t3/t0;
       }
+
     }
   );
+
+  }
+
 
   return TaskStatus::complete;
 }
