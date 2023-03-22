@@ -22,7 +22,7 @@
 
 IsothermalGRMHD::IsothermalGRMHD(MeshBlockPack *pp, ParameterInput *pin) :
     EquationOfState("mhd", pp, pin) {
-  eos_data.is_ideal = true;
+  eos_data.is_ideal = false;
   eos_data.gamma = 0.0;
   eos_data.iso_cs = pin->GetReal("mhd","iso_sound_speed");
   eos_data.iso_cs_rel_lim = pin->GetReal("mhd","iso_sound_speed_limit");
@@ -243,7 +243,6 @@ void IsothermalGRMHD::ConsToPrim(DvceArray5D<Real> &cons, const DvceFaceFld4D<Re
         cons(m,IM1,k,j,i) = u_out.mx;
         cons(m,IM2,k,j,i) = u_out.my;
         cons(m,IM3,k,j,i) = u_out.mz;
-        cons(m,IEN,k,j,i) = u_out.e;
         u.d = u_out.d;  // (needed if there are scalars below)
       }
 

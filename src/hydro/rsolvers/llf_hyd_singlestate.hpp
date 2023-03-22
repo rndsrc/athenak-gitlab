@@ -102,8 +102,8 @@ void SingleStateLLF_SRHyd(const HydPrim1D &wl, const HydPrim1D &wr, const EOS_Da
   }else{
     Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
 
-    wgas_l = wl.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in L-state
-    wgas_r = wr.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in R-state
+    wgas_l = wl.d*( 1. +( 1. + SQR(eos.iso_cs_rel_lim)) * eps);  // total enthalpy in L-state
+    wgas_r = wr.d*( 1. +( 1. + SQR(eos.iso_cs_rel_lim)) * eps);  // total enthalpy in R-state
     pl = eos.IsothermalRelGasPressure(wl.d);
     pr = eos.IsothermalRelGasPressure(wr.d);
   }
@@ -268,8 +268,8 @@ void SingleStateLLF_GRHyd(const HydPrim1D wl, const HydPrim1D wr,
     wgas_r = wr_idn + gamma_prime * wr_ipr;
   }else{
     Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
-    wgas_l = wl.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in L-state
-    wgas_r = wr.d*( 1. +( 1. + eos.iso_cs_rel_lim*eos.iso_cs_rel_lim) * eps);  // total enthalpy in R-state
+    wgas_l = wl.d*( 1. +( 1. + SQR(eos.iso_cs_rel_lim)) * eps);  // total enthalpy in L-state
+    wgas_r = wr.d*( 1. +( 1. + SQR(eos.iso_cs_rel_lim)) * eps);  // total enthalpy in R-state
   }
 
   Real qa = wgas_r * uur[0];

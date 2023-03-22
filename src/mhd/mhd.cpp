@@ -70,9 +70,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
       peos = new IsothermalGRMHD(ppack, pin);
     } else {
       peos = new IsothermalMHD(ppack, pin);
-      nmhd = 4;
     }
-
+    nmhd = 4;
   // EOS string not recognized
   } else {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl

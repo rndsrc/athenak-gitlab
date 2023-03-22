@@ -37,11 +37,10 @@ void SingleC2P_IsothermalSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2,
   // Here we use p = rho T = rho eps cs_rel_lim^2
   // and T = cs^2/ (1- (cs/cs_rel_lim)^2)  (=const)
   
-  Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
-  Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+  Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
 
   // Note that h is a constant for isothermal
-  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs));     // (C1) & (C21)
+  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs_rel_lim));     // (C1) & (C21)
 
   // Recast all variables (eq C2)
   Real r = sqrt(s2)/u.d;
@@ -77,8 +76,7 @@ void SingleC2P_IsothermalSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2,
 KOKKOS_INLINE_FUNCTION
 void SingleP2C_IsothermalSRHyd(const HydPrim1D &w, const Real iso_cs, const Real iso_cs_rel_lim, HydCons1D &u) {
 
-  Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
-  Real eps = temperature/SQR(iso_cs_rel_lim);
+  Real eps = SQR(iso_cs/iso_cs_rel_lim)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
 
   // Calculate Lorentz factor
   Real u0 = sqrt(1.0 + SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
@@ -116,8 +114,7 @@ void SingleP2C_IsothermalGRHyd(const Real glower[][4], const Real gupper[][4],
   Real u_2 = glower[2][0]*u0 + glower[2][1]*u1 + glower[2][2]*u2 + glower[2][3]*u3;
   Real u_3 = glower[3][0]*u0 + glower[3][1]*u1 + glower[3][2]*u2 + glower[3][3]*u3;
 
-  Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
-  Real eps = temperature/SQR(iso_cs_rel_lim);
+  Real eps = SQR(iso_cs/iso_cs_rel_lim)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
 
   Real wgas_u0 = (1. + eps* (1. + SQR(iso_cs_rel_lim))) * w.d* u0;
 

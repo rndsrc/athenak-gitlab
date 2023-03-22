@@ -43,10 +43,9 @@ Real Equation44_Isothermal(const Real mu, const Real b2, const Real rpar, const 
   // Here we use p = rho T = rho eps cs_rel_lim^2
   // and T = cs^2/ (1- (cs/cs_rel_lim)^2)  (=const)
   
-  Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
-  Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+  Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
 
-  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs));   
+  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs_rel_lim));   
   return mu - 1./(h/w + rbar*mu);         // (45)
 }
 
@@ -185,11 +184,10 @@ void SingleC2P_IsothermalSRMHD(MHDCons1D &u, const EOS_Data &eos, Real s2, Real 
   }
 
   // compute specific internal energy density then apply floor
-  Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
-  Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+  Real eps = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
 
   // set parameters required for velocity inversion
-  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs));     // (C1) & (C21)
+  Real const h = 1.0 + eps*(1. + SQR(eos.iso_cs_rel_lim));     // (C1) & (C21)
   Real const conv = lor/(h*lor + b2);  // (C26)
 
   // set primitive variables
@@ -211,9 +209,8 @@ void SingleP2C_IsothermalSRMHD(const MHDPrim1D &w, const Real iso_cs, const Real
   Real u0 = sqrt(1.0 + SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
 
   // compute specific internal energy density then apply floor
-  Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
-  Real eps = temperature/SQR(iso_cs_rel_lim);
-  Real const h = 1.0 + eps*(1. + SQR(iso_cs));     // (C1) & (C21)
+  Real eps = SQR(iso_cs/iso_cs_rel_lim)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
+  Real const h = 1.0 + eps*(1. + SQR(iso_cs_rel_lim));     // (C1) & (C21)
 
   // Calculate 4-magnetic field
   Real b0 = w.bx*w.vx + w.by*w.vy + w.bz*w.vz;
@@ -240,9 +237,8 @@ void SingleP2C_IsothermalGRMHD(const Real glower[][4], const Real gupper[][4],
                           const MHDPrim1D &w, const Real iso_cs, const Real iso_cs_rel_lim, HydCons1D &u) {
 
   // compute specific internal energy density then apply floor
-  Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
-  Real eps = temperature/SQR(iso_cs_rel_lim);
-  Real const h = 1.0 + eps*(1. + SQR(iso_cs));     // (C1) & (C21)
+  Real eps = SQR(iso_cs/iso_cs_rel_lim)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
+  Real const h = 1.0 + eps*(1. + SQR(iso_cs_rel_lim));     // (C1) & (C21)
 						       //
   // Calculate 4-velocity (exploiting symmetry of metric)
   Real q = glower[1][1]*w.vx*w.vx +2.0*glower[1][2]*w.vx*w.vy +2.0*glower[1][3]*w.vx*w.vz

@@ -44,8 +44,7 @@ struct EOS_Data {
   KOKKOS_INLINE_FUNCTION
   Real IsothermalRelGasPressure(const Real d) const {
     Real temperature = SQR(iso_cs)/(1.0 - SQR(iso_cs/iso_cs_rel_lim));
-    Real eps = temperature/SQR(iso_cs_rel_lim);
-    return d*eps*iso_cs_rel_lim;
+    return d*temperature;
   }
 
   // NON-RELATIVISTIC IDEAL GAS HYDRO: inlined sound speed function
@@ -89,7 +88,7 @@ struct EOS_Data {
   KOKKOS_INLINE_FUNCTION
   void IdealSRHydroSoundSpeeds(const Real d, const Real p, const Real ux, const Real lor,
                                Real& l_p, Real& l_m) const {
-    Real cs2 = (is_ideal) ? gamma*p / (d + gamma*p/(gamma - 1.0)) : iso_cs*iso_cs;  // (DZB 73)
+    Real cs2 = (is_ideal) ? gamma*p / (d + gamma*p/(gamma - 1.0)) : SQR(iso_cs);  // (DZB 73)
     Real v2 = 1.0 - 1.0/(lor*lor);
     auto const p1 = (ux/lor) * (1.0 - cs2);
     auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*(ux/lor))) / lor;
@@ -108,7 +107,7 @@ struct EOS_Data {
                             const Real b_sq, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
     Real w = d + gamma*p/(gamma - 1.0);
-    Real cs_sq = (is_ideal) ? gamma*p/w : iso_cs*iso_cs; // (DZB 73)
+    Real cs_sq = (is_ideal) ? gamma*p/w : SQR(iso_cs); // (DZB 73)
     Real va_sq = b_sq / (b_sq + w);                      // (DZB 73)
     Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;         // (DZB 72)
 
@@ -140,7 +139,7 @@ struct EOS_Data {
     const Real discriminant_tol = -1.0e-10;  // values between this and 0 are considered 0
 
     // Calculate comoving sound speed
-    Real cs_sq = (is_ideal) ? gamma * p / (d + gamma*p/(gamma - 1.0)) : iso_cs*iso_cs;
+    Real cs_sq = (is_ideal) ? gamma * p / (d + gamma*p/(gamma - 1.0)) : SQR(iso_cs);
 
     // Set sound speeds in appropriate coordinates
     Real a = SQR(u0) - (g00 + SQR(u0)) * cs_sq;
@@ -183,7 +182,7 @@ struct EOS_Data {
                             const Real g11, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
     Real w = d + gamma*p/(gamma - 1.0);
-    Real cs_sq = (is_ideal) ? gamma * p / w : iso_cs*iso_cs;
+    Real cs_sq = (is_ideal) ? gamma * p / w : SQR(iso_cs);
     Real va_sq = b_sq / (b_sq + w);
     Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;
 
