@@ -1134,6 +1134,21 @@ if (pmy_pack->pmhd != nullptr){
 	      SingleP2C_IdealSRMHD(u, eos.gamma, u_out);
 	    }else{
 	      SingleP2C_IsothermalSRMHD(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+  	     
+	      // Need to perform a Lorentz boost below, so need to restore
+	      // u_out.e
+  	      Real u0 = sqrt(1.0 + SQR(u.vx) + SQR(u.vy) + SQR(u.vz));
+	      // Calculate 4-magnetic field
+	      Real b0 = u.bx*u.vx + u.by*u.vy + u.bz*u.vz;
+	      Real b1 = (u.bx + b0 * u.vx) / u0;
+	      Real b2 = (u.by + b0 * u.vy) / u0;
+	      Real b3 = (u.bz + b0 * u.vz) / u0;
+	      Real b_sq = -SQR(b0) + SQR(b1) + SQR(b2) + SQR(b3);
+
+	      Real eps  = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.- SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+  	      Real wtot_u02 = (u.d*(1.+ eps*(1.+ SQR(eos.iso_cs_rel_lim))) + b_sq) * u0 * u0;
+
+	      u_out.e  = wtot_u02 - b0 * b0 - (eps*u.d*SQR(eos.iso_cs_rel_lim) + 0.5*b_sq) - u_out.d;  // In SR, evolve E - D
 	    }
 
         Real en = u_out.d + u_out.e;
@@ -1191,6 +1206,15 @@ if (pmy_pack->pmhd != nullptr){
 	      SingleP2C_IdealSRHyd(u, eos.gamma, u_out);
 	    }else{
 	      SingleP2C_IsothermalSRHyd(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+
+	      // Need to perform a Lorentz boost below, so need to restore
+	      // u_out.e
+  	      Real u0 = sqrt(1.0 + SQR(u.vx) + SQR(u.vy) + SQR(u.vz));
+
+	      Real eps  = SQR(eos.iso_cs/eos.iso_cs_rel_lim)/(1.- SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+  	      Real wtot_u02 = (u.d*(1.+ eps*(1.+ SQR(eos.iso_cs_rel_lim)))) * u0 * u0;
+
+	      u_out.e  = wtot_u02 - eps*u.d*SQR(eos.iso_cs_rel_lim) - u_out.d;  // In SR, evolve E - D
 	    }
 
         Real en = u_out.d + u_out.e;
