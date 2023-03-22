@@ -112,13 +112,32 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
   b_r[3] = (wr.bz + b_r[0] * wr.vz) / gam_r;
   Real b_sq_r = -SQR(b_r[0]) + SQR(b_r[1]) + SQR(b_r[2]) + SQR(b_r[3]);
 
+  Real pl, pr;
+  Real wgas_l, wgas_r;
+
+  if(eos.is_ideal){
+    pl = eos.IdealGasPressure(wl.e);
+    pr = eos.IdealGasPressure(wr.e);
+
+    const Real gamma_prime = eos.gamma/(eos.gamma - 1.0);
+
+    wgas_l = wl.d + gamma_prime * pl;  // total enthalpy in L-state
+    wgas_r = wr.d + gamma_prime * pr;  // total enthalpy in R-state
+  }else{
+    Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+    Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+    pl = wl.d*temperature;
+    pr = wr.d*temperature;
+
+    wgas_l = wl.d*(1.+ eps) + pl;
+    wgas_r = wr.d*(1.+ eps) + pr;
+  }
+
   // Calculate left wavespeeds
-  Real pl = eos.IdealGasPressure(wl.e);
   Real lm_l, lp_l;
   eos.IdealSRMHDFastSpeeds(wl.d, pl, wl.vx, gam_l, b_sq_l, lp_l, lm_l);
 
   // Calculate right wavespeeds
-  Real pr = eos.IdealGasPressure(wr.e);
   Real lm_r, lp_r;
   eos.IdealSRMHDFastSpeeds(wr.d, pr, wr.vx, gam_r, b_sq_r, lp_r, lm_r);
 
@@ -129,11 +148,10 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
 
   // Calculate conserved quantities in L region (MUB 8)
   MHDCons1D consl;
-  Real wgas_l = wl.d + eos.gamma * wl.e;
   Real wtot_l = wgas_l + b_sq_l;
   Real ptot_l = pl + 0.5*b_sq_l;
   consl.d  = wl.d * gam_l;
-  consl.e  = wtot_l * gam_l * gam_l - b_l[0] * b_l[0] - ptot_l;
+  if(eos.is_ideal) consl.e  = wtot_l * gam_l * gam_l - b_l[0] * b_l[0] - ptot_l;
   consl.mx = wtot_l * wl.vx * gam_l - b_l[1] * b_l[0];
   consl.my = wtot_l * wl.vy * gam_l - b_l[2] * b_l[0];
   consl.mz = wtot_l * wl.vz * gam_l - b_l[3] * b_l[0];
@@ -143,7 +161,7 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
   // Calculate fluxes in L region (MUB 15)
   MHDCons1D fl;
   fl.d  = wl.d * wl.vx;
-  fl.e  = wtot_l * gam_l * wl.vx - b_l[0] * b_l[1];
+  if(eos.is_ideal) fl.e  = wtot_l * gam_l * wl.vx - b_l[0] * b_l[1];
   fl.mx = wtot_l * wl.vx * wl.vx - b_l[1] * b_l[1] + ptot_l;
   fl.my = wtot_l * wl.vy * wl.vx - b_l[2] * b_l[1];
   fl.mz = wtot_l * wl.vz * wl.vx - b_l[3] * b_l[1];
@@ -152,11 +170,10 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
 
   // Calculate conserved quantities in R region (MUB 8)
   MHDCons1D consr;
-  Real wgas_r = wr.d + eos.gamma * wr.e;
   Real wtot_r = wgas_r + b_sq_r;
   Real ptot_r = pr + 0.5*b_sq_r;
   consr.d  = wr.d * gam_r;
-  consr.e  = wtot_r * gam_r * gam_r - b_r[0] * b_r[0] - ptot_r;
+  if(eos.is_ideal) consr.e  = wtot_r * gam_r * gam_r - b_r[0] * b_r[0] - ptot_r;
   consr.mx = wtot_r * wr.vx * gam_r - b_r[1] * b_r[0];
   consr.my = wtot_r * wr.vy * gam_r - b_r[2] * b_r[0];
   consr.mz = wtot_r * wr.vz * gam_r - b_r[3] * b_r[0];
@@ -166,7 +183,7 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
   // Calculate fluxes in R region (MUB 15)
   MHDCons1D fr;
   fr.d  = wr.d * wr.vx;
-  fr.e  = wtot_r * gam_r * wr.vx - b_r[0] * b_r[1];
+  if(eos.is_ideal) fr.e  = wtot_r * gam_r * wr.vx - b_r[0] * b_r[1];
   fr.mx = wtot_r * wr.vx * wr.vx - b_r[1] * b_r[1] + ptot_r;
   fr.my = wtot_r * wr.vy * wr.vx - b_r[2] * b_r[1];
   fr.mz = wtot_r * wr.vz * wr.vx - b_r[3] * b_r[1];
@@ -175,7 +192,7 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
 
   // Compute the LLF flux at the interface
   flux.d  = 0.5 * (fl.d  + fr.d  - lambda * (consr.d  - consl.d ));
-  flux.e  = 0.5 * (fl.e  + fr.e  - lambda * (consr.e  - consl.e ));
+  if(eos.is_ideal) flux.e  = 0.5 * (fl.e  + fr.e  - lambda * (consr.e  - consl.e ));
   flux.mx = 0.5 * (fl.mx + fr.mx - lambda * (consr.mx - consl.mx));
   flux.my = 0.5 * (fl.my + fr.my - lambda * (consr.my - consl.my));
   flux.mz = 0.5 * (fl.mz + fr.mz - lambda * (consr.mz - consl.mz));
@@ -183,7 +200,7 @@ void SingleStateLLF_SRMHD(const MHDPrim1D &wl, const MHDPrim1D &wr, const Real &
   flux.bz =  0.5 * (fl.bz + fr.bz - lambda * (consr.bz - consl.bz));
 
   // We evolve tau = E - D
-  flux.e -= flux.d;
+  if(eos.is_ideal) flux.e -= flux.d;
 
   return;
 }
@@ -217,9 +234,24 @@ void SingleStateLLF_GRMHD(const MHDPrim1D wl, const MHDPrim1D wr, const Real bx,
   const Real &wr_iby=wr.by;
   const Real &wr_ibz=wr.bz;
 
-  Real wl_ipr, wr_ipr;
-  wl_ipr = eos.IdealGasPressure(wl.e);
-  wr_ipr = eos.IdealGasPressure(wr.e);
+    Real wl_ipr, wr_ipr;
+    Real wgas_l, wgas_r;
+
+    if(eos.is_ideal){
+      wl_ipr = eos.IdealGasPressure(wl.e);
+      wr_ipr = eos.IdealGasPressure(wr.e);
+
+      wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    }else{
+      Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+      Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+      wl_ipr = wl_idn*temperature;
+      wr_ipr = wr_idn*temperature;
+
+      wgas_l = wl_idn*(1.+ eps) + wl_ipr;
+      wgas_r = wr_idn*(1.+ eps) + wr_ipr;
+    }
 
   // reference to longitudinal field
   const Real &bxi = bx;
@@ -344,17 +376,17 @@ void SingleStateLLF_GRMHD(const MHDPrim1D wl, const MHDPrim1D wr, const Real bx,
 
   // Calculate difference du =  U_R - U_l in conserved quantities (rho u^0 and T^0_\mu)
   MHDCons1D du;
-  Real wtot_r = wr_idn + gamma_prime * wr_ipr + bsq_r;
+  Real wtot_r = wgas_r + bsq_r;
   Real ptot_r = wr_ipr + 0.5*bsq_r;
   Real qa = wtot_r * uur[0];
-  Real wtot_l = wl_idn + gamma_prime * wl_ipr + bsq_l;
+  Real wtot_l = wgas_l + bsq_l;
   Real ptot_l = wl_ipr + 0.5*bsq_l;
   Real qb = wtot_l * uul[0];
   du.d  = (wr_idn*uur[0]) - (wl_idn*uul[0]);
   du.mx = (qa*ulr[ivx] - bur[0]*blr[ivx]) - (qb*ull[ivx] - bul[0]*bll[ivx]);
   du.my = (qa*ulr[ivy] - bur[0]*blr[ivy]) - (qb*ull[ivy] - bul[0]*bll[ivy]);
   du.mz = (qa*ulr[ivz] - bur[0]*blr[ivz]) - (qb*ull[ivz] - bul[0]*bll[ivz]);
-  du.e  = (qa*ulr[0] - bur[0]*blr[0] + ptot_r) - (qb*ull[0] - bul[0]*bll[0] + ptot_l);
+  if(eos.is_ideal) du.e  = (qa*ulr[0] - bur[0]*blr[0] + ptot_r) - (qb*ull[0] - bul[0]*bll[0] + ptot_l);
   du.by = (bur[ivy]*uur[0] - bur[0]*uur[ivy]) - (bul[ivy]*uul[0] - bul[0]*uul[ivy]);
   du.bz = (bur[ivz]*uur[0] - bur[0]*uur[ivz]) - (bul[ivz]*uul[0] - bul[0]*uul[ivz]);
 
@@ -365,7 +397,7 @@ void SingleStateLLF_GRMHD(const MHDPrim1D wl, const MHDPrim1D wr, const Real bx,
   fl.mx = qa * ull[ivx] - bul[ivx] * bll[ivx] + ptot_l;
   fl.my = qa * ull[ivy] - bul[ivx] * bll[ivy];
   fl.mz = qa * ull[ivz] - bul[ivx] * bll[ivz];
-  fl.e  = qa * ull[0]   - bul[ivx] * bll[0];
+  if(eos.is_ideal) fl.e  = qa * ull[0]   - bul[ivx] * bll[0];
   fl.by = bul[ivy] * uul[ivx] - bul[ivx] * uul[ivy];
   fl.bz = bul[ivz] * uul[ivx] - bul[ivx] * uul[ivz];
 
@@ -376,7 +408,7 @@ void SingleStateLLF_GRMHD(const MHDPrim1D wl, const MHDPrim1D wr, const Real bx,
   fr.mx = qa * ulr[ivx] - bur[ivx] * blr[ivx] + ptot_r;
   fr.my = qa * ulr[ivy] - bur[ivx] * blr[ivy];
   fr.mz = qa * ulr[ivz] - bur[ivx] * blr[ivz];
-  fr.e  = qa * ulr[0]   - bur[ivx] * blr[0];
+  if(eos.is_ideal) fr.e  = qa * ulr[0]   - bur[ivx] * blr[0];
   fr.by = bur[ivy] * uur[ivx] - bur[ivx] * uur[ivy];
   fr.bz = bur[ivz] * uur[ivx] - bur[ivx] * uur[ivz];
 
@@ -385,12 +417,12 @@ void SingleStateLLF_GRMHD(const MHDPrim1D wl, const MHDPrim1D wr, const Real bx,
   flux.mx =  0.5 * (fl.mx + fr.mx - lambda * du.mx);
   flux.my =  0.5 * (fl.my + fr.my - lambda * du.my);
   flux.mz =  0.5 * (fl.mz + fr.mz - lambda * du.mz);
-  flux.e  =  0.5 * (fl.e  + fr.e  - lambda * du.e);
+  if(eos.is_ideal) flux.e  =  0.5 * (fl.e  + fr.e  - lambda * du.e);
   flux.by = -0.5 * (fl.by + fr.by - lambda * du.by);
   flux.bz =  0.5 * (fl.bz + fr.bz - lambda * du.bz);
 
   // We evolve tau = T^t_t + D
-  flux.e  += flux.d;
+  if(eos.is_ideal) flux.e  += flux.d;
   return;
 }
 

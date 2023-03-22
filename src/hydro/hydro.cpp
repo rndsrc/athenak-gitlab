@@ -47,15 +47,14 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     nhydro = 5;
   // isothermal EOS
   } else if (eqn_of_state.compare("isothermal") == 0) {
-    if (pmy_pack->pcoord->is_special_relativistic ||
-        pmy_pack->pcoord->is_general_relativistic) {
-      std::cout << "### FATAL ERROR in "<< __FILE__ <<" at line " << __LINE__ << std::endl
-                << "<hydro>/eos = isothermal cannot be used with SR/GR" << std::endl;
-      std::exit(EXIT_FAILURE);
+    if (pmy_pack->pcoord->is_special_relativistic) {
+      peos = new IsothermalSRHydro(ppack, pin);
+    } else if (pmy_pack->pcoord->is_general_relativistic) {
+      peos = new IsothermalGRHydro(ppack, pin);
     } else {
       peos = new IsothermalHydro(ppack, pin);
-      nhydro = 4;
     }
+      nhydro = 4;
   // EOS string not recognized
   } else {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl

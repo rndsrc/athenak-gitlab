@@ -86,8 +86,15 @@ TaskStatus Hydro::NewTimeStep(Driver *pdriver, int stage) {
       } else if (is_special_relativistic_) {
         Real v2 = SQR(w0_(m,IVX,k,j,i)) + SQR(w0_(m,IVY,k,j,i)) + SQR(w0_(m,IVZ,k,j,i));
         Real lor = sqrt(1.0 + v2);
-        // FIXME ERM: Ideal fluid for now
-        Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
+	Real p;
+        if(eos.is_ideal){
+          p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
+	}else{
+          p = eos.IsothermalRelGasPressure(w0_(m,IDN,k,j,i));
+	}
+
+	// Note: The ideal sound speed routines handle isothermal EOSs
+	// internally.
 
         Real lm, lp;
         eos.IdealSRHydroSoundSpeeds(w0_(m,IDN,k,j,i), p, w0_(m,IVX,k,j,i), lor, lp, lm);

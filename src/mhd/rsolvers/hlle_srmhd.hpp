@@ -57,9 +57,24 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     Real bb2_r = br(iby,i);
     Real bb3_r = br(ibz,i);
 
-    Real pgas_l, pgas_r;
-    pgas_l = eos.IdealGasPressure(wl(IEN,i));
-    pgas_r = eos.IdealGasPressure(wr(IEN,i));
+    Real wl_ipr, wr_ipr;
+    Real wgas_l, wgas_r;
+
+    if(eos.is_ideal){
+      wl_ipr = eos.IdealGasPressure(wl(IEN,i));
+      wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+
+      wgas_l = rho_l + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = rho_r + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    }else{
+      Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+      Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+      wl_ipr = rho_l*temperature;
+      wr_ipr = rho_r*temperature;
+
+      wgas_l = rho_l*(1.+ eps) + wl_ipr;
+      wgas_r = rho_r*(1.+ eps) + wr_ipr;
+    }
 
     // Extract normal magnetic field
     Real bb1 = bx(m,k,j,i);
@@ -82,11 +97,11 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Calculate left wavespeeds
     Real lm_l, lp_l;
-    eos.IdealSRMHDFastSpeeds(rho_l, pgas_l, u_l[1], u_l[0], b_sq_l, lp_l, lm_l);
+    eos.IdealSRMHDFastSpeeds(rho_l, wl_ipr, u_l[1], u_l[0], b_sq_l, lp_l, lm_l);
 
     // Calculate right wavespeeds
     Real lm_r, lp_r;
-    eos.IdealSRMHDFastSpeeds(rho_r, pgas_r, u_r[1], u_r[0], b_sq_r, lp_r, lm_r);
+    eos.IdealSRMHDFastSpeeds(rho_r, wr_ipr, u_r[1], u_r[0], b_sq_r, lp_r, lm_r);
 
     // Calculate extremal wavespeeds
     Real lambda_l = fmin(lm_l, lm_r);  // (MB 55)
@@ -94,11 +109,10 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Calculate conserved quantities in L region (MUB 8)
     MHDCons1D consl;
-    Real wgas_l = rho_l + gamma_prime * pgas_l;
     Real wtot_l = wgas_l + b_sq_l;
-    Real ptot_l = pgas_l + 0.5*b_sq_l;
+    Real ptot_l = wl_ipr + 0.5*b_sq_l;
     consl.d  = rho_l * u_l[0];
-    consl.e  = wtot_l * u_l[0] * u_l[0] - b_l[0] * b_l[0] - ptot_l;
+    if(eos.is_ideal) consl.e  = wtot_l * u_l[0] * u_l[0] - b_l[0] * b_l[0] - ptot_l;
     consl.mx = wtot_l * u_l[1] * u_l[0] - b_l[1] * b_l[0];
     consl.my = wtot_l * u_l[2] * u_l[0] - b_l[2] * b_l[0];
     consl.mz = wtot_l * u_l[3] * u_l[0] - b_l[3] * b_l[0];
@@ -108,7 +122,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     // Calculate fluxes in L region (MUB 15)
     MHDCons1D fl;
     fl.d  = rho_l * u_l[1];
-    fl.e  = wtot_l * u_l[0] * u_l[1] - b_l[0] * b_l[1];
+    if(eos.is_ideal) fl.e  = wtot_l * u_l[0] * u_l[1] - b_l[0] * b_l[1];
     fl.mx = wtot_l * u_l[1] * u_l[1] - b_l[1] * b_l[1] + ptot_l;
     fl.my = wtot_l * u_l[2] * u_l[1] - b_l[2] * b_l[1];
     fl.mz = wtot_l * u_l[3] * u_l[1] - b_l[3] * b_l[1];
@@ -117,11 +131,10 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Calculate conserved quantities in R region (MUB 8)
     MHDCons1D consr;
-    Real wgas_r = rho_r + gamma_prime * pgas_r;
     Real wtot_r = wgas_r + b_sq_r;
-    Real ptot_r = pgas_r + 0.5*b_sq_r;
+    Real ptot_r = wr_ipr + 0.5*b_sq_r;
     consr.d  = rho_r * u_r[0];
-    consr.e  = wtot_r * u_r[0] * u_r[0] - b_r[0] * b_r[0] - ptot_r;
+    if(eos.is_ideal) consr.e  = wtot_r * u_r[0] * u_r[0] - b_r[0] * b_r[0] - ptot_r;
     consr.mx = wtot_r * u_r[1] * u_r[0] - b_r[1] * b_r[0];
     consr.my = wtot_r * u_r[2] * u_r[0] - b_r[2] * b_r[0];
     consr.mz = wtot_r * u_r[3] * u_r[0] - b_r[3] * b_r[0];
@@ -131,7 +144,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     // Calculate fluxes in R region (MUB 15)
     MHDCons1D fr;
     fr.d  = rho_r * u_r[1];
-    fr.e  = wtot_r * u_r[0] * u_r[1] - b_r[0] * b_r[1];
+    if(eos.is_ideal) fr.e  = wtot_r * u_r[0] * u_r[1] - b_r[0] * b_r[1];
     fr.mx = wtot_r * u_r[1] * u_r[1] - b_r[1] * b_r[1] + ptot_r;
     fr.my = wtot_r * u_r[2] * u_r[1] - b_r[2] * b_r[1];
     fr.mz = wtot_r * u_r[3] * u_r[1] - b_r[3] * b_r[1];
@@ -146,7 +159,7 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     flux_hll.mx = (lambda_r*fl.mx - lambda_l*fr.mx + qa*(consr.mx - consl.mx)) * qb;
     flux_hll.my = (lambda_r*fl.my - lambda_l*fr.my + qa*(consr.my - consl.my)) * qb;
     flux_hll.mz = (lambda_r*fl.mz - lambda_l*fr.mz + qa*(consr.mz - consl.mz)) * qb;
-    flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*(consr.e  - consl.e )) * qb;
+    if(eos.is_ideal) flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*(consr.e  - consl.e )) * qb;
     flux_hll.by = (lambda_r*fl.by - lambda_l*fr.by + qa*(consr.by - consl.by)) * qb;
     flux_hll.bz = (lambda_r*fl.bz - lambda_l*fr.bz + qa*(consr.bz - consl.bz)) * qb;
 
@@ -165,13 +178,13 @@ void HLLE_SR(TeamMember_t const &member, const EOS_Data &eos,
     flx(m,ivx,k,j,i) = flux_interface->mx;
     flx(m,ivy,k,j,i) = flux_interface->my;
     flx(m,ivz,k,j,i) = flux_interface->mz;
-    flx(m,IEN,k,j,i) = flux_interface->e;
+    if(eos.is_ideal) flx(m,IEN,k,j,i) = flux_interface->e;
 
     ey(m,k,j,i) = -flux_interface->by;
     ez(m,k,j,i) =  flux_interface->bz;
 
     // We evolve tau = E - D
-    flx(m,IEN,k,j,i) -= flx(m,IDN,k,j,i);
+    if(eos.is_ideal) flx(m,IEN,k,j,i) -= flx(m,IDN,k,j,i);
   });
 
   return;

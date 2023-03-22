@@ -51,8 +51,23 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     Real &wr_ivz=wr(ivz,i);
 
     Real wl_ipr, wr_ipr;
-    wl_ipr = eos.IdealGasPressure(wl(IEN,i));
-    wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+    Real wgas_l, wgas_r;
+
+    if(eos.is_ideal){
+      wl_ipr = eos.IdealGasPressure(wl(IEN,i));
+      wr_ipr = eos.IdealGasPressure(wr(IEN,i));
+
+      wgas_l = wl_idn + gamma_prime * wl_ipr;  // total enthalpy in L-state
+      wgas_r = wr_idn + gamma_prime * wr_ipr;  // total enthalpy in R-state
+    }else{
+      Real temperature = SQR(eos.iso_cs)/(1.0 - SQR(eos.iso_cs/eos.iso_cs_rel_lim));
+      Real eps = temperature/SQR(eos.iso_cs_rel_lim);
+      wl_ipr = wl_idn*temperature;
+      wr_ipr = wr_idn*temperature;
+
+      wgas_l = wl_idn*(1.+ eps) + wl_ipr;
+      wgas_r = wr_idn*(1.+ eps) + wr_ipr;
+    }
 
     // Extract components of metric
     Real &x1min = size.d_view(m).x1min;
@@ -147,15 +162,13 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Calculate difference du =  U_R - U_l in conserved quantities (rho u^0 and T^0_\mu)
     HydCons1D du;
-    Real wgas_l = wl_idn + gamma_prime * wl_ipr;
-    Real wgas_r = wr_idn + gamma_prime * wr_ipr;
     Real qa = wgas_r * uur[0];
     Real qb = wgas_l * uul[0];
     du.d  = wr_idn * uur[0] - wl_idn * uul[0];
     du.mx = qa * ulr[ivx] - qb * ull[ivx];
     du.my = qa * ulr[ivy] - qb * ull[ivy];
     du.mz = qa * ulr[ivz] - qb * ull[ivz];
-    du.e  = qa * ulr[0] - qb * ull[0] + wr_ipr - wl_ipr;
+    if(eos.is_ideal) du.e  = qa * ulr[0] - qb * ull[0] + wr_ipr - wl_ipr;
 
     // Calculate fluxes in L region (rho u^i and T^i_\mu, where i = ivx)
     HydCons1D fl;
@@ -164,7 +177,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     fl.mx = qa * ull[ivx] + wl_ipr;
     fl.my = qa * ull[ivy];
     fl.mz = qa * ull[ivz];
-    fl.e  = qa * ull[0];
+    if(eos.is_ideal) fl.e  = qa * ull[0];
 
     // Calculate fluxes in R region (rho u^i and T^i_\mu, where i = ivx)
     HydCons1D fr;
@@ -173,7 +186,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     fr.mx = qa * ulr[ivx] + wr_ipr;
     fr.my = qa * ulr[ivy];
     fr.mz = qa * ulr[ivz];
-    fr.e  = qa * ulr[0];
+    if(eos.is_ideal) fr.e  = qa * ulr[0];
 
     // Calculate fluxes in HLL region
     HydCons1D flux_hll;
@@ -183,7 +196,7 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     flux_hll.mx = (lambda_r*fl.mx - lambda_l*fr.mx + qa*du.mx) * qb;
     flux_hll.my = (lambda_r*fl.my - lambda_l*fr.my + qa*du.my) * qb;
     flux_hll.mz = (lambda_r*fl.mz - lambda_l*fr.mz + qa*du.mz) * qb;
-    flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
+    if(eos.is_ideal) flux_hll.e  = (lambda_r*fl.e  - lambda_l*fr.e  + qa*du.e ) * qb;
 
     // Determine region of wavefan
     HydCons1D *flux_interface;
@@ -200,10 +213,11 @@ void HLLE_GR(TeamMember_t const &member, const EOS_Data &eos,
     flx(m,ivx,k,j,i) = flux_interface->mx;
     flx(m,ivy,k,j,i) = flux_interface->my;
     flx(m,ivz,k,j,i) = flux_interface->mz;
-    flx(m,IEN,k,j,i) = flux_interface->e;
-
-    // We evolve tau = T^t_t + D
-    flx(m,IEN,k,j,i) += flx(m,IDN,k,j,i);
+    if(eos.is_ideal) {
+      flx(m,IEN,k,j,i) = flux_interface->e;
+      // We evolve tau = T^t_t + D
+      flx(m,IEN,k,j,i) += flx(m,IDN,k,j,i);
+    }
   });
 
   return;

@@ -44,8 +44,10 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos,
     wri.by = br(iby,i);
     wri.bz = br(ibz,i);
 
-    wli.e = wl(IEN,i);
-    wri.e = wr(IEN,i);
+    if(eos.is_ideal){
+      wli.e = wl(IEN,i);
+      wri.e = wr(IEN,i);
+    }
 
     // Extract normal magnetic field
     Real &bxi = bx(m,k,j,i);
@@ -56,7 +58,7 @@ void LLF_SR(TeamMember_t const &member, const EOS_Data &eos,
 
     // Store results in 3D array of fluxes
     flx(m,IDN,k,j,i) = flux.d;
-    flx(m,IEN,k,j,i) = flux.e;
+    if(eos.is_ideal) flx(m,IEN,k,j,i) = flux.e;
     flx(m,ivx,k,j,i) = flux.mx;
     flx(m,ivy,k,j,i) = flux.my;
     flx(m,ivz,k,j,i) = flux.mz;
