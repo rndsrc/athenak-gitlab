@@ -70,8 +70,8 @@ MHD::MHD(MeshBlockPack *ppack, ParameterInput *pin) :
       peos = new IsothermalGRMHD(ppack, pin);
     } else {
       peos = new IsothermalMHD(ppack, pin);
+     }
       nmhd = 4;
-    }
 
   // EOS string not recognized
   } else {

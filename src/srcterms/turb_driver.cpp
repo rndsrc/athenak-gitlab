@@ -23,6 +23,8 @@
 #include "eos/eos.hpp"
 #include "eos/ideal_c2p_hyd.hpp"
 #include "eos/ideal_c2p_mhd.hpp"
+#include "eos/isothermal_c2p_hyd.hpp"
+#include "eos/isothermal_c2p_mhd.hpp"
 
 //----------------------------------------------------------------------------------------
 // constructor, initializes data structures and parameters
@@ -854,6 +856,8 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
   DvceArray5D<Real> u0,u0_;
   DvceArray5D<Real> w0;
   DvceFaceFld4D<Real>* bcc0;
+
+
   if (pmy_pack->phydro != nullptr) u0 = (pmy_pack->phydro->u0);
   if (pmy_pack->phydro != nullptr) peos = (pmy_pack->phydro->peos);
   if (pmy_pack->pmhd != nullptr) u0 = (pmy_pack->pmhd->u0);
@@ -883,6 +887,9 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
     }
   );
 
+
+  auto &eos = peos->eos_data;
+
   par_for("push", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
       Real v1 = force_(m,0,k,j,i);
@@ -904,7 +911,7 @@ TaskStatus TurbulenceDriver::AddForcing(Driver *pdrive, int stage) {
 
 	auto Fv = (v1*ux + v2 * uy + v3 * uz)/ut;
 
-        u0(m, IEN, k,j,i) += Fv*den*dt;
+        if(eos.is_ideal) u0(m, IEN, k,j,i) += Fv*den*dt;
       }
       u0(m,IM1,k,j,i) += den*v1*dt;
       u0(m,IM2,k,j,i) += den*v2*dt;
@@ -944,7 +951,7 @@ if (pmy_pack->pmhd != nullptr){
 	    u.mx = u0(m,IM1,k,j,i);
 	    u.my = u0(m,IM2,k,j,i);
 	    u.mz = u0(m,IM3,k,j,i);
-	    u.e  = u0(m,IEN,k,j,i);
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
 
 	    u.bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
 	    u.by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
@@ -961,8 +968,13 @@ if (pmy_pack->pmhd != nullptr){
 	    bool dfloor_used=false, efloor_used=false;
 	    bool vceiling_used=false, c2p_failure=false;
 	    int iter_used=0;
+	    if(eos.is_ideal){
 	    SingleC2P_IdealSRMHD(u, eos, s2, b2, rpar, w,
 				 dfloor_used, efloor_used, c2p_failure, iter_used);
+	    }else{
+	    SingleC2P_IsothermalSRMHD(u, eos, s2, b2, rpar, w,
+				 dfloor_used, c2p_failure, iter_used);
+	    }
 	    // apply velocity ceiling if necessary
 	    Real lor = sqrt(1.0+SQR(w.vx)+SQR(w.vy)+SQR(w.vz));
 	    if (lor > eos.gamma_max) {
@@ -980,7 +992,7 @@ if (pmy_pack->pmhd != nullptr){
 	u0(m,IM1,k,j,i) = w.vx;
 	u0(m,IM2,k,j,i) = w.vy;
 	u0(m,IM3,k,j,i) = w.vz;
-	u0(m,IEN,k,j,i) = w.e;
+	if(eos.is_ideal) u0(m,IEN,k,j,i) = w.e;
 
     }
   );
@@ -998,7 +1010,7 @@ if (pmy_pack->pmhd != nullptr){
 	    u.mx = u0(m,IM1,k,j,i);
 	    u.my = u0(m,IM2,k,j,i);
 	    u.mz = u0(m,IM3,k,j,i);
-	    u.e  = u0(m,IEN,k,j,i);
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
 
 	    // Compute (S^i S_i) (eqn C2)
 	    Real s2 = SQR(u.mx) + SQR(u.my) + SQR(u.mz);
@@ -1009,8 +1021,13 @@ if (pmy_pack->pmhd != nullptr){
 	    bool dfloor_used=false, efloor_used=false;
 	    bool vceiling_used=false, c2p_failure=false;
 	    int iter_used=0;
+	    if(eos.is_ideal){
 	    SingleC2P_IdealSRHyd(u, eos, s2, w,
 				 dfloor_used, efloor_used, c2p_failure, iter_used);
+	    }else{
+	    SingleC2P_IsothermalSRHyd(u, eos, s2, w,
+				 dfloor_used, c2p_failure, iter_used);
+	    }
 	    // apply velocity ceiling if necessary
 	    Real lor = sqrt(1.0+SQR(w.vx)+SQR(w.vy)+SQR(w.vz));
 	    if (lor > eos.gamma_max) {
@@ -1025,7 +1042,7 @@ if (pmy_pack->pmhd != nullptr){
 	u0(m,IM1,k,j,i) = w.vx;
 	u0(m,IM2,k,j,i) = w.vy;
 	u0(m,IM3,k,j,i) = w.vz;
-	u0(m,IEN,k,j,i) = w.e;
+	if(eos.is_ideal) u0(m,IEN,k,j,i) = w.e;
 
     }
   );
@@ -1096,7 +1113,7 @@ if (pmy_pack->pmhd != nullptr){
   par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
 
-  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
+       if(eos.is_ideal)  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
 
 
 	    // load single state conserved variables
@@ -1105,14 +1122,19 @@ if (pmy_pack->pmhd != nullptr){
 	    u.vx = u0(m,IM1,k,j,i);
 	    u.vy = u0(m,IM2,k,j,i);
 	    u.vz = u0(m,IM3,k,j,i);
-	    u.e  = u0(m,IEN,k,j,i);
+            u.e = 0.;
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
 
 	    u.bx = 0.5*(b.x1f(m,k,j,i) + b.x1f(m,k,j,i+1));
 	    u.by = 0.5*(b.x2f(m,k,j,i) + b.x2f(m,k,j+1,i));
 	    u.bz = 0.5*(b.x3f(m,k,j,i) + b.x3f(m,k+1,j,i));
 
 	    HydCons1D u_out;
-	    SingleP2C_IdealSRMHD(u, eos.gamma, u_out);
+	    if(eos.is_ideal){
+	      SingleP2C_IdealSRMHD(u, eos.gamma, u_out);
+	    }else{
+	      SingleP2C_IsothermalSRMHD(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+	    }
 
         Real en = u_out.d + u_out.e;
 	Real sx = u_out.mx;
@@ -1131,8 +1153,10 @@ if (pmy_pack->pmhd != nullptr){
 
 	// Does not require knowledge of v
 
-	u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
-	u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+        if(eos.is_ideal){
+		u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
+		u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+	}
 
 	u0(m, IM1,k,j,i) = sx+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vx;
 	u0(m, IM2,k,j,i) = sy+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vy;
@@ -1151,7 +1175,7 @@ if (pmy_pack->pmhd != nullptr){
   par_for("net_mom_4", DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
 
-  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
+       if(eos.is_ideal)  u0(m,IEN,k,j,i) = fmin(u0(m,IEN,k,j,i), 40.*u0(m,IDN,k,j,i));
 
 	    // load single state conserved variables
 	    HydPrim1D u;
@@ -1159,10 +1183,15 @@ if (pmy_pack->pmhd != nullptr){
 	    u.vx = u0(m,IM1,k,j,i);
 	    u.vy = u0(m,IM2,k,j,i);
 	    u.vz = u0(m,IM3,k,j,i);
-	    u.e  = u0(m,IEN,k,j,i);
+	    u.e = 0.;
+	    if(eos.is_ideal) u.e  = u0(m,IEN,k,j,i);
 
 	    HydCons1D u_out;
-	    SingleP2C_IdealSRHyd(u, eos.gamma, u_out);
+	    if(eos.is_ideal){
+	      SingleP2C_IdealSRHyd(u, eos.gamma, u_out);
+	    }else{
+	      SingleP2C_IsothermalSRHyd(u, eos.iso_cs, eos.iso_cs_rel_lim, u_out);
+	    }
 
         Real en = u_out.d + u_out.e;
 	Real sx = u_out.mx;
@@ -1180,9 +1209,11 @@ if (pmy_pack->pmhd != nullptr){
 	u0(m,IDN,k,j,i) = dens; //*uA_0*(1.-beta*betaA);
 
 	// Does not require knowledge of v
-
-	u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
-	u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+      
+        if(eos.is_ideal){
+		u0(m, IEN,k,j,i) = uA_0*en - uA_0*(sx*vx + sy*vy + sz*vz);
+		u0(m, IEN,k,j,i) -= u0(m,IDN,k,j,i);
+	}
 
 	u0(m, IM1,k,j,i) = sx+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vx;
 	u0(m, IM2,k,j,i) = sy+ (uA_0 -1.)/(betaA*betaA)*(sx*vx + sy*vy + sz*vz)*vy;

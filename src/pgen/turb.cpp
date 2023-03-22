@@ -121,12 +121,12 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       u0(m,IM3,k,j,i) = 0.0;
 
       // initialize B
-      b0.x1f(m,k,j,i) = 0.0;
+      b0.x1f(m,k,j,i) = B0;
       b0.x2f(m,k,j,i) = 0.0;
-      b0.x3f(m,k,j,i) = B0;
-      if (i==ie) {b0.x1f(m,k,j,i+1) = 0.0;}
+      b0.x3f(m,k,j,i) = 0.0;
+      if (i==ie) {b0.x1f(m,k,j,i+1) = B0;}
       if (j==je) {b0.x2f(m,k,j+1,i) = 0.0;}
-      if (k==ke) {b0.x3f(m,k+1,j,i) = B0;}
+      if (k==ke) {b0.x3f(m,k+1,j,i) = 0.0;}
 
       if (eos.is_ideal) {
         u0(m,IEN,k,j,i) = p0/gm1 + 0.5*B0*B0 + // fix contribution from dB
