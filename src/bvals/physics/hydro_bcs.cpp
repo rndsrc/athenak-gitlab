@@ -48,9 +48,16 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
             }
           }
           break;
+        // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
         case BoundaryFlag::outflow:
           for (int i=0; i<ng; ++i) {
             u0(m,n,k,j,is-i-1) = u0(m,n,k,j,is);
+          }
+          break;
+        case BoundaryFlag::extrapolate_outflow:
+          for (int i=0; i<ng; ++i) {
+            u0(m,n,k,j,is-i-1) = 4.*u0(m,n,k,j,is-i)   -6.*u0(m,n,k,j,is-i+1)
+                                +4.*u0(m,n,k,j,is-i+2) -1.*u0(m,n,k,j,is-i+3);
           }
           break;
         case BoundaryFlag::inflow:
@@ -85,6 +92,13 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
         case BoundaryFlag::outflow:
           for (int i=0; i<ng; ++i) {
             u0(m,n,k,j,ie+i+1) = u0(m,n,k,j,ie);
+          }
+          break;
+        // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
+        case BoundaryFlag::extrapolate_outflow:
+          for (int i=0; i<ng; ++i) {
+            u0(m,n,k,j,ie+i+1) = 4.*u0(m,n,k,j,ie+i)   -6.*u0(m,n,k,j,ie+i-1)
+                                +4.*u0(m,n,k,j,ie+i-2) -1.*u0(m,n,k,j,ie+i-3);
           }
           break;
         case BoundaryFlag::inflow:
@@ -130,6 +144,13 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
             u0(m,n,k,js-j-1,i) = u0(m,n,k,js,i);
           }
           break;
+        // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
+        case BoundaryFlag::extrapolate_outflow:
+          for (int j=0; j<ng; ++j) {
+            u0(m,n,k,js-j-1,i) = 4.*u0(m,n,k,js-j,i)   -6.*u0(m,n,k,js-j+1,i)
+                                +4.*u0(m,n,k,js-j+2,i) -1.*u0(m,n,k,js-j+3,i);
+          }
+          break;
         case BoundaryFlag::inflow:
           for (int j=0; j<ng; ++j) {
             u0(m,n,k,js-j-1,i) = u_in.d_view(n,BoundaryFace::inner_x2);
@@ -161,6 +182,13 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
         case BoundaryFlag::outflow:
           for (int j=0; j<ng; ++j) {
             u0(m,n,k,je+j+1,i) = u0(m,n,k,je,i);
+          }
+          break;
+        // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
+        case BoundaryFlag::extrapolate_outflow:
+          for (int j=0; j<ng; ++j) {
+            u0(m,n,k,je+j+1,i) = 4.*u0(m,n,k,je+j,i)   -6.*u0(m,n,k,je+j-1,i)
+                                +4.*u0(m,n,k,je+j-2,i) -1.*u0(m,n,k,je+j-3,i);
           }
           break;
         case BoundaryFlag::inflow:
@@ -205,6 +233,13 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
           u0(m,n,ks-k-1,j,i) = u0(m,n,ks,j,i);
         }
         break;
+      // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
+      case BoundaryFlag::extrapolate_outflow:
+        for (int k=0; k<ng; ++k) {
+          u0(m,n,ks-k-1,j,i) = 4.*u0(m,n,ks-k,j,i)   -6.*u0(m,n,ks-k+1,j,i)
+                              +4.*u0(m,n,ks-k+2,j,i) -1.*u0(m,n,ks-k+3,j,i);
+        }
+        break;
       case BoundaryFlag::inflow:
         for (int k=0; k<ng; ++k) {
           u0(m,n,ks-k-1,j,i) = u_in.d_view(n,BoundaryFace::inner_x3);
@@ -237,6 +272,13 @@ void BoundaryValues::HydroBCs(MeshBlockPack *ppack, DualArray2D<Real> u_in,
       case BoundaryFlag::outflow:
         for (int k=0; k<ng; ++k) {
           u0(m,n,ke+k+1,j,i) = u0(m,n,ke,j,i);
+        }
+        break;
+      // Taken from GR-Athena++, src/bvals/cc/extrapolate_outflow_cc.cpp
+      case BoundaryFlag::extrapolate_outflow:
+        for (int k=0; k<ng; ++k) {
+          u0(m,n,ke+k+1,j,i) = 4.*u0(m,n,ke+k,j,i)   -6.*u0(m,n,ke+k-1,j,i)
+                              +4.*u0(m,n,ke+k-2,j,i) -1.*u0(m,n,ke+k-3,j,i);
         }
         break;
       case BoundaryFlag::inflow:

@@ -454,6 +454,8 @@ BoundaryFlag Mesh::GetBoundaryFlag(const std::string& input_string) {
     return BoundaryFlag::reflect;
   } else if (input_string == "outflow") {
     return BoundaryFlag::outflow;
+  } else if (input_string == "extrapolate_outflow") {
+    return BoundaryFlag::extrapolate_outflow;
   } else if (input_string == "inflow") {
     return BoundaryFlag::inflow;
   } else if (input_string == "diode") {
