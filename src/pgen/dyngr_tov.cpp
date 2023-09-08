@@ -600,7 +600,7 @@ static Real Interpolate(Real x, const Real x1, const Real x2, const Real y1, con
 void TOVHistory(HistoryData *pdata, Mesh *pm) {
   // All the functions we need are in the hydro variables; return early if
   // the data isn't hydro data.
-  if (pdata->physics != PhysicsModule::HydroDynamics) {
+  if (pdata->physics != PhysicsModule::MagnetoHydroDynamics) {
     return;
   }
   // Otherwise, the first thing we need to do is increase the number of variables available.
@@ -610,7 +610,7 @@ void TOVHistory(HistoryData *pdata, Mesh *pm) {
   pdata->label[nmhd+6] = "rho-max";
 
   // capture class variables for kernel
-  auto &w0_ = pm->pmb_pack->phydro->w0;
+  auto &w0_ = pm->pmb_pack->pmhd->w0;
 
   // loop over all MeshBlocks in this pack
   auto &indcs = pm->pmb_pack->pmesh->mb_indcs;
