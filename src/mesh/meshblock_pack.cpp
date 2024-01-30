@@ -17,6 +17,7 @@
 #include "mhd/mhd.hpp"
 #include "adm/adm.hpp"
 #include "z4c/z4c.hpp"
+#include "z4c/z4c_puncture_tracker.hpp"
 #include "ion-neutral/ion_neutral.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"

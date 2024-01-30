@@ -15,6 +15,8 @@
 #include "globals.hpp"
 #include "mesh/mesh.hpp"
 #include "z4c/z4c.hpp"
+#include "z4c/z4c_amr.hpp"
+#include "z4c/z4c_puncture_tracker.hpp"
 #include "adm/adm.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "TwoPunctures.h"

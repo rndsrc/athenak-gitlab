@@ -157,7 +157,6 @@ void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp)
 // L-2 norm for refinement kind of like sphere in sphere
 void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
 {
-  PRD;
   auto &refine_flag = pmbp->pmesh->pmr->refine_flag;
   auto &size = pmbp->pmb->mb_size;
   int nmb = pmbp->nmb_thispack;
