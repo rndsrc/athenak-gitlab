@@ -49,6 +49,7 @@ struct Z4cTaskIDs {
 };
 
 namespace z4c {
+class Z4c_AMR;
 
 // Shift needed for derivatives
 //----------------------------------------------------------------------------------------
@@ -234,6 +235,9 @@ class Z4c {
   void Z4cWeyl(MeshBlockPack *pmbp);
   void WaveExtr(MeshBlockPack *pmbp);
   void AlgConstr(MeshBlockPack *pmbp);
+
+  // amr criteria
+  Z4c_AMR *pz4c_amr{nullptr};
 
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Z4c
