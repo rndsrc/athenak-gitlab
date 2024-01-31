@@ -43,7 +43,7 @@ struct Z4cTaskIDs {
   TaskID csend;
   TaskID crecv;
   TaskID restu;
-  TaskID ptrack;
+  TaskID ptrck;
   TaskID weyl_scalar;
   TaskID waveform;
 };
