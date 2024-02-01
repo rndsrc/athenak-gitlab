@@ -25,14 +25,14 @@ static ini_data *data;
 
 void ADMTwoPunctures(MeshBlockPack *pmbp, ini_data *data);
 //void Z4cHistFunc(HistoryData *pdata, Mesh *pm);
-void RefinementCondition(MeshBlockPack* pmbp);
+//void RefinementCondition(MeshBlockPack* pmbp);
 
 //----------------------------------------------------------------------------------------
 //! \fn ProblemGenerator::UserProblem_()
 //! \brief Problem Generator for two punctures
 void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   //user_hist_func = Z4cHistFunc;
-  user_ref_func  = RefinementCondition;
+  //user_ref_func  = RefinementCondition;
 
   if (restart) return;
 
@@ -323,7 +323,8 @@ void Z4cHistFunc(HistoryData *pdata, Mesh *pm)
 */
 
 // how decide the refinement
-void RefinementCondition(MeshBlockPack* pmbp) 
+/*void RefinementCondition(MeshBlockPack* pmbp) 
 {
   pmbp->pz4c->pz4c_amr->Refine(pmbp);
-}
+}*/
+
