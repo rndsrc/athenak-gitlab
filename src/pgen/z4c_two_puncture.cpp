@@ -291,15 +291,25 @@ void ADMTwoPunctures(MeshBlockPack *pmbp, ini_data *data) {
       host_adm.vK_dd(m,1, 2, k, j, i) = Kyz[flat_ix];
     }
 
-    free(gxx); free(gyy); free(gzz);
-    free(gxy); free(gxz); free(gyz);
+    delete [] gxx;
+    delete [] gyy;
+    delete [] gzz;
+    delete [] gxy;
+    delete [] gxz; 
+    delete [] gyz;
 
-    free(Kxx); free(Kyy); free(Kzz);
-    free(Kxy); free(Kxz); free(Kyz);
+    delete [] Kxx;
+    delete [] Kyy;
+    delete [] Kzz;
+    delete [] Kxy;
+    delete [] Kxz; 
+    delete [] Kyz;
 
-    free(psi); free(alp);
-
-    free(x); free(y); free(z);
+    delete [] psi;
+    delete [] alp;
+    delete [] x;
+    delete [] y;
+    delete [] z;
   }
   Kokkos::deep_copy(u_adm, host_u_adm);
   return;
