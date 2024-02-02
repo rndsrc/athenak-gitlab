@@ -33,7 +33,6 @@ LagrangeInterpolator::LagrangeInterpolator(MeshBlockPack *pmy_pack, Real rcoords
   for(int i=0;i<3;++i) {
     rcoord(i) = rcoords[i];
   }
-
   SetInterpolationIndices();
   CalculateWeight();
 }
@@ -57,34 +56,11 @@ Real LagrangeInterpolator::Interpolate(DvceArray5D<Real> &val,int nvars) {
             for (int j=0; j<2*ng; j++) {
                 for (int k=0; k<2*ng; k++) {
                     Real iwght = weights(i,0)*weights(j,1)*weights(k,2);
-                    ivals += iwght*val(ii0,nvars,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
-                }
-            }
-        }
-    }
-  return ivals;
-}
-
-Real LagrangeInterpolator::InterpolateTensor(AthenaTensor<Real,TensorSymm::NONE,3,1> &val,int nvars) {
-  Real ivals = 0.;
-  int &ng = pmy_pack->pmesh->mb_indcs.ng;
-  int &ii0 = interp_indcs(0);
-  int &ii1 = interp_indcs(1);
-  int &ii2 = interp_indcs(2);
-  int &ii3 = interp_indcs(3);
-  auto &weights = interp_wghts;
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
-
-  int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
-
-  if (interp_indcs(0)==-1) {  // point not on this rank
-        ivals = 0.0;
-  } else {
-        for (int i=0; i<2*ng; i++) {
-            for (int j=0; j<2*ng; j++) {
-                for (int k=0; k<2*ng; k++) {
-                    Real iwght = weights(i,0)*weights(j,1)*weights(k,2);
-                    ivals += iwght*val(ii0,nvars,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
+                    auto buffer = Kokkos::subview(val,ii0,nvars,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
+                    Real scalar;
+                    // Deep Copy Scalar View into a scalar
+                    Kokkos::deep_copy(scalar, buffer);
+                    ivals += iwght*scalar;
                 }
             }
         }

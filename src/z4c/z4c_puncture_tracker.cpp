@@ -85,15 +85,14 @@ PunctureTracker::~PunctureTracker() {
 //----------------------------------------------------------------------------------------
 void PunctureTracker::InterpolateShift(MeshBlockPack *pmbp) 
 {
-  auto &z4c = pmbp->pz4c->z4c;
-  auto &beta_u = z4c.beta_u;
+  auto &pz4c = pmbp->pz4c;
+  auto &u0 = pz4c->u0;
   auto *S = new LagrangeInterpolator(pmbp,pos);
 
-  if (S->point_exist)
-  {
-    for (int a = 0; a < 3; ++a) {
-      betap[a] = S->InterpolateTensor(beta_u,a);
-    }
+  if (S->point_exist) {
+    betap[0] = S->Interpolate(u0,pz4c->I_Z4C_BETAX);
+    betap[1] = S->Interpolate(u0,pz4c->I_Z4C_BETAY);
+    betap[2] = S->Interpolate(u0,pz4c->I_Z4C_BETAZ);
     owns_puncture = true;
   }
   

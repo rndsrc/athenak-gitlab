@@ -25,11 +25,11 @@ class LagrangeInterpolator {
   Real ResetPointAndInterpolate(DvceArray5D<Real> &val, int nvars, Real rcoords2[3]);
   bool point_exist; // point exist on this rank (meshblock pack)
  private:
-  DvceArray1D<Real> rcoord; // xyz coordinate for interpolated value
+  HostArray1D<Real> rcoord; // xyz coordinate for interpolated value
 
   int nvars; // index of the variable for interpolation
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Hydro
   int ng; // number of ghost cell, which sets interpolation level automatically
-  DvceArray1D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
-  DvceArray2D<Real> interp_wghts;  // weights for interpolation
+  HostArray1D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
+  HostArray2D<Real> interp_wghts;  // weights for interpolation
 };
