@@ -37,7 +37,10 @@ class TurbulenceDriver {
   int mode_count;
   Real tcorr, dedt;
   Real expo, exp_prl, exp_prp;
+  Real dtdrive;
+  Real drive_time = 0.0;
   int driving_type;
+  bool parabola_driving;
 
   // functions
   void IncludeInitializeModesTask(TaskList &tl, TaskID start);
