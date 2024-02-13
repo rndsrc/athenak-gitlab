@@ -4,10 +4,11 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 
-#ifndef PUNCTURE_TRACKER_HPP_
-#define PUNCTURE_TRACKER_HPP_
+#ifndef Z4C_Z4C_PUNCTURE_TRACKER_HPP_
+#define Z4C_Z4C_PUNCTURE_TRACKER_HPP_
 
 #include <string>
+#include <cstdio>
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
@@ -22,7 +23,7 @@ namespace z4c {
 //! \class PunctureTracker
 //! \brief Tracks a single puncture
 class PunctureTracker {
-  public:
+ public:
     //! Initialize a tracker
     PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n);
     //! Destructor (will close output file)
@@ -38,7 +39,7 @@ class PunctureTracker {
       return pos[a];
     }
 
-  private:
+ private:
     bool owns_puncture;
     bool bitant;
     Real pos[NDIM];
@@ -49,4 +50,5 @@ class PunctureTracker {
 };
 
 }// end namespace z4c
-#endif
+
+#endif // Z4C_Z4C_PUNCTURE_TRACKER_HPP_

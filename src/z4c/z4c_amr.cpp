@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <limits>
 
 #include "athena.hpp"
 #include "parameter_input.hpp"

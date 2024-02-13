@@ -43,8 +43,10 @@ PunctureTracker::PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n):
     if (access(ofname.c_str(), F_OK) == 0) {
       pofile = fopen(ofname.c_str(), "a");
       if (NULL == pofile) {
-        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl;
-        std::cout << "Could not open file '" << ofname << "' for writing!" << std::endl;
+        std::cout << "### FATAL ERROR in " << __FILE__ 
+                  << " at line " << __LINE__ << std::endl;
+        std::cout << "Could not open file '" << ofname 
+                  << "' for writing!" << std::endl;
         std::exit(EXIT_FAILURE);
       }
       // read the last iteration and position (used after a restart)
@@ -71,8 +73,10 @@ PunctureTracker::PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n):
     else {
       pofile = fopen(ofname.c_str(), "w");
       if (NULL == pofile) {
-        std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl;
-        std::cout << "Could not open file '" << ofname << "' for writing!" << std::endl;
+        std::cout << "### FATAL ERROR in " << __FILE__ 
+                  << " at line " << __LINE__ << std::endl;
+        std::cout << "Could not open file '" << ofname 
+                  << "' for writing!" << std::endl;
         std::exit(EXIT_FAILURE);
       }
       fprintf(pofile, "# 1:time 2:x 3:y 4:z 5:betax 6:betay 7:betaz\n");
@@ -117,7 +121,8 @@ void PunctureTracker::EvolveTracker() {
   }
 #if !(MPI_PARALLEL_ENABLED)
   else {
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl;
+    std::cout << "### FATAL ERROR in " << __FILE__ 
+              << " at line " << __LINE__ << std::endl;
     std::cout << "couldn't find the puncture!" << std::endl;
     std::exit(EXIT_FAILURE);
   }
@@ -134,7 +139,8 @@ void PunctureTracker::EvolveTracker() {
   }
   MPI_Allreduce(MPI_IN_PLACE, buf, 2*NDIM + 1, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
   if (buf[6] < 1.) {
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl;
+    std::cout << "### FATAL ERROR in " << __FILE__ 
+              << " at line " << __LINE__ << std::endl;
     std::cout << "The puncture has left the grid" << std::endl;
     std::exit(EXIT_FAILURE);
   }
