@@ -7,8 +7,8 @@
 #ifndef Z4C_Z4C_PUNCTURE_TRACKER_HPP_
 #define Z4C_Z4C_PUNCTURE_TRACKER_HPP_
 
-#include <string>
 #include <cstdio>
+#include <string>
 
 #include "athena.hpp"
 #include "mesh/mesh.hpp"
@@ -23,13 +23,13 @@ namespace z4c {
 //! \class PunctureTracker
 //! \brief Tracks a single puncture
 class PunctureTracker {
- public:
+  public:
     //! Initialize a tracker
-    PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n);
+    PunctureTracker(Mesh *pmesh, ParameterInput *pin, int n);
     //! Destructor (will close output file)
     ~PunctureTracker();
     //! Interpolate the shift vector to the puncture position
-    void InterpolateShift(MeshBlockPack * pmbp);
+    void InterpolateShift(MeshBlockPack *pmbp);
     //! Update and broadcast the puncture position
     void EvolveTracker();
     //! Write data to file
@@ -38,17 +38,16 @@ class PunctureTracker {
     inline Real GetPos(int a) {
       return pos[a];
     }
-
- private:
+  private:
     bool owns_puncture;
     bool bitant;
     Real pos[NDIM];
     Real betap[NDIM];
-    Mesh const * pmesh;
+    Mesh const *pmesh;
     std::string ofname;
-    FILE * pofile;
+    FILE *pofile;
 };
 
-}// end namespace z4c
+} // end namespace z4c
 
 #endif // Z4C_Z4C_PUNCTURE_TRACKER_HPP_

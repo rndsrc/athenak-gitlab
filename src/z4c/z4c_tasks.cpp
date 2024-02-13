@@ -8,6 +8,7 @@
 //  stagestart_tl, stagerun_tl, stageend_tl, operatorsplit_tl (currently not used)
 
 #include <iostream>
+#include <cstdio>
 
 #include "athena.hpp"
 #include "globals.hpp"
