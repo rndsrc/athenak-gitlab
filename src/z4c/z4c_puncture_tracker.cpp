@@ -22,7 +22,7 @@ using namespace z4c;
 
 //----------------------------------------------------------------------------------------
 PunctureTracker::PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n):
-    owns_puncture{false}, pos{NAN, NAN, NAN}, betap{NAN, NAN, NAN}, 
+    owns_puncture{false}, pos{NAN, NAN, NAN}, betap{NAN, NAN, NAN},
     pmesh{pmesh} {
   ofname = pin->GetString("job", "basename") + ".";
   ofname += pin->GetOrAddString("z4c", "filename", "puncture_");
@@ -56,9 +56,9 @@ PunctureTracker::PunctureTracker(Mesh * pmesh, ParameterInput * pin, int n):
         if (line.length() > 1) lastline.str(line);
       }
       file.close();
-      
+
       // get iter, pos, beta
-      lastline >> time 
+      lastline >> time
                >> pos[0]   >> pos[1]   >> pos[2]
                >> betap[0] >> betap[1] >> betap[2];
     }
@@ -83,7 +83,7 @@ PunctureTracker::~PunctureTracker() {
 }
 
 //----------------------------------------------------------------------------------------
-void PunctureTracker::InterpolateShift(MeshBlockPack *pmbp) 
+void PunctureTracker::InterpolateShift(MeshBlockPack *pmbp)
 {
   auto &pz4c = pmbp->pz4c;
   auto &u0 = pz4c->u0;
@@ -95,13 +95,13 @@ void PunctureTracker::InterpolateShift(MeshBlockPack *pmbp)
     betap[2] = S->Interpolate(u0,pz4c->I_Z4C_BETAZ);
     owns_puncture = true;
   }
-  
+
   delete S;
 }
 
 //----------------------------------------------------------------------------------------
 void PunctureTracker::EvolveTracker() {
-  
+
   if (owns_puncture) {
     for (int a = 0; a < NDIM; ++a) {
       pos[a] -= pmesh->dt * betap[a];
@@ -145,7 +145,7 @@ void PunctureTracker::EvolveTracker() {
 }
 
 //----------------------------------------------------------------------------------------
-void PunctureTracker::WriteTracker() const {  
+void PunctureTracker::WriteTracker() const {
   if (0 == global_variable::my_rank) {
     fprintf(pofile, "%.15e %.15e %.15e %.15e %.15e %.15e %.15e\n",
         pmesh->time, pos[0], pos[1], pos[2], betap[0], betap[1], betap[2]);

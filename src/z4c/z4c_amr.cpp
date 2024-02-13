@@ -42,18 +42,18 @@ void Z4c_AMR::Refine(MeshBlockPack *pmy_pack)
     msg << "No such option for z4c/refinement" << std::endl;
     std::exit(EXIT_FAILURE);
   }
-}  
+}
 
 // Mimicking box in box refinement with Linf
 void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp)
-{  
+{
   auto &refine_flag = pmbp->pmesh->pmr->refine_flag;
   auto &size = pmbp->pmb->mb_size;
   int nmb = pmbp->nmb_thispack;
   int mbs = pmbp->pmesh->gids_eachrank[global_variable::my_rank];
-  Real L = (x1max - x1min)/2. - half_initial_d; 
-  
-  for (int m=0; m < nmb; ++m) 
+  Real L = (x1max - x1min)/2. - half_initial_d;
+
+  for (int m=0; m < nmb; ++m)
   {
     // level
     int level = pmbp->pmesh->lloc_eachmb->level - pmbp->pmesh->root_level;
@@ -66,7 +66,7 @@ void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp)
     Real &x3min = size.h_view(m).x3min;
     Real &x3max = size.h_view(m).x3max;
     Real xv[24];
-    
+
     //Needed to calculate coordinates of vertices of a block with same center but
     //edge of 1/8th of the original size
     Real x1sum_sup = (5*x1max+3*x1min)/8.;
@@ -135,7 +135,7 @@ void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp)
       }
     }
     Real ratio = L/d;
-    if (ratio < 1) 
+    if (ratio < 1)
     {
       refine_flag.d_view(m+mbs) = -1;
       continue;
@@ -143,15 +143,15 @@ void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp)
 
     //Calculate level that the block should be in, given a box-in-box theoretical structure of the grid
     Real th_level = std::floor(std::log2(ratio));
-    if (th_level > level) 
+    if (th_level > level)
     {
       refine_flag.d_view(m+mbs) = 1;
-    } 
-    else if (th_level < level) 
+    }
+    else if (th_level < level)
     {
       refine_flag.d_view(m+mbs) = -1;
     }
-  }// for (int m=0; m < nmb; ++m) 
+  }// for (int m=0; m < nmb; ++m)
 }
 
 // L-2 norm for refinement kind of like sphere in sphere
@@ -161,9 +161,9 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
   auto &size = pmbp->pmb->mb_size;
   int nmb = pmbp->nmb_thispack;
   int mbs = pmbp->pmesh->gids_eachrank[global_variable::my_rank];
-  Real L = (x1max - x1min)/2. - half_initial_d; 
-  
-  for (int m=0; m < nmb; ++m) 
+  Real L = (x1max - x1min)/2. - half_initial_d;
+
+  for (int m=0; m < nmb; ++m)
   {
     // level
     int level = pmbp->pmesh->lloc_eachmb[m+mbs].level - pmbp->pmesh->root_level;
@@ -176,7 +176,7 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
     Real &x3min = size.h_view(m).x3min;
     Real &x3max = size.h_view(m).x3max;
     Real xv[24];
-    
+
     //Needed to calculate coordinates of vertices of a block with same center but
     //edge of 1/8th of the original size
     Real x1sum_sup = (5*x1max+3*x1min)/8.;
@@ -223,7 +223,7 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
     for (auto ptracker : pmbp->pz4c_ptracker) {
       // square difference
       Real diff;
-      
+
       Real dmin_punct = std::numeric_limits<Real>::max();
       for (int i_vert = 0; i_vert < 8; ++i_vert) {
         // Norm_L-2
@@ -234,7 +234,7 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
         }
         // Compute the L-2 norm
         norm_L2 = std::sqrt(norm_L2);
-    
+
        //Calculate minimum of the distances of the 8 vertices above
         if (dmin_punct > norm_L2) {
           dmin_punct = norm_L2;
@@ -243,11 +243,11 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
       //Calculate minimum of the closest between the n punctures
       if (d > dmin_punct) {
         d = dmin_punct;
-      }      
+      }
     }
     Real ratio = L/d;
-    
-    if (ratio < 1) 
+
+    if (ratio < 1)
     {
       refine_flag.d_view(m+mbs) = -1;
       continue;
@@ -255,13 +255,13 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp)
 
     //Calculate level that the block should be in, given a box-in-box theoretical structure of the grid
     Real th_level = std::floor(std::log2(ratio));
-    if (th_level >= level) 
+    if (th_level >= level)
     {
       refine_flag.d_view(m+mbs) = 1;
-    } 
+    }
     else
     {
       refine_flag.d_view(m+mbs) = -1;
     }
-  }// for (int m=0; m < nmb; ++m) 
+  }// for (int m=0; m < nmb; ++m)
 }

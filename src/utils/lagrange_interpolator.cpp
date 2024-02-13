@@ -13,7 +13,7 @@
 #include "athena.hpp"
 #include "athena_tensor.hpp"
 #include "lagrange_interpolator.hpp"
-// calculate indices of the mesh block and xyz coordinate indices for the given point whose coordinate 
+// calculate indices of the mesh block and xyz coordinate indices for the given point whose coordinate
 // is given by rcoord; results returned in interp_indcs[4]
 
 LagrangeInterpolator::LagrangeInterpolator(MeshBlockPack *pmy_pack, Real rcoords[3]):
@@ -114,7 +114,7 @@ void LagrangeInterpolator::SetInterpolationIndices() {
                                                             (x2min+dx2/2.0))/dx2));
             interp_indcs(3) = static_cast<int>(std::floor((rcoord(2)-
                                                             (x3min+dx3/2.0))/dx3));
-      
+
            break;
       }
     }
