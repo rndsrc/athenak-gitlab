@@ -1,3 +1,9 @@
+//========================================================================================
+// AthenaXXX astrophysical plasma code
+// Copyright(C) 2020 James M. Stone <jmstone@ias.edu> and the Athena code team
+// Licensed under the 3-clause BSD License (the "LICENSE")
+//========================================================================================
+
 #ifndef PUNCTURE_TRACKER_HPP_
 #define PUNCTURE_TRACKER_HPP_
 
