@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -24,7 +25,7 @@
 #include "z4c/z4c.hpp"
 #include "z4c_puncture_tracker.hpp"
 
-using namespace z4c;
+namespace z4c {
 
 //----------------------------------------------------------------------------------------
 PunctureTracker::PunctureTracker(Mesh *pmesh, ParameterInput *pin, int n):
@@ -164,3 +165,4 @@ void PunctureTracker::WriteTracker() const {
     fflush(pofile);
   }
 }
+} // namespace z4c
