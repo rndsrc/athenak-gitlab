@@ -16,7 +16,7 @@
 #include "z4c/z4c_amr.hpp"
 #include "z4c/z4c_puncture_tracker.hpp"
 
-using namespace z4c;
+namespace z4c{
 
 // set some parameters
 Z4c_AMR::Z4c_AMR(Z4c *z4c, ParameterInput *pin): pz4c(z4c), pin(pin) {
@@ -256,4 +256,5 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp) {
       refine_flag.d_view(m + mbs) = -1;
     }
   } // for (int m=0; m < nmb; ++m)
+}
 }

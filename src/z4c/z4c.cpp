@@ -62,7 +62,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u_rhs("u_rhs z4c",1,1,1,1,1),
   u_weyl("u_weyl",1,1,1,1,1),
   psi_out("psi_out",1,1,1),
-  pz4c_amr(new Z4c_AMR(this,pin)){
+  pz4c_amr(new Z4c_AMR(this,pin)) {
   // (1) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
   std::string evolution_t = pin->GetString("time","evolution");

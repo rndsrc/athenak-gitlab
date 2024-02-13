@@ -4,8 +4,8 @@
 // Licensed under the 3-clause BSD License (the "LICENSE")
 //========================================================================================
 
-#ifndef Z4c_AMR_HPP_
-#define Z4c_AMR_HPP_
+#ifndef Z4C_Z4C_AMR_HPP_
+#define Z4C_Z4C_AMR_HPP_
 
 #include "athena.hpp"
 #include <string>
@@ -36,4 +36,4 @@ class Z4c_AMR {
 };
 
 } // namespace z4c
-#endif // Z4c_AMR_HPP_
+#endif // Z4C_Z4C_AMR_HPP_
