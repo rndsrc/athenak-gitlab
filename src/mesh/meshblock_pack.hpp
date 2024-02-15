@@ -9,6 +9,7 @@
 //  \brief defines MeshBlockPack class, a container for MeshBlocks
 
 #include <memory>
+#include <vector> // vector<>
 
 #include "parameter_input.hpp"
 #include "coordinates/coordinates.hpp"

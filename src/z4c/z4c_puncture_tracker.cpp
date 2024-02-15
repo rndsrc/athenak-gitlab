@@ -5,13 +5,14 @@
 //========================================================================================
 
 #include <assert.h>
+#include <unistd.h>
+
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <unistd.h>
 
 #if MPI_PARALLEL_ENABLED
 #include <mpi.h>
@@ -109,7 +110,6 @@ void PunctureTracker::InterpolateShift(MeshBlockPack *pmbp) {
 
 //----------------------------------------------------------------------------------------
 void PunctureTracker::EvolveTracker() {
-
   if (owns_puncture) {
     for (int a = 0; a < NDIM; ++a) {
       pos[a] -= pmesh->dt * betap[a];
@@ -117,15 +117,15 @@ void PunctureTracker::EvolveTracker() {
     // Impose the motion on the z = 0 plane with bitant.
     if (bitant)
       pos[2] = 0;
-  }
 #if !(MPI_PARALLEL_ENABLED)
-  else {
+  } else {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
               << std::endl;
     std::cout << "couldn't find the puncture!" << std::endl;
     std::exit(EXIT_FAILURE);
   }
 #else
+  }
   Real buf[2 * NDIM + 1] = {0., 0., 0., 0., 0., 0., 0.};
   if (owns_puncture) {
     buf[0] = pos[0];

@@ -33,9 +33,8 @@ void Z4c_AMR::Refine(MeshBlockPack *pmy_pack) {
   // use box in box method
   if (ref_method == "Linf_box_in_box") {
     LinfBoxInBox(pmy_pack);
-  }
   // use L-2 norm as a criteria for refinement
-  else if (ref_method == "L2_sphere_in_sphere") {
+  } else if (ref_method == "L2_sphere_in_sphere") {
     L2SphereInSphere(pmy_pack);
   } else {
     std::stringstream msg;
@@ -108,7 +107,7 @@ void Z4c_AMR::LinfBoxInBox(MeshBlockPack *pmbp) {
 
     // Min distance between the two punctures
     Real d = std::numeric_limits<Real>::max();
-    for (auto ptracker: pmbp->pz4c_ptracker) {
+    for (auto ptracker : pmbp->pz4c_ptracker) {
       // Abs difference
       Real diff;
       // Max norm_inf
@@ -214,7 +213,7 @@ void Z4c_AMR::L2SphereInSphere(MeshBlockPack *pmbp) {
 
     // Min distance between the two punctures
     Real d = std::numeric_limits<Real>::max();
-    for (auto ptracker: pmbp->pz4c_ptracker) {
+    for (auto ptracker : pmbp->pz4c_ptracker) {
       // square difference
       Real diff;
 

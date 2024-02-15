@@ -5,14 +5,16 @@
 //========================================================================================
 //! \file lagrange_interpolator.hpp
 
+#include <cmath>
+#include <iostream>
+#include <list>
+
 #include "lagrange_interpolator.hpp"
 #include "athena.hpp"
 #include "athena_tensor.hpp"
 #include "coordinates/cell_locations.hpp"
 #include "mesh/mesh.hpp"
-#include <cmath>
-#include <iostream>
-#include <list>
+
 // calculate indices of the mesh block and xyz coordinate indices for the given
 // point whose coordinate is given by rcoord; results returned in
 // interp_indcs[4]
@@ -23,7 +25,6 @@ LagrangeInterpolator::LagrangeInterpolator(
               pmy_pack(pmy_pack),
               rcoord("rccord", 1), interp_indcs("interp_indcs", 1),
               interp_wghts("interp_wghts", 1, 1), point_exist(false) {
-
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   // int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int &ng = indcs.ng;
@@ -150,7 +151,6 @@ void LagrangeInterpolator::CalculateWeight() {
       interp_wghts(i, 2) = 0.;
     }
   } else {
-
     // extract spherical grid positions
     Real &x0 = rcoord(0);
     Real &y0 = rcoord(1);
