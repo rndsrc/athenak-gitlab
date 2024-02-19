@@ -88,7 +88,6 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
   Real vx3 = pin->GetOrAddReal("problem", "punc_velocity_x3", 0.);
 
   adm::ADM::ADM_vars &adm = pmbp->padm->adm;
-  z4c::Z4c::Z4c_vars &z4c = pmbp->pz4c->z4c;
 
   par_for("pgen one puncture",
   DevExeSpace(),0,nmb-1,ksg,keg,jsg,jeg,isg,ieg,
