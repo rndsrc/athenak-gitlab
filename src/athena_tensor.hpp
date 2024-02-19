@@ -289,7 +289,7 @@ class AthenaScratchTensor<T, sym, ndim, 1> {
   }
 
  private:
-  Real data_[3];
+  Real data_[ndim];
 };
 
 //----------------------------------------------------------------------------------------
@@ -388,8 +388,8 @@ class AthenaScratchTensor<T, sym, ndim, 3> {
   }
 
  private:
-  Real data_[27];
-  int idxmap_[3][3][3];
+  Real data_[ndim*ndim*ndim];
+  int idxmap_[ndim][ndim][ndim];
   int ndof_;
 };
 
@@ -463,8 +463,8 @@ class AthenaScratchTensor<T, sym, ndim, 4> {
   }
 
  private:
-  Real data_[81];
-  int idxmap_[3][3][3][3];
+  Real data_[ndim*ndim*ndim*ndim];
+  int idxmap_[ndim][ndim][ndim][ndim];
   int ndof_;
 };
 
