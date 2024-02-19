@@ -254,9 +254,6 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
 KOKKOS_INLINE_FUNCTION
 void LorentzBoost(Real vx1, Real vx2, Real vx3, AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> &lambda) {
   lambda.ZeroClear();
-  vx1 *= -1;
-  vx2 *= -1;
-  vx3 *= -1;
   // Velocity magnitude squared
   Real vsq = SQR(vx1)+SQR(vx2)+SQR(vx3);
   if (vsq == 0) {
