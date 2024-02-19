@@ -152,16 +152,11 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     for(int a = 1; a < 4; ++a) {
       dpsi4(a) = -ADM_mass*xp[a]*std::pow(psi,3)/std::pow(r,1.5);
     }
-    // spatial partial of g00
-    AthenaScratchTensor<Real, TensorSymm::NONE, 4, 1> dg00;
-    for(int a = 1; a < 4; ++a) {
-      dg00(a) = 8*xp[a]*SQR(ADM_mass-4*r)/(r*std::pow(ADM_mass+4*r,3))
-              + 8*xp[a]*(ADM_mass-4*r)/(r*SQR(ADM_mass+4*r));
-    }
 
     // put together partial derivatives
     for(int a = 1; a < 4; ++a) {
-      dg_p_ddd(a,0,0) = dg00(a);
+      dg_p_ddd(a,0,0) = 8*xp[a]*SQR(ADM_mass-4*r)/(r*std::pow(ADM_mass+4*r,3))
+              + 8*xp[a]*(ADM_mass-4*r)/(r*SQR(ADM_mass+4*r));
       for(int b = 1; b < 4; ++b) {
         dg_p_ddd(a,b,b) = dpsi4(a);
       }
@@ -235,7 +230,8 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> dbeta_du;
     for(int a = 0; a < 3; ++a)
     for(int b = 0; b < 3; ++b) {
-      dbeta_du(a,b) = SQR(adm.alpha(m,k,j,i))*(dg_boosted_duu(a+1,0,b+1)+dg_boosted_duu(a+1,0,0)*adm.beta_u(m,b,k,j,i));
+      dbeta_du(a,b) = SQR(adm.alpha(m,k,j,i))*(dg_boosted_duu(a+1,0,b+1)
+                      +dg_boosted_duu(a+1,0,0)*adm.beta_u(m,b,k,j,i));
     }
 
     // extrinsic curvature
@@ -245,7 +241,7 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
       for(int c = 0; c < 3; ++c) {
         adm.vK_dd(m,a,b,k,j,i) += - adm.beta_u(m,c,k,j,i)*dg_boosted_ddd(c,a,b)
                                   - g_boosted_dd(c,b)*dbeta_du(a,c)
-                                  - g_boosted_dd(c,a)*dbeta_du(b,c);
+                                  - g_boosted_dd(a,c)*dbeta_du(b,c);
       }
       adm.vK_dd(m,a,b,k,j,i) /= - 2*adm.alpha(m,k,j,i);
     }
