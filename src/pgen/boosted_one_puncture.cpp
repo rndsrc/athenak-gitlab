@@ -116,7 +116,8 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     LorentzBoost(vx1, vx2, vx3, lambda);
 
     // inverse Lorentz boost
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> lambda_inv = inverse(lambda);
+    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> lambda_inv;
+    LorentzBoost(-vx1, -vx2, -vx3, lambda_inv);
 
     // coordinate in the boosted frame (p or primed)
     Real xp[4];
@@ -154,8 +155,8 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     // spatial partial of g00
     AthenaScratchTensor<Real, TensorSymm::NONE, 4, 1> dg00;
     for(int a = 1; a < 4; ++a) {
-      dg00(a) = 8*xp[a]*SQR(ADM_mass-4*sqrt(r))/(sqrt(r)*std::pow(ADM_mass+4*sqrt(r),3))
-              + 8*xp[a]*(ADM_mass-4*sqrt(r))/(sqrt(r)*SQR(ADM_mass+4*sqrt(r)));
+      dg00(a) = 8*xp[a]*SQR(ADM_mass-4*r)/(r*std::pow(ADM_mass+4*r,3))
+              + 8*xp[a]*(ADM_mass-4*r)/(r*SQR(ADM_mass+4*r));
     }
 
     // put together partial derivatives
