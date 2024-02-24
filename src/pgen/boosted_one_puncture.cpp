@@ -57,6 +57,16 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     case 4: pmbp->pz4c->ADMToZ4c<4>(pmbp, pin);
             break;
   }
+  pmbp->pz4c->Z4cToADM(pmbp);
+  switch (indcs.ng) {
+    case 2: pmbp->pz4c->ADMConstraints<2>(pmbp);
+            break;
+    case 3: pmbp->pz4c->ADMConstraints<3>(pmbp);
+            break;
+    case 4: pmbp->pz4c->ADMConstraints<4>(pmbp);
+            break;
+  }
+
   std::cout<<"OnePuncture initialized."<<std::endl;
 
 
@@ -79,7 +89,7 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
   int jsg = js-indcs.ng; int jeg = je+indcs.ng;
   int ksg = ks-indcs.ng; int keg = ke+indcs.ng;
   int nmb = pmbp->nmb_thispack;
-  Real ADM_mass = pin->GetOrAddReal("problem", "punc_ADM_mass", 1.);
+  Real m0 = pin->GetOrAddReal("problem", "punc_ADM_mass", 1.);
   Real center_x1 = pin->GetOrAddReal("problem", "punc_center_x1", 0.);
   Real center_x2 = pin->GetOrAddReal("problem", "punc_center_x2", 0.);
   Real center_x3 = pin->GetOrAddReal("problem", "punc_center_x3", 0.);
@@ -111,140 +121,46 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     x2v -= center_x2;
     x3v -= center_x3;
 
-    // construct lorentz boost
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> lambda;
-    LorentzBoost(vx1, vx2, vx3, lambda);
+    // velocity magnitude for now assuming only vx1 is non-zero! Do a rotation later
+    Real vel = std::sqrt(std::pow(vx1,2) + std::pow(vx2,2) + std::pow(vx3,2));
 
-    // inverse Lorentz boost
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> lambda_inv;
-    LorentzBoost(-vx1, -vx2, -vx3, lambda_inv);
+    // boost factor
+    Real Gamma = 1/std::sqrt(1-std::pow(vel,2));
 
-    // coordinate in the boosted frame (p or primed)
-    Real xp[4];
+    // coordinate in the comoving frame (x0)
+    Real x0[4];
     Real xinit[4] = {0,x1v,x2v,x3v};
 
-    for(int a = 0; a < 4; ++a) {
-      xp[a] = 0;
-      for (int b = 0; b < 4; ++b) {
-        xp[a] += lambda(a,b)*xinit[b];
-      }
-    }
-    // radial coordinate in boosted frame
-    Real r = std::sqrt(std::pow(xp[1],2) + std::pow(xp[2],2) + std::pow(xp[3],2));
+    x0[1] = xinit[1]*Gamma;
+    x0[2] = xinit[2];
+    x0[3] = xinit[3];
 
-    // metric in boosted frame
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> g_p_dd;
-    g_p_dd.ZeroClear();
-    // conformal factor and omega (whatever it's called)
-    Real psi = 1.0 + 0.25*ADM_mass/r;
-    Real omega = 1.0 - 0.25*ADM_mass/r;
+    // radial coordinate in comoving frame
+    Real r0 = std::sqrt(std::pow(x0[1],2) + std::pow(x0[2],2) + std::pow(x0[3],2));
 
-    g_p_dd(0,0) = - std::pow(omega,2) / std::pow(psi,2);
-    for(int a = 1; a < 4; ++a) {
-      g_p_dd(a,a) = std::pow(psi,4);
-    }
+    // conformal factor and lapse in comoving frame; equation 2 from arXiv:0810.4735
+    Real psi0 = 1.0 + 0.5*m0/r0;
+    Real alpha0 = (1 - 0.5*m0/r0)/psi0;
 
-    // metric partial derivative in boosted frame
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 3> dg_p_ddd;
-    dg_p_ddd.ZeroClear();
-    // spatial partial of psi^4
-    AthenaScratchTensor<Real, TensorSymm::NONE, 4, 1> dpsi4;
-    for(int a = 1; a < 4; ++a) {
-      dpsi4(a) = -ADM_mass*xp[a]*std::pow(psi,3)/std::pow(r,1.5);
-    }
+    // B0 as in equation 4 from arXiv:0810.4735
+    Real B0 = std::sqrt(std::pow(Gamma,2)*(1-std::pow(vel,2)*std::pow(alpha0,2)*std::pow(psi0,-4)));
 
-    // put together partial derivatives
-    for(int a = 1; a < 4; ++a) {
-      dg_p_ddd(a,0,0) = 8*xp[a]*SQR(ADM_mass-4*r)/(r*std::pow(ADM_mass+4*r,3))
-              + 8*xp[a]*(ADM_mass-4*r)/(r*SQR(ADM_mass+4*r));
-      for(int b = 1; b < 4; ++b) {
-        dg_p_ddd(a,b,b) = dpsi4(a);
-      }
-    }
-
-    // inverse metric partial derivative in boosted frame
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 3> dg_p_duu;
-    dg_p_duu.ZeroClear();
-    // since the metric is diagonal, each component is simply g^aa=1/g_aa
-    // the partials are just then g^bb,a = -1/g_bb^2 g_bb,a
-    // put together partial derivatives
-    for(int a = 1; a < 4; ++a) {
-      for(int b = 0; b < 4; ++b) {
-        dg_p_duu(a,b,b) = -1/SQR(g_p_dd(b,b))*dg_p_ddd(a,b,b);
-      }
-    }
-
-    // Construct the boosted metric
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> g_boosted_dd;
-    g_boosted_dd.ZeroClear();
-    for(int a = 0; a < 4; ++a)
-    for(int b = a; b < 4; ++b)
-    for(int c = 0; c < 4; ++c)
-    for(int d = 0; d < 4; ++d) {
-      g_boosted_dd(a,b) += lambda(c,a)*lambda(d,b)*g_p_dd(c,d);
-    }
-
-    // Construct the boosted metric derivative
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 3> dg_boosted_ddd;
-    dg_boosted_ddd.ZeroClear();
-
-    for(int a = 0; a < 4; ++a)
-    for(int b = a; b < 4; ++b)
-    for(int c = 0; c < 4; ++c)
-    for(int d = 0; d < 4; ++d)
-    for(int e = 0; e < 4; ++e)
-    for(int f = 0; f < 4; ++f) {
-      dg_boosted_ddd(e,a,b) += lambda(f,e)*lambda(c,a)*lambda(d,b)*dg_p_ddd(f,c,d);
-    }
-
-    // Construct the boosted inverse metric derivative
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 3> dg_boosted_duu;
-    dg_boosted_duu.ZeroClear();
-
-    for(int a = 0; a < 4; ++a)
-    for(int b = a; b < 4; ++b)
-    for(int c = 0; c < 4; ++c)
-    for(int d = 0; d < 4; ++d)
-    for(int e = 0; e < 4; ++e)
-    for(int f = 0; f < 4; ++f) {
-      dg_boosted_duu(e,a,b) += lambda(f,e)*lambda_inv(c,a)*lambda_inv(d,b)*dg_p_duu(f,c,d);
-    }
-
-    // Lastly calculate the ADM variable
-    // First the inverted spacetime metric
-    AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> g_boosted_uu = inverse(g_boosted_dd);
-
-    // Gauge variables
-    adm.alpha(m,k,j,i) = 1/sqrt(-g_boosted_uu(0,0));
+    // adm metric in the code frame
     for(int a = 0; a < 3; ++a) {
-      adm.beta_u(m,a,k,j,i) = g_boosted_uu(0,a+1)*SQR(adm.alpha(m,k,j,i));
+      adm.g_dd(m,a,a,k,j,i) = std::pow(psi0,4);
     }
+    adm.g_dd(m,0,0,k,j,i) *= std::pow(B0,2);
+  
+    // Gauge variables in the code frame
+    adm.alpha(m,k,j,i) = alpha0/B0;
+    adm.beta_u(m,0,k,j,i) = (std::pow(alpha0,2)-std::pow(psi0,4))
+                          /(std::pow(psi0,4)-std::pow(alpha0,2)*std::pow(vel,2))*vel;
 
-    // adm metric
-    for(int a = 0; a < 3; ++a)
-    for(int b = a; b < 3; ++b) {
-      adm.g_dd(m,a,b,k,j,i) = g_boosted_dd(a+1,b+1);
-    }
-
-    // partials for the shift vector
-    AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> dbeta_du;
-    for(int a = 0; a < 3; ++a)
-    for(int b = 0; b < 3; ++b) {
-      dbeta_du(a,b) = SQR(adm.alpha(m,k,j,i))*(dg_boosted_duu(a+1,0,b+1)
-                      +dg_boosted_duu(a+1,0,0)*adm.beta_u(m,b,k,j,i));
-    }
-
-    // extrinsic curvature
-    for(int a = 0; a < 3; ++a)
-    for(int b = a; b < 3; ++b) {
-      adm.vK_dd(m,a,b,k,j,i) = dg_boosted_ddd(0,a,b);
-      for(int c = 0; c < 3; ++c) {
-        adm.vK_dd(m,a,b,k,j,i) += - adm.beta_u(m,c,k,j,i)*dg_boosted_ddd(c,a,b)
-                                  - g_boosted_dd(c,b)*dbeta_du(a,c)
-                                  - g_boosted_dd(a,c)*dbeta_du(b,c);
-      }
-      adm.vK_dd(m,a,b,k,j,i) /= - 2*adm.alpha(m,k,j,i);
-    }
+    adm.vK_dd(m,0,0,k,j,i) = 0;
+    adm.vK_dd(m,0,0,k,j,i) = 0;
+    adm.vK_dd(m,0,0,k,j,i) = 0;
+    adm.vK_dd(m,0,0,k,j,i) = 0;
+    adm.vK_dd(m,0,0,k,j,i) = 0;
   });
 }
 
