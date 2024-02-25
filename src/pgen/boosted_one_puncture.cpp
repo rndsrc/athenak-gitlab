@@ -66,7 +66,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     case 4: pmbp->pz4c->ADMConstraints<4>(pmbp);
             break;
   }
-
   std::cout<<"OnePuncture initialized."<<std::endl;
 
 
@@ -150,17 +149,28 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
       adm.g_dd(m,a,a,k,j,i) = std::pow(psi0,4);
     }
     adm.g_dd(m,0,0,k,j,i) *= std::pow(B0,2);
-  
+
     // Gauge variables in the code frame
     adm.alpha(m,k,j,i) = alpha0/B0;
     adm.beta_u(m,0,k,j,i) = (std::pow(alpha0,2)-std::pow(psi0,4))
                           /(std::pow(psi0,4)-std::pow(alpha0,2)*std::pow(vel,2))*vel;
 
-    adm.vK_dd(m,0,0,k,j,i) = 0;
-    adm.vK_dd(m,0,0,k,j,i) = 0;
-    adm.vK_dd(m,0,0,k,j,i) = 0;
-    adm.vK_dd(m,0,0,k,j,i) = 0;
-    adm.vK_dd(m,0,0,k,j,i) = 0;
+
+
+    // extrinsic curvature
+    Real alpha0p = 4*m0/std::pow(m0+2*r0,2);
+    Real second_term =
+    ((4 * std::pow(vel, 2) * std::pow((m0 - 2 * r0), 2)) / std::pow((m0 + 2 * r0), 3) +
+    (4 * std::pow(vel, 2) * (m0 - 2 * r0)) / std::pow((m0 + 2 * r0), 2) -
+    (m0 * std::pow((m0 + 2 * r0), 3)) / (4 * std::pow(r0, 5))) /
+    ((1 + m0 / (2 * r0)) * (1 + m0 / (2 * r0)) * (1 + m0 / (2 * r0)) * (1 + m0 / (2 * r0)) -
+    (std::pow(vel, 2) * std::pow((m0 - 2 * r0), 2)) / std::pow((m0 + 2 * r0), 2));
+
+    adm.vK_dd(m,0,0,k,j,i) = Gamma * Gamma * B0 * x1v * vel / r0 * (2 * alpha0p - alpha0 / 2 * second_term);
+    adm.vK_dd(m,1,1,k,j,i) = 2 * Gamma * Gamma * x1v * vel * alpha0 * (- m0 / (2 * r0 * r0)) / (psi0 * B0 * r0);
+    adm.vK_dd(m,2,2,k,j,i) = 2 * Gamma * Gamma * x1v * vel * alpha0 * (- m0 / (2 * r0 * r0)) / (psi0 * B0 * r0);
+    adm.vK_dd(m,0,1,k,j,i) = B0 * x2v * vel / r0 * (alpha0p - alpha0 / 2 * second_term);
+    adm.vK_dd(m,0,2,k,j,i) = B0 * x3v * vel / r0 * (alpha0p - alpha0 / 2 * second_term);
   });
 }
 
