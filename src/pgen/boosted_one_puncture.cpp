@@ -58,6 +58,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
             break;
   }
   pmbp->pz4c->Z4cToADM(pmbp);
+  pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
   switch (indcs.ng) {
     case 2: pmbp->pz4c->ADMConstraints<2>(pmbp);
             break;
