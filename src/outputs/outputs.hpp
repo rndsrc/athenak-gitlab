@@ -19,7 +19,7 @@
     #error NHISTORY > NREDUCTION in outputs.hpp
 #endif
 
-#define NOUTPUT_CHOICES 142
+#define NOUTPUT_CHOICES 145
 // choices for output variables used in <ouput> blocks in input file
 // TO ADD MORE CHOICES:
 //   - add more strings to array below, change NOUTPUT_CHOICES above appropriately
@@ -59,6 +59,7 @@ static const char *var_choice[NOUTPUT_CHOICES] = {
   "z4c_Theta",
   "z4c_alpha",
   "z4c_betax", "z4c_betay", "z4c_betaz",
+  "z4c_Bx", "z4c_By", "z4c_Bz",
   "z4c",
 
   "weyl_rpsi4", "weyl_ipsi4",

@@ -122,14 +122,14 @@ BaseTypeOutput::BaseTypeOutput(OutputParameters opar, Mesh *pm) :
        << std::endl << "Input file is likely missing corresponding block" << std::endl;
     exit(EXIT_FAILURE);
   }
-  if ((ivar>=97) && (ivar<139) && (pm->pmb_pack->pz4c == nullptr)) {
+  if ((ivar>=97) && (ivar<142) && (pm->pmb_pack->pz4c == nullptr)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
        << "Output of Z4c variable requested in <output> block '"
        << out_params.block_name << "' but Z4c object not constructed."
        << std::endl << "Input file is likely missing corresponding block" << std::endl;
     exit(EXIT_FAILURE);
   }
-  if ((ivar>=139) && (ivar<142) && (pm->pmb_pack->pz4c == nullptr)) {
+  if ((ivar>=142) && (ivar<145) && (pm->pmb_pack->pz4c == nullptr)) {
     std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
        << "Output of weyl variable requested in <output> block '"
        << out_params.block_name << "' but weyl object not constructed."

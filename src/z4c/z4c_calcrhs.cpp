@@ -103,6 +103,9 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> LGam_u;
     // Lie derivative of the shift
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> Lbeta_u;
+    // Lie derivative of the shift advective derivative
+    AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> LB_u;
+
 
     // Lie derivative of conf. 3-metric
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Lg_dd;
@@ -152,6 +155,7 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     // Vectors
     for (int a = 0; a < 3; ++a) {
       Lbeta_u(a) = 0.0;
+      LB_u(a) = 0.0;
       LGam_u(a) = 0.0;
       Gamma_u(a) = 0.0;
       DA_u(a) = 0.0;
@@ -248,6 +252,9 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     for(int a = 0; a < 3; ++a)
     for(int b = 0; b < 3; ++b) {
       Lbeta_u(b) += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.beta_u, m,a,b,k,j,i);
+      if (!opt.gamma_driver_shift) {
+        LB_u(b) += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.vB_u, m,a,b,k,j,i);
+      }
       LGam_u(b)  += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.vGam_u,  m,a,b,k,j,i);
     }
 
@@ -521,14 +528,22 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
                  + opt.lapse_harmonic * z4c.alpha(m,k,j,i);
     rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
                        - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
-
-    // shift vector
-    for(int a = 0; a < 3; ++a) {
-      rhs.beta_u(m,a,k,j,i) = opt.shift_ggamma * z4c.vGam_u(m,a,k,j,i)
-                            + opt.shift_advect * Lbeta_u(a);
-      rhs.beta_u(m,a,k,j,i) -= opt.shift_eta * z4c.beta_u(m,a,k,j,i);
-      // FORCE beta = 0
-      //rhs.beta_u(m,a,k,j,i) = 0;
+    if (opt.gamma_driver_shift) {
+      for(int a = 0; a < 3; ++a) {
+        rhs.beta_u(m,a,k,j,i) = opt.shift_ggamma * z4c.vGam_u(m,a,k,j,i)
+                              + opt.shift_advect * Lbeta_u(a);
+        rhs.beta_u(m,a,k,j,i) -= opt.shift_eta * z4c.beta_u(m,a,k,j,i);
+      }
+    } else {
+      // shift vector
+      for(int a = 0; a < 3; ++a) {
+        rhs.beta_u(m,a,k,j,i) = Lbeta_u(a) + 0.75 * z4c.vB_u(m,a,k,j,i);
+      }
+      // advective derivative of shift
+      for(int a = 0; a < 3; ++a) {
+        rhs.vB_u(m,a,k,j,i) = LB_u(a) + rhs.vGam_u(m,a,k,j,i) - LGam_u(a)
+                              - opt.vB_eta * z4c.vB_u(m,a,k,j,i);
+      }
     }
 
     // harmonic gauge terms
