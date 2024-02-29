@@ -48,7 +48,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
 
   ADMOnePunctureBoosted(pmbp, pin);
-  // pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
   switch (indcs.ng) {
     case 2: pmbp->pz4c->ADMToZ4c<2>(pmbp, pin);
             break;
@@ -58,7 +57,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
             break;
   }
   pmbp->pz4c->Z4cToADM(pmbp);
-  // pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
+  pmbp->pz4c->GaugePreCollapsedLapse(pmbp, pin);
   switch (indcs.ng) {
     case 2: pmbp->pz4c->ADMConstraints<2>(pmbp);
             break;
@@ -152,9 +151,9 @@ void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin) {
     adm.g_dd(m,0,0,k,j,i) *= std::pow(B0,2);
 
     // Gauge variables in the code frame
-    adm.alpha(m,k,j,i) = alpha0/B0;
-    adm.beta_u(m,0,k,j,i) = (std::pow(alpha0,2)-std::pow(psi0,4))
-                          /(std::pow(psi0,4)-std::pow(alpha0,2)*std::pow(vel,2))*vel;
+    // adm.alpha(m,k,j,i) = alpha0/B0;
+    // adm.beta_u(m,0,k,j,i) = (std::pow(alpha0,2)-std::pow(psi0,4))
+    //                      /(std::pow(psi0,4)-std::pow(alpha0,2)*std::pow(vel,2))*vel;
 
 
 
