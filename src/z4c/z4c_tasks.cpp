@@ -270,9 +270,9 @@ TaskStatus Z4c::ApplyPhysicalBCs(Driver *pdrive, int stage) {
 TaskStatus Z4c::PunctureTracker(Driver *pdrive, int stage) {
   if (stage == pdrive->nexp_stages) {
     for (auto ptracker : pmy_pack->pz4c_ptracker) {
+      ptracker->WriteTracker();
       ptracker->InterpolateShift(pmy_pack);
       ptracker->EvolveTracker();
-      ptracker->WriteTracker();
     }
   }
   return TaskStatus::complete;

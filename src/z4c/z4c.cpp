@@ -107,7 +107,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
 
   rhs.alpha.InitWithShallowSlice (u_rhs, I_Z4C_ALPHA);
   rhs.beta_u.InitWithShallowSlice(u_rhs, I_Z4C_BETAX, I_Z4C_BETAZ);
-  rhs.vB_u.InitWithShallowSlice(u0, I_Z4C_BX, I_Z4C_BZ);
+  rhs.vB_u.InitWithShallowSlice(u_rhs, I_Z4C_BX, I_Z4C_BZ);
   rhs.chi.InitWithShallowSlice   (u_rhs, I_Z4C_CHI);
   rhs.vKhat.InitWithShallowSlice  (u_rhs, I_Z4C_KHAT);
   rhs.vTheta.InitWithShallowSlice (u_rhs, I_Z4C_THETA);
