@@ -62,7 +62,6 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   }
   std::cout<<"OnePuncture initialized."<<std::endl;
 
-
   return;
 }
 
