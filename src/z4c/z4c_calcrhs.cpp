@@ -252,7 +252,7 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     for(int a = 0; a < 3; ++a)
     for(int b = 0; b < 3; ++b) {
       Lbeta_u(b) += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.beta_u, m,a,b,k,j,i);
-      if (!opt.gamma_driver_shift) {
+      if (!opt.first_order_shift) {
         LB_u(b) += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.vB_u, m,a,b,k,j,i);
       }
       LGam_u(b)  += Lx<NGHOST>(a, idx, z4c.beta_u, z4c.vGam_u,  m,a,b,k,j,i);
@@ -524,11 +524,18 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
       // (oopsi4*mat.S_dd(m,a,b,k,j,i) - (1./3.)*S(1)*z4c.g_dd(m,a,b,k,j,i));
     }
     // lapse function
-    Real const f = opt.lapse_oplog * opt.lapse_harmonicf
-                 + opt.lapse_harmonic * z4c.alpha(m,k,j,i);
-    rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
-                       - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
-    if (opt.gamma_driver_shift) {
+    if (!opt.shock_avoid_lapse) {
+      Real const f = opt.lapse_oplog * opt.lapse_harmonicf
+        + opt.lapse_harmonic * z4c.alpha(m,k,j,i);
+      rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
+        - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
+    } else {
+      Real const f = 1 + 1/(z4c.alpha(m,k,j,i)*z4c.alpha(m,k,j,i));
+      rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
+        - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
+    }
+    
+    if (opt.first_order_shift) {
       for(int a = 0; a < 3; ++a) {
         rhs.beta_u(m,a,k,j,i) = opt.shift_ggamma * z4c.vGam_u(m,a,k,j,i)
                               + opt.shift_advect * Lbeta_u(a);
@@ -537,11 +544,11 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     } else {
       // shift vector
       for(int a = 0; a < 3; ++a) {
-        rhs.beta_u(m,a,k,j,i) = z4c.vB_u(m,a,k,j,i);
+        rhs.beta_u(m,a,k,j,i) = Lbeta_u(a) + z4c.vB_u(m,a,k,j,i);
       }
       // advective derivative of shift
       for(int a = 0; a < 3; ++a) {
-        rhs.vB_u(m,a,k,j,i) =  rhs.vGam_u(m,a,k,j,i) - opt.vB_eta * z4c.vB_u(m,a,k,j,i);
+        rhs.vB_u(m,a,k,j,i) =  LB_u(a) + rhs.vGam_u(m,a,k,j,i) - opt.vB_eta * z4c.vB_u(m,a,k,j,i);
       }
     }
 

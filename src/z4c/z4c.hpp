@@ -190,8 +190,12 @@ class Z4c {
     // Gauge condition for shift derivative
     Real vB_eta;
 
-    // gamma-driver shift or using B as in Marronetti et al.
-    bool gamma_driver_shift;
+    // first order shift or second order shift as in Marronetti et al.
+    bool first_order_shift;
+
+    // shock avoiding lapse as in Albubierre 1997
+    bool shock_avoid_lapse;
+
     // Boundary extrapolation order
     int extrap_order;
   };
