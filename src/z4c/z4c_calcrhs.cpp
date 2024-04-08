@@ -531,7 +531,7 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
         - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
     } else {
       Real const f = 1 + 1/(z4c.alpha(m,k,j,i)*z4c.alpha(m,k,j,i));
-      rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
+      rhs.alpha(m,k,j,i) = Lalpha
         - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
     }
     
@@ -544,7 +544,7 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     } else {
       // shift vector
       for(int a = 0; a < 3; ++a) {
-        rhs.beta_u(m,a,k,j,i) = Lbeta_u(a) + z4c.vB_u(m,a,k,j,i);
+        rhs.beta_u(m,a,k,j,i) = Lbeta_u(a) - opt.shift_eta * z4c.beta_u(m,a,k,j,i) + z4c.vB_u(m,a,k,j,i);
       }
       // advective derivative of shift
       for(int a = 0; a < 3; ++a) {
