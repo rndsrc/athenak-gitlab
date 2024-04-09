@@ -32,7 +32,8 @@ char const * const Z4c::Z4c_names[Z4c::nz4c] = {
   "z4c_Gamx", "z4c_Gamy", "z4c_Gamz",
   "z4c_Theta",
   "z4c_alpha",
-  "z4c_betax", "z4c_betay", "z4c_betaz",
+  "z4c_betax", "z4c_betay", "z4c_betaz", 
+  "z4c_Bx", "z4c_By", "z4c_Bz",
 };
 
 char const * const Z4c::Constraint_names[Z4c::ncon] = {
@@ -62,7 +63,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u_rhs("u_rhs z4c",1,1,1,1,1),
   u_weyl("u_weyl",1,1,1,1,1),
   psi_out("psi_out",1,1,1),
-  pz4c_amr(new Z4c_AMR(this,pin)){
+  pz4c_amr(new Z4c_AMR(this,pin)) {
   // (1) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
   std::string evolution_t = pin->GetString("time","evolution");
@@ -96,6 +97,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
 
   z4c.alpha.InitWithShallowSlice (u0, I_Z4C_ALPHA);
   z4c.beta_u.InitWithShallowSlice(u0, I_Z4C_BETAX, I_Z4C_BETAZ);
+  z4c.vB_u.InitWithShallowSlice(u0, I_Z4C_BX, I_Z4C_BZ);
   z4c.chi.InitWithShallowSlice   (u0, I_Z4C_CHI);
   z4c.vKhat.InitWithShallowSlice  (u0, I_Z4C_KHAT);
   z4c.vTheta.InitWithShallowSlice (u0, I_Z4C_THETA);
@@ -105,6 +107,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
 
   rhs.alpha.InitWithShallowSlice (u_rhs, I_Z4C_ALPHA);
   rhs.beta_u.InitWithShallowSlice(u_rhs, I_Z4C_BETAX, I_Z4C_BETAZ);
+  rhs.vB_u.InitWithShallowSlice(u_rhs, I_Z4C_BX, I_Z4C_BZ);
   rhs.chi.InitWithShallowSlice   (u_rhs, I_Z4C_CHI);
   rhs.vKhat.InitWithShallowSlice  (u_rhs, I_Z4C_KHAT);
   rhs.vTheta.InitWithShallowSlice (u_rhs, I_Z4C_THETA);
@@ -133,6 +136,13 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   opt.shift_hh = pin->GetOrAddReal("z4c", "shift_H", 0.0);
 
   opt.shift_eta = pin->GetOrAddReal("z4c", "shift_eta", 2.0);
+  opt.vB_eta = pin->GetOrAddReal("z4c", "B_eta", 1.0);
+  opt.first_order_shift = pin->GetOrAddBoolean("z4c", "first_order_shift", 1);
+  opt.shock_avoid_lapse = pin->GetOrAddBoolean("z4c", "shock_avoid_lapse", 0);
+
+
+  opt.extrap_order = fmax(2,fmin(indcs.ng,fmin(4,
+      pin->GetOrAddInteger("z4c", "extrap_order", 2))));
 
   diss = opt.diss*pow(2., -2.*indcs.ng)*(indcs.ng % 2 == 0 ? -1. : 1.);
   }
