@@ -473,7 +473,8 @@ AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> GaussLegendreGrid::InterpolateToS
 //! \fn void GaussLegendreGrid::InterpolateToSphere
 //! \brief interpolate Rank3 tensors to surface of sphere
 
-AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> GaussLegendreGrid::InterpolateToSphere(DualArray6D<Real> &dg_ddd) {
+AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> 
+GaussLegendreGrid::InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 3> &dg_ddd) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int &is = indcs.is; int &js = indcs.js; int &ks = indcs.ks;
   int &ng = indcs.ng;
@@ -519,7 +520,7 @@ AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> GaussLegendreGrid::InterpolateToS
         for (int j=0; j<2*ng; j++) {
           for (int k=0; k<2*ng; k++) {
             Real iwght = iwghts.d_view(n,i,0)*iwghts.d_view(n,j,1)*iwghts.d_view(n,k,2);
-            int_value += iwght*dg_ddd.d_view(ii0,u,v,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
+            int_value += iwght*dg_ddd(ii0,u,v1,v2,ii3-(ng-k-ks)+1,ii2-(ng-j-js)+1,ii1-(ng-i-is)+1);
           }
         }
       }

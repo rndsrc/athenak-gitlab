@@ -62,6 +62,8 @@ void Z4c::AssembleZ4cTasks(std::map<std::string, std::shared_ptr<TaskList>> tl) 
   id.admc  = tl["after_stagen"]->AddTask(&Z4c::ADMConstraints_, this, id.z4tad);
   id.weyl_scalar  = tl["after_stagen"]->AddTask(&Z4c::CalcWeylScalar_, this, id.admc);
   id.ptrck = tl["after_stagen"]->AddTask(&Z4c::PunctureTracker, this, id.admc);
+  id.dg_ddd = tl["after_stagen"]->AddTask(&Z4c::CalculateDg, this, id.ptrck);
+  id.ahfind = tl["after_stagen"]->AddTask(&Z4c::FindAH, this, id.dg_ddd);
   return;
 }
 
@@ -189,6 +191,29 @@ TaskStatus Z4c::ADMConstraints_(Driver *pdrive, int stage) {
               break;
     }
   }
+  return TaskStatus::complete;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn  void Z4c::Calculate_Dg
+//! \brief
+
+TaskStatus Z4c::CalculateDg(Driver *pdrive, int stage) {
+  auto &indcs = pmy_pack->pmesh->mb_indcs;
+  if (stage == pdrive->nexp_stages) {
+    switch (indcs.ng) {
+      case 2: MetricPartial<2>(pmy_pack);
+              break;
+      case 3: MetricPartial<3>(pmy_pack);
+              break;
+      case 4: MetricPartial<4>(pmy_pack);
+              break;
+    }
+  }
+  return TaskStatus::complete;
+}
+
+TaskStatus Z4c::FindAH(Driver *pdrive, int stage) {
   return TaskStatus::complete;
 }
 

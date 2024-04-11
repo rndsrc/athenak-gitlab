@@ -21,6 +21,7 @@
 #include "adm/adm.hpp"
 #include "z4c/z4c.hpp"
 #include "z4c/z4c_puncture_tracker.hpp"
+#include "z4c/z4c_ahfind.hpp"
 #include "diffusion/viscosity.hpp"
 #include "diffusion/resistivity.hpp"
 #include "radiation/radiation.hpp"
@@ -186,10 +187,14 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
     padm = new adm::ADM(this, pin);
     // init puncture tracker
     int npunct = pin->GetOrAddInteger("z4c", "npunct", 0);
+    // init horizon finder
+    // TODO: hzhu add logic to turn on and off the ahfinder
     if (npunct > 0) {
       pz4c_ptracker.reserve(npunct);
+      pz4c_ahfind.reserve(npunct);
       for (int n = 0; n < npunct; ++n) {
         pz4c_ptracker.push_back(new z4c::PunctureTracker(pmesh, pin, n));
+        pz4c_ahfind.push_back(new z4c::AHF(pmesh, pin, n));
       }
     }
 

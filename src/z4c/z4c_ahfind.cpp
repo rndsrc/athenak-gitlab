@@ -22,30 +22,8 @@
 
 using namespace z4c;
 
-
-int SYMM2_Ind(int v1, int v2) {
-  if (v1==0) {
-    return v2;
-  } else if (v1==1) {
-    if (v2==0) {
-      return 1;
-    } else {
-      return v2+2;
-    }
-  } else {
-    if (v2==0) {
-      return 2;
-    } else {
-      return v2+3;
-    }
-  }
-}
-
 //----------------------------------------------------------------------------------------
-// \!fn void DualArray6D<Real> metric_partial(MeshBlockPack *pmbp)
-// \brief Compute derivative of g_ij
-//
-// This sets the d_g_kij everywhere in the Mesh
+// \brief constructor
 //----------------------------------------------------------------------------------------
 AHF::AHF(Mesh * pmesh, ParameterInput * pin, int n):
   S{nullptr},
@@ -65,34 +43,23 @@ AHF::AHF(Mesh * pmesh, ParameterInput * pin, int n):
     // probably need to write a new function to shift the location of the sphere
 }
 
-
 void AHF::FastFlow() {
-    // Evaluate partial derivatives of the metric over the entire domain
-    // 6 dimensional array, nmb, 3, 6, ncells3, ncells2, ncells1
-    //DualArray6D<Real> *dg_ddd = nullptr;
-    auto pmbp = pmesh->pmb_pack;
-    auto &indcs = pmbp->pmesh->mb_indcs;
-    DualArray6D<Real> dg_ddd;
+  auto pmbp = pmesh->pmb_pack;
+  auto &indcs = pmbp->pmesh->mb_indcs;
+  auto &dg_ddd = pmbp->pz4c->dg_ddd;
+  auto &H = null_expansion;
 
-    switch (indcs.ng) {
-      case 2: dg_ddd = metric_partial<2>(pmbp);
-              break;
-      case 3: dg_ddd = metric_partial<3>(pmbp);
-              break;
-      case 4: dg_ddd = metric_partial<4>(pmbp);
-              break;
-    }
+  // Evaluate Surface Null Expansion, Gundlach 1997 eqn 9
+  // SurfaceNullExpansion(pmbp, S);
+  AnalyticSurfaceNullExpansion(S);
 
-  // Surface Null Expansion, Gundlach 1997 eqn 9
-  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
-
-  // Template this integration function over DualArray1D and Tensor of rank 0
   Real H_integrated = S->Integrate(H);
   std::cout << "Initial Norm of H: " << H_integrated << std::endl;
   std::cout << "Initial Radius: " << S->pointwise_radius.h_view(0) << std::endl;
 
   std::ofstream spherical_grid_output;
   // alpha and beta parametrization
+  // change these to be input options later
   Real alpha = 1.;
   Real beta = 0.5;
 
@@ -101,9 +68,10 @@ void AHF::FastFlow() {
   Real B = beta/alpha;
 
   for (int itr=0; itr<maxit; ++itr) {
-    // auto pointwise_radius = S->pointwise_radius;
+    // convert to spectral space
     auto H_spectral = S->SpatialToSpectral(H);
 
+    // radius in spectral space
     auto r_spectral = S->SpatialToSpectral(S->pointwise_radius);
 
     DualArray1D<Real> r_spectral_np1;
@@ -121,10 +89,11 @@ void AHF::FastFlow() {
     S->SetPointwiseRadius(r_np1,center);
 
     // reevaluate H
-    H = SurfaceNullExpansion(pmbp, S, dg_ddd); // AnalyticSurfaceNullExpansion(S); // 
+    // SurfaceNullExpansion(pmbp, S); 
+    AnalyticSurfaceNullExpansion(S);
 
     H_integrated = S->Integrate(H);
-  
+
     std::cout << "Itr " << itr+1 << "   Norm of H: " << std::abs(H_integrated) << "\t" << "Radius: " << S->pointwise_radius.h_view(0) << "\t" 
     << "H spectral 0th: "<< H_spectral.h_view(0) <<std::endl;
     if (std::abs(H_integrated)<=1e-5) {
@@ -132,65 +101,17 @@ void AHF::FastFlow() {
       break;
     }
   }
-  delete dg_ddd;
 }
-
-template <int NGHOST>
-DualArray6D<Real> AHF::metric_partial(MeshBlockPack *pmbp) {
-  // capture variables for the kernel
-  auto &indcs = pmbp->pmesh->mb_indcs;
-  auto &size = pmbp->pmb->mb_size;
-  int &is = indcs.is; int &ie = indcs.ie;
-  int &js = indcs.js; int &je = indcs.je;
-  int &ks = indcs.ks; int &ke = indcs.ke;
-  int &nghost = indcs.ng;
-
-  //For GLOOPS
-  int nmb = pmbp->nmb_thispack;
-
-  // Initialize dg_ddd container
-  int ncells1 = indcs.nx1 + 2*nghost;
-  int ncells2 = indcs.nx2 + 2*nghost;
-  int ncells3 = indcs.nx3 + 2*nghost;
-  DualArray6D<Real> dg_ddd_full;
-  Kokkos::realloc(dg_ddd_full,nmb,3,6,ncells3,ncells2,ncells1);
-
-  auto &adm = pmbp->padm->adm;
-  par_for("metric derivative",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-    Real idx[] = {size.d_view(m).dx1, size.d_view(m).dx2, size.d_view(m).dx3};
-    // -----------------------------------------------------------------------------------
-    // derivatives
-    //
-    // first derivatives of g
-    for(int c = 0; c < 3; ++c)
-    for(int a = 0; a < 3; ++a)
-    for(int b = a; b < 3; ++b) {
-      dg_ddd_full.d_view(m,c,SYMM2_Ind(a,b),k,j,i) = Dx<NGHOST>(c, idx, adm.g_dd, m,a,b,k,j,i);
-    }
-  });
-
-  // sync to host
-  dg_ddd_full.template modify<DevExeSpace>();
-  dg_ddd_full.template sync<HostMemSpace>();
-  return dg_ddd_full;
-}
-
-template DualArray6D<Real> AHF::metric_partial<2>(MeshBlockPack *pmbp);
-template DualArray6D<Real> AHF::metric_partial<3>(MeshBlockPack *pmbp);
-template DualArray6D<Real> AHF::metric_partial<4>(MeshBlockPack *pmbp);
-
 
 //----------------------------------------------------------------------------------------
-// \!fn void AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0>  SurfaceNullExpansion(MeshBlockPack *pmbp, 
+// \!fn void  SurfaceNullExpansion(MeshBlockPack *pmbp, 
 // GaussLegendreGrid *S, DualArray6D<Real> dg_ddd)
 // \brief Compute \rho H for horizon finder
 //
 // This evaluate the surface null expansion multiplied by a weighting function \rho.
 // 
 //----------------------------------------------------------------------------------------
-
-AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AHF::SurfaceNullExpansion(MeshBlockPack *pmbp, GaussLegendreGrid *S, DualArray6D<Real> dg_ddd) {
+void AHF::SurfaceNullExpansion(MeshBlockPack *pmbp, GaussLegendreGrid *S) {
   // Load adm variables
   auto &adm = pmbp->padm->adm;
   auto &g_dd = adm.g_dd;
@@ -199,6 +120,7 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AHF::SurfaceNullExpansion(MeshBlo
   int nangles = S->nangles;
   auto surface_jacobian = S->surface_jacobian;
   auto d_surface_jacobian = S->d_surface_jacobian;
+  auto dg_ddd = pmbp->pz4c->dg_ddd;
 
   // *****************  Step 4 of Schnetter 2002  *******************
 
@@ -442,8 +364,10 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AHF::SurfaceNullExpansion(MeshBlo
   }
 
   // Surface Null Expansion, Gundlach 1997 eqn 9
-  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
-  H.NewAthenaSurfaceTensor(nangles);
+  //AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
+  //H.NewAthenaSurfaceTensor(nangles);
+
+  auto &H = null_expansion;
 
   for(int n=0; n<nangles; ++n) {
     H(n) = 0;
@@ -454,23 +378,16 @@ AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AHF::SurfaceNullExpansion(MeshBlo
       }
     }
   }
-
-  return H;
 }
 
 // Analytical surface null expansion for Schwarzschild in isotropic coordinate, testing only
-AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> AnalyticSurfaceNullExpansion(GaussLegendreGrid *S) {
+void AHF::AnalyticSurfaceNullExpansion(GaussLegendreGrid *S) {
   int nangles = S->nangles;
-  AthenaSurfaceTensor<Real,TensorSymm::NONE,3,0> H;
-  H.NewAthenaSurfaceTensor(nangles);
+  auto &H = null_expansion;
 
   auto r = S->pointwise_radius;
   for(int n=0; n<nangles; ++n) {
     Real denominator = 2*r.h_view(n)+1;
     H(n) = 8*r.h_view(n)*(2*r.h_view(n)-1)/(denominator*denominator*denominator);
   }
-  return H;
 }
-
-
-

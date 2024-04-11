@@ -54,8 +54,8 @@ class GaussLegendreGrid {
     void InterpolateToSphere(int nvars, DvceArray5D<Real> &val);  // interpolate scalar field to sphere
     // Interpolate rank 2 tensors to sphere
     AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,2> InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 2> &g_dd);
-    // change the input type later
-    AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> InterpolateToSphere(DualArray6D<Real> &d_g_ddd);
+    // Interpolate rank 3 tensors to sphere
+    AthenaSurfaceTensor<Real,TensorSymm::SYM2,3,3> InterpolateToSphere(AthenaTensor<Real, TensorSymm::SYM2, 3, 3> &d_g_ddd);
     DualArray2D<int> interp_indcs;   // indices of MeshBlock and zones therein for interp
     DualArray3D<Real> interp_wghts;  // weights for interpolation
 

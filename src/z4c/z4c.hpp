@@ -50,6 +50,7 @@ struct Z4cTaskIDs {
   TaskID ahfind;
   TaskID weyl_scalar;
   TaskID waveform;
+  TaskID dg_ddd;
 };
 
 namespace z4c {
@@ -109,6 +110,7 @@ class Z4c {
   DvceArray5D<Real> u_rhs;     // z4c rhs storage
   DvceArray5D<Real> coarse_u0; // coarse representation of z4c solution
   DvceArray5D<Real> u_weyl; // weyl scalars
+  DvceArray5D<Real> u_dg; // derivative of metric for horizon finder and adm quantities
 
   // puncture location
   Real ppos[3] = {0.,0.,0.}; // later on initiate from input file
@@ -167,6 +169,8 @@ class Z4c {
   };
   Matter_vars mat;
 
+  AthenaTensor<Real, TensorSymm::SYM2, 3, 3> dg_ddd; // derivative of spatial metric
+
   struct Options {
     Real chi_psi_power;   // chi = psi^N, N = chi_psi_power
     // puncture's floor value for chi, use max(chi, chi_div_floor)
@@ -199,6 +203,9 @@ class Z4c {
 
     // Boundary extrapolation order
     int extrap_order;
+
+    // Running with Apparent Horizon Finder or not
+    bool ahfind;
   };
   Options opt;
   Real diss;              // Dissipation parameter
@@ -234,9 +241,11 @@ class Z4c {
 
   TaskStatus Z4cToADM_(Driver *d, int stage);
   TaskStatus ADMConstraints_(Driver *d, int stage);
+  TaskStatus CalculateDg(Driver *d, int stage);
   TaskStatus Z4cBoundaryRHS(Driver *d, int stage);
   TaskStatus RestrictU(Driver *d, int stage);
   TaskStatus PunctureTracker(Driver *d, int stage);
+  TaskStatus FindAH(Driver *d, int stage);
   TaskStatus CalcWeylScalar_(Driver *d, int stage);
   TaskStatus CalcWaveForm_(Driver *d, int stage);
 
@@ -252,7 +261,8 @@ class Z4c {
   void Z4cWeyl(MeshBlockPack *pmbp);
   void WaveExtr(MeshBlockPack *pmbp);
   void AlgConstr(MeshBlockPack *pmbp);
-
+  template <int NGHOST>
+  void MetricPartial(MeshBlockPack *pmbp);
   // amr criteria
   Z4c_AMR *pz4c_amr{nullptr};
 
