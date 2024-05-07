@@ -17,13 +17,15 @@
 #include "tasklist/task_list.hpp"
 #include "bvals/bvals.hpp"
 
+#include <Kokkos_Random.hpp>
+
 // forward declarations
 
 // constants that enumerate ParticlesPusher options
 enum class ParticlesPusher {drift, leap_frog, lagrangian_tracer, lagrangian_mc};
 
 // constants that enumerate ParticleTypes
-enum class ParticleType {cosmic_ray};
+enum class ParticleType {cosmic_ray, lagrangian_mc};
 
 //----------------------------------------------------------------------------------------
 //! \struct ParticlesTaskIDs
@@ -82,8 +84,13 @@ class Particles {
   TaskStatus ClearSend(Driver *pdriver, int stage);
   TaskStatus ClearRecv(Driver *pdriver, int stage);
 
+  // ... for particle pushers
+  void PushDrift();
+  void PushLagrangianMC();
+
  private:
   MeshBlockPack* pmy_pack;  // ptr to MeshBlockPack containing this Particles
+  Kokkos::Random_XorShift64_Pool<> rand_pool64;
 };
 
 } // namespace particles

@@ -64,6 +64,7 @@ TaskStatus ParticlesBoundaryValues::SetNewPrtclGID() {
   Kokkos::realloc(sendlist, static_cast<int>(0.1*npart));
   par_for("part_update",DevExeSpace(),0,(npart-1), KOKKOS_LAMBDA(const int p) {
     int m = pi(PGID,p) - gids;
+
     Real x1 = pr(IPX,p);
     Real x2 = pr(IPY,p);
     Real x3 = pr(IPZ,p);
@@ -191,6 +192,7 @@ TaskStatus ParticlesBoundaryValues::SetNewPrtclGID() {
       pr(IPZ,p) -= (meshsize.x3max - meshsize.x3min);
     }
   });
+
   nprtcl_send = counter;
   Kokkos::resize(sendlist, nprtcl_send);
   // sync sendlist device array with host
