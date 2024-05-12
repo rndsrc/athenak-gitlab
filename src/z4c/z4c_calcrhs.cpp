@@ -34,12 +34,23 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
   auto &z4c = pmy_pack->pz4c->z4c;
   auto &rhs = pmy_pack->pz4c->rhs;
   auto &opt = pmy_pack->pz4c->opt;
+  int scr_level = 0;
 
   // ===================================================================================
   // Main RHS calculation
   //
-  par_for("z4c rhs loop",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+  // 2 1D scratch array and 1 2D scratch array
+  size_t scr_size = ScrArray1D<Real>::shmem_size(1)*15 // 0 tensors
+              + ScrArray1D<Real>::shmem_size(3)*10 // vectors
+              + ScrArray1D<Real>::shmem_size(6)*11 // rank 2 tensor with symm
+              + ScrArray1D<Real>::shmem_size(9)*2  // rank 2 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(18)*4 // rank 3 tensor with symm
+              + ScrArray1D<Real>::shmem_size(36);  // rank 4 tensor with symm
+  par_for_outer("z4c rhs loop",DevExeSpace(),
+  scr_size,scr_level,0,nmb-1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+  // par_for("z4c rhs loop",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+  // KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Define scratch arrays to be used in the following calculations
 
     // Gamma computed from the metric
@@ -49,18 +60,25 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
 
     // inverse of conf. metric
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> g_uu;
+    g_uu.NewAthenaScratchTensor(member, scr_level);
     // inverse of A
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> A_uu;
+    A_uu.NewAthenaScratchTensor(member, scr_level);
     // g^cd A_ac A_db
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> AA_dd;
+    AA_dd.NewAthenaScratchTensor(member, scr_level);
     // Ricci tensor
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> R_dd;
+    R_dd.NewAthenaScratchTensor(member, scr_level);
     // Ricci tensor, conformal contribution
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Rphi_dd;
+    Rphi_dd.NewAthenaScratchTensor(member, scr_level);
     // 2nd differential of the lapse
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Ddalpha_dd;
+    Ddalpha_dd.NewAthenaScratchTensor(member, scr_level);
     // 2nd differential of phi
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Ddphi_dd;
+    Ddphi_dd.NewAthenaScratchTensor(member, scr_level);
 
     // Christoffel symbols of 1st kind
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 3> Gamma_ddd;
@@ -84,12 +102,16 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
 
     // lapse 2nd drvts
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> ddalpha_dd;
+    ddalpha_dd.NewAthenaScratchTensor(member, scr_level);
     // shift 1st drvts
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> dbeta_du;
+    dbeta_du.NewAthenaScratchTensor(member, scr_level);
     // chi 2nd drvts
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> ddchi_dd;
+    ddchi_dd.NewAthenaScratchTensor(member, scr_level);
     // Gamma 1st drvts
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> dGam_du;
+    dGam_du.NewAthenaScratchTensor(member, scr_level);
 
     // metric 1st drvts
     AthenaScratchTensor<Real, TensorSymm::SYM2,  3, 3> dg_ddd;
@@ -106,8 +128,10 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
 
     // Lie derivative of conf. 3-metric
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Lg_dd;
+    Lg_dd.NewAthenaScratchTensor(member, scr_level);
     // Lie derivative of A
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> LA_dd;
+    LA_dd.NewAthenaScratchTensor(member, scr_level);
 
     Real idx[] = {1/size.d_view(m).dx1, 1/size.d_view(m).dx2, 1/size.d_view(m).dx3};
 
@@ -556,7 +580,7 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
       u_rhs(m,n,k,j,i) += Diss<NGHOST>(a, idx, u0, m, n, k, j, i)*diss;
     }
   });
-
+  std::cout << "rhs done" << std::endl;
   return TaskStatus::complete;
 }
 

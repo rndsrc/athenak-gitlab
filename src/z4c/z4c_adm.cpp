@@ -63,11 +63,22 @@ void Z4c::ADMToZ4c(MeshBlockPack *pmbp, ParameterInput *pin) {
   auto &z4c = pmbp->pz4c->z4c;
   auto &adm = pmbp->padm->adm;
   auto &opt = pmbp->pz4c->opt;
-  // 2 1D scratch array and 1 2D scratch array
-  par_for("initialize z4c fields",DevExeSpace(),
-  0,nmb-1,ksg,keg,jsg,jeg,isg,ieg,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+  int scr_level = 0;
+  size_t scr_size = ScrArray1D<Real>::shmem_size(1)*0 // 0 tensors
+              + ScrArray1D<Real>::shmem_size(3)*0 // vectors
+              + ScrArray1D<Real>::shmem_size(6)*1 // rank 2 tensor with symm
+              + ScrArray1D<Real>::shmem_size(9)*0  // rank 2 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(18)*0 // rank 3 tensor with symm
+              + ScrArray1D<Real>::shmem_size(36)*0;  // rank 4 tensor with symm
+
+  par_for_outer("initialize z4c fields",DevExeSpace(),
+  scr_size,scr_level,0,nmb-1,ksg,keg,jsg,jeg,isg,ieg,
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+  //par_for("initialize z4c fields",DevExeSpace(),
+  //0,nmb-1,ksg,keg,jsg,jeg,isg,ieg,
+  //KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> Kt_dd;
+    Kt_dd.NewAthenaScratchTensor(member, scr_level);
     Real detg = adm::SpatialDet(adm.g_dd(m,0,0,k,j,i), adm.g_dd(m,0,1,k,j,i),
                                 adm.g_dd(m,0,2,k,j,i), adm.g_dd(m,1,1,k,j,i),
                                 adm.g_dd(m,1,2,k,j,i), adm.g_dd(m,2,2,k,j,i));
@@ -224,17 +235,31 @@ void Z4c::ADMConstraints(MeshBlockPack *pmbp) {
   auto &u_con = pmbp->pz4c->u_con;
   Kokkos::deep_copy(u_con, 0.);
   auto &con = pmbp->pz4c->con;
-  par_for("ADM constraints loop",DevExeSpace(),
-  0,nmb-1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+  int scr_level = 0;
+  size_t scr_size = ScrArray1D<Real>::shmem_size(1)*0 // 0 tensors
+              + ScrArray1D<Real>::shmem_size(3)*3 // vectors
+              + ScrArray1D<Real>::shmem_size(6)*4 // rank 2 tensor with symm
+              + ScrArray1D<Real>::shmem_size(9)*0  // rank 2 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(18)*9 // rank 3 tensor with symm
+              + ScrArray1D<Real>::shmem_size(36)*1;  // rank 4 tensor with symm
+  par_for_outer("ADM constraints loop",DevExeSpace(),
+  scr_size,scr_level,0,nmb-1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+  //par_for("ADM constraints loop",DevExeSpace(),
+  //0,nmb-1,ks,ke,js,je,is,ie,
+  //KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> Gamma_u;
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> Gamma_u_z4c;
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 1> M_u;
 
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> g_uu;
+    g_uu.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> g_uu_z4c;
+    g_uu_z4c.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> R_dd;
+    R_dd.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> K_ud;
+    K_ud.NewAthenaScratchTensor(member, scr_level);
 
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 3> dg_ddd;
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 3> dg_ddd_z4c;

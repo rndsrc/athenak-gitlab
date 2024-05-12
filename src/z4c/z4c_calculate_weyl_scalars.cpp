@@ -42,9 +42,20 @@ void Z4c::Z4cWeyl(MeshBlockPack *pmbp) {
   auto &weyl = pmbp->pz4c->weyl;
   auto &u_weyl = pmbp->pz4c->u_weyl;
   Kokkos::deep_copy(u_weyl, 0.);
-
-  par_for("z4c_weyl_scalar",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
-  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+  int scr_level = 0;
+  size_t scr_size = ScrArray1D<Real>::shmem_size(1)*0 // 0 tensors
+              + ScrArray1D<Real>::shmem_size(3)*4 // vectors
+              + ScrArray1D<Real>::shmem_size(6)*3 // rank 2 tensor with symm
+              + ScrArray1D<Real>::shmem_size(9)*1  // rank 2 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(18)*6 // rank 3 tensor with symm
+              + ScrArray1D<Real>::shmem_size(27)*1 // rank 3 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(36)*0 // rank 4 tensor with symm
+              + ScrArray1D<Real>::shmem_size(81)*2;// rank 4 tensor with no symm
+  par_for_outer("z4c weyl scalar",DevExeSpace(),
+  scr_size,scr_level,0,nmb-1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k, const int j, const int i) {
+  //par_for("z4c_weyl_scalar",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+  //KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
     // Simplify constants (2 & sqrt 2 factors) featured in re/im[psi4]
     const Real FR4 = 0.25;
     Real &x1min = size.d_view(m).x1min;
@@ -86,8 +97,11 @@ void Z4c::Z4cWeyl(MeshBlockPack *pmbp) {
     // Rank 2
     // inverse of conf. metric
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> g_uu;
+    g_uu.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> R_dd;        // Ricci tensor
+    R_dd.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 2> K_ud;        // extrinsic curvature
+    K_ud.NewAthenaScratchTensor(member, scr_level);
 
     // Rank 3
     AthenaScratchTensor<Real, TensorSymm::SYM2,  3, 3> dg_ddd;      // metric 1st drvts
@@ -121,6 +135,7 @@ void Z4c::Z4cWeyl(MeshBlockPack *pmbp) {
 
     // Generic tensors
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> Riemm4_dd;   // 4D Riemann *n^a*n^c
+    Riemm4_dd.NewAthenaScratchTensor(member, scr_level);
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 3> Riemm4_ddd;  // 4D Riemann * n^a
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 4> Riem3_dddd;  // 3D Riemann tensor
     AthenaScratchTensor<Real, TensorSymm::NONE, 3, 4> Riemm4_dddd; // 4D Riemann tensor

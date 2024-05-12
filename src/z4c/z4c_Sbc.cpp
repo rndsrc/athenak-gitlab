@@ -24,6 +24,7 @@ namespace z4c {
 KOKKOS_INLINE_FUNCTION
 static void Z4cSommerfeld(const Z4c::Z4c_vars& z4c, const Z4c::Z4c_vars& rhs,
     const RegionIndcs &indcs, const DualArray1D<RegionSize> &size,
+    const TeamMember_t &member, const int scr_level,
     const int m, const int k, const int j, const int i) {
   // -------------------------------------------------------------------------------------
   // Scratch data
@@ -36,6 +37,7 @@ static void Z4cSommerfeld(const Z4c::Z4c_vars& z4c, const Z4c::Z4c_vars& rhs,
 
   // Vectors
   AthenaScratchTensor<Real, TensorSymm::NONE, 3, 2> dGam_du;
+  dGam_du.NewAthenaScratchTensor(member, scr_level);
 
   // Tensors
   AthenaScratchTensor<Real, TensorSymm::SYM2, 3, 3> dA_ddd;
@@ -126,15 +128,11 @@ static void Z4cSommerfeld(const Z4c::Z4c_vars& z4c, const Z4c::Z4c_vars& rhs,
 //! \brief placeholder for the Sommerfield Boundary conditions for z4c
 TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
   auto &pm = pmy_pack->pmesh;
-  int &ng = pmy_pack->pmesh->mb_indcs.ng;
   auto &mb_bcs = pmy_pack->pmb->mb_bcs;
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   auto &size = pmy_pack->pmb->mb_size;
 
   int nmb = pmy_pack->nmb_thispack;
-  int n1 = indcs.nx1 + 2*ng;
-  int n2 = (indcs.nx2 > 1)? (indcs.nx2 + 2*ng) : 1;
-  int n3 = (indcs.nx3 > 1)? (indcs.nx3 + 2*ng) : 1;
   int is = indcs.is;
   int ie = indcs.ie;
   int js = indcs.js;
@@ -144,19 +142,29 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
 
   auto &z4c_ = z4c;
   auto &rhs_ = rhs;
+  int scr_level = 0;
+  size_t scr_size = ScrArray1D<Real>::shmem_size(1)*0 // 0 tensors
+              + ScrArray1D<Real>::shmem_size(3)*6 // vectors
+              + ScrArray1D<Real>::shmem_size(6)*0 // rank 2 tensor with symm
+              + ScrArray1D<Real>::shmem_size(9)*2  // rank 2 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(18)*2 // rank 3 tensor with symm
+              + ScrArray1D<Real>::shmem_size(27)*0 // rank 3 tensor with no symm
+              + ScrArray1D<Real>::shmem_size(36)*0 // rank 4 tensor with symm
+              + ScrArray1D<Real>::shmem_size(81)*0;// rank 4 tensor with no symm
 
   // We only need to apply this condition for outflow boundaries
   if (pm->mesh_bcs[BoundaryFace::inner_x1] == BoundaryFlag::outflow
       || pm->mesh_bcs[BoundaryFace::inner_x1] == BoundaryFlag::diode
       || pm->mesh_bcs[BoundaryFace::outer_x1] == BoundaryFlag::outflow
       || pm->mesh_bcs[BoundaryFace::outer_x1] == BoundaryFlag::diode) {
-    par_for("z4crhs_bc_x1", DevExeSpace(), 0, (nmb-1), ks, ke, js, je,
-    KOKKOS_LAMBDA(int m, int k, int j) {
+    par_for_outer("z4crhs_bc_x1", DevExeSpace(), 
+    scr_size, scr_level, 0, (nmb-1), ks, ke, js, je,
+    KOKKOS_LAMBDA(TeamMember_t member, int m, int k, int j) {
       // Inner boundary
       switch(mb_bcs.d_view(m,BoundaryFace::inner_x1)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, k, j, is);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, k, j, is);
           break;
         default:
           break;
@@ -165,7 +173,7 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
       switch (mb_bcs.d_view(m,BoundaryFace::outer_x1)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, k, j, ie);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, k, j, ie);
           break;
         default:
           break;
@@ -176,13 +184,14 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
       || pm->mesh_bcs[BoundaryFace::inner_x2] == BoundaryFlag::diode
       || pm->mesh_bcs[BoundaryFace::outer_x2] == BoundaryFlag::outflow
       || pm->mesh_bcs[BoundaryFace::outer_x2] == BoundaryFlag::diode) {
-    par_for("z4crhs_bc_x1", DevExeSpace(), 0, (nmb-1), ks, ke, is, ie,
-    KOKKOS_LAMBDA(int m, int k, int i) {
+    par_for_outer("z4crhs_bc_x1", DevExeSpace(),
+    scr_size, scr_level, 0, (nmb-1), ks, ke, is, ie,
+    KOKKOS_LAMBDA(TeamMember_t member, int m, int k, int i) {
       // Inner boundary
       switch(mb_bcs.d_view(m,BoundaryFace::inner_x2)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, k, js, i);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, k, js, i);
           break;
         default:
           break;
@@ -191,7 +200,7 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
       switch (mb_bcs.d_view(m,BoundaryFace::outer_x2)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, k, je, i);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, k, je, i);
           break;
         default:
           break;
@@ -202,13 +211,14 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
       || pm->mesh_bcs[BoundaryFace::inner_x3] == BoundaryFlag::diode
       || pm->mesh_bcs[BoundaryFace::outer_x3] == BoundaryFlag::outflow
       || pm->mesh_bcs[BoundaryFace::outer_x3] == BoundaryFlag::diode) {
-    par_for("z4crhs_bc_x1", DevExeSpace(), 0, (nmb-1), js, je, is, ie,
-    KOKKOS_LAMBDA(int m, int j, int i) {
+    par_for_outer("z4crhs_bc_x1", DevExeSpace(),
+    scr_size, scr_level, 0, (nmb-1), js, je, is, ie,
+    KOKKOS_LAMBDA(TeamMember_t member, int m, int j, int i) {
       // Inner boundary
       switch(mb_bcs.d_view(m,BoundaryFace::inner_x3)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, ks, j, i);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, ks, j, i);
           break;
         default:
           break;
@@ -217,7 +227,7 @@ TaskStatus Z4c::Z4cBoundaryRHS(Driver *pdriver, int stage) {
       switch (mb_bcs.d_view(m,BoundaryFace::outer_x3)) {
         case BoundaryFlag::diode:
         case BoundaryFlag::outflow:
-            Z4cSommerfeld(z4c_, rhs_, indcs, size, m, ke, j, i);
+            Z4cSommerfeld(z4c_, rhs_, indcs, size, member, scr_level, m, ke, j, i);
           break;
         default:
           break;

@@ -292,8 +292,7 @@ class AthenaScratchTensor<T, sym, ndim, 1> {
   Real data_[3];
 };
 
-//----------------------------------------------------------------------------------------
-// rank 2 AthenaScratchTensor
+// rank 2 AthenaScratchTensor; spatially 0D rank 2 tensor fields
 // This is a 0D AthenaScratchTensor
 template<typename T, TensorSymm sym, int ndim>
 class AthenaScratchTensor<T, sym, ndim, 2> {
@@ -310,25 +309,24 @@ class AthenaScratchTensor<T, sym, ndim, 2> {
     return idxmap_[a][b];
   }
   KOKKOS_INLINE_FUNCTION
-  Real operator()(int const a, int const b) const {
-    return data_[idxmap_[a][b]];
+  decltype(auto) operator()(int const a, int const b) const {
+    return data_(idxmap_[a][b]);
   }
   KOKKOS_INLINE_FUNCTION
-  Real & operator()(int const a, int const b) {
-    return data_[idxmap_[a][b]];
+  void NewAthenaScratchTensor(const TeamMember_t & member, int scr_level) {
+    data_ = ScrArray1D<T>(member.team_scratch(scr_level), ndof_);
   }
   KOKKOS_INLINE_FUNCTION
   void ZeroClear() {
-    for (int i = 0; i < ndim*ndim; ++i) {
-      data_[i] = 0.0;
-    }
+    Kokkos::Experimental::local_deep_copy(data_, 0);
   }
 
  private:
-  Real data_[9];
-  int idxmap_[3][3];
+  ScrArray1D<T> data_;
+  int idxmap_[ndim][ndim];
   int ndof_;
 };
+
 
 //----------------------------------------------------------------------------------------
 // Implementation details
