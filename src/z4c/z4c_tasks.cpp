@@ -175,10 +175,14 @@ TaskStatus Z4c::EnforceAlgConstr(Driver *pdrive, int stage) {
 //! \brief
 
 TaskStatus Z4c::Z4cToADM_(Driver *pdrive, int stage) {
-  if (stage == pdrive->nexp_stages) {
-    Z4cToADM(pmy_pack);
+  if (pmy_pack->pz4c->turn_off_adm == 1) {
+    return TaskStatus::complete;
+  } else {
+    if (stage == pdrive->nexp_stages) {
+      Z4cToADM(pmy_pack);
+    }
+    return TaskStatus::complete;
   }
-  return TaskStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------
@@ -186,18 +190,22 @@ TaskStatus Z4c::Z4cToADM_(Driver *pdrive, int stage) {
 //! \brief
 
 TaskStatus Z4c::ADMConstraints_(Driver *pdrive, int stage) {
-  auto &indcs = pmy_pack->pmesh->mb_indcs;
-  if (stage == pdrive->nexp_stages) {
-    switch (indcs.ng) {
-      case 2: ADMConstraints<2>(pmy_pack);
-              break;
-      case 3: ADMConstraints<3>(pmy_pack);
-              break;
-      case 4: ADMConstraints<4>(pmy_pack);
-              break;
+  if (pmy_pack->pz4c->turn_off_adm == 1) {
+    return TaskStatus::complete;
+  } else {
+    auto &indcs = pmy_pack->pmesh->mb_indcs;
+    if (stage == pdrive->nexp_stages) {
+      switch (indcs.ng) {
+        case 2: ADMConstraints<2>(pmy_pack);
+                break;
+        case 3: ADMConstraints<3>(pmy_pack);
+                break;
+        case 4: ADMConstraints<4>(pmy_pack);
+                break;
+      }
     }
+    return TaskStatus::complete;
   }
-  return TaskStatus::complete;
 }
 
 //----------------------------------------------------------------------------------------

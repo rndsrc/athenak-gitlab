@@ -160,11 +160,23 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   pbval_weyl->InitializeBuffers((2));
   Kokkos::Profiling::popRegion();
 
+  // turn off adm
+  // set turn_off_adm = 1 to turn off the evaluation of adm variable/constraints
+  // this speed up the code by about 10 %
+  turn_off_adm = pin->GetOrAddReal("z4c","turn_off_adm",0);
+
   // wave extraction spheres
   // TODO(@hzhu): Read radii from input file
   auto &grids = spherical_grids;
   // set nrad_wave_extraction = 0 to turn off wave extraction
   nrad = pin->GetOrAddReal("z4c", "nrad_wave_extraction", 1);
+
+  // check to make sure turn_off_adm = 0 if wave extraction is enabled
+  if (nrad!=0 && turn_off_adm==1) {
+    std::cout << "Wave extraction requires evaluating the adm variables." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
   int nlev = pin->GetOrAddReal("z4c", "extraction_nlev", 10);
   for (int i=1; i<=nrad; i++) {
     Real rad = pin->GetOrAddReal("z4c", "extraction_radius_"+std::to_string(i), 10);

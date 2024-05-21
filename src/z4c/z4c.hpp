@@ -217,7 +217,7 @@ class Z4c {
   Real waveform_dt;
   Real last_output_time;
   int nrad; // number of radii to perform wave extraction
-
+  int turn_off_adm; // turn off evaluation of the adm variables and constraints
   // functions
   void AssembleZ4cTasks(std::map<std::string, std::shared_ptr<TaskList>> tl);
   TaskStatus InitRecv(Driver *d, int stage);
