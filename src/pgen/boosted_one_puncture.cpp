@@ -21,10 +21,12 @@
 #include "globals.hpp"
 #include "mesh/mesh.hpp"
 #include "z4c/z4c.hpp"
+#include "z4c/z4c_amr.hpp"
 #include "adm/adm.hpp"
 #include "coordinates/cell_locations.hpp"
 
 void ADMOnePunctureBoosted(MeshBlockPack *pmbp, ParameterInput *pin);
+void RefinementCondition(MeshBlockPack* pmbp);
 
 KOKKOS_INLINE_FUNCTION
 AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> 
@@ -37,6 +39,7 @@ void LorentzBoost(Real vx1, Real vx2, Real vx3, AthenaScratchTensor<Real, Tensor
 //! \fn ProblemGenerator::UserProblem_()
 //! \brief Problem Generator for single puncture
 void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
+  user_ref_func  = RefinementCondition;
   MeshBlockPack *pmbp = pmy_mesh_->pmb_pack;
   auto &indcs = pmy_mesh_->mb_indcs;
 
@@ -266,4 +269,9 @@ inverse(AthenaScratchTensor<Real, TensorSymm::SYM2, 4, 2> matrix) {
                      matrix(0,2) * (matrix(1,0) * matrix(2,1) - matrix(1,1) * matrix(2,0))) /
                     det;
     return inv;
+}
+
+// how decide the refinement
+void RefinementCondition(MeshBlockPack* pmbp) {
+  pmbp->pz4c->pz4c_amr->Refine(pmbp);
 }
