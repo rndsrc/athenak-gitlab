@@ -527,8 +527,9 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     if (!opt.shock_avoid_lapse) {
       Real const f = opt.lapse_oplog * opt.lapse_harmonicf
         + opt.lapse_harmonic * z4c.alpha(m,k,j,i);
-      rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
-        - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
+      //rhs.alpha(m,k,j,i) = opt.lapse_advect * Lalpha
+      //  - f * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
+      rhs.alpha(m,k,j,i) = Lalpha - 2 * z4c.alpha(m,k,j,i) * z4c.vKhat(m,k,j,i);
     } else {
       Real const f = 1 + 1/(z4c.alpha(m,k,j,i)*z4c.alpha(m,k,j,i));
       rhs.alpha(m,k,j,i) = Lalpha
@@ -544,11 +545,11 @@ TaskStatus Z4c::CalcRHS(Driver *pdriver, int stage) {
     } else {
       // shift vector
       for(int a = 0; a < 3; ++a) {
-        rhs.beta_u(m,a,k,j,i) = Lbeta_u(a) - opt.shift_eta * z4c.beta_u(m,a,k,j,i) + z4c.vB_u(m,a,k,j,i);
+        rhs.beta_u(m,a,k,j,i) = z4c.vB_u(m,a,k,j,i);
       }
       // advective derivative of shift
       for(int a = 0; a < 3; ++a) {
-        rhs.vB_u(m,a,k,j,i) =  LB_u(a) + rhs.vGam_u(m,a,k,j,i) - opt.vB_eta * z4c.vB_u(m,a,k,j,i);
+        rhs.vB_u(m,a,k,j,i) =  rhs.vGam_u(m,a,k,j,i) - opt.vB_eta * z4c.vB_u(m,a,k,j,i);
       }
     }
 
