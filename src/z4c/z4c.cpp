@@ -63,6 +63,8 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u_rhs("u_rhs z4c",1,1,1,1,1),
   u_weyl("u_weyl",1,1,1,1,1),
   coarse_u_weyl("coarse_u_weyl",1,1,1,1,1),
+  u_adm_ints("u_adm_ints",1,1,1,1,1),
+  coarse_u_adm_ints("coarse_u_adm_ints",1,1,1,1,1),
   psi_out("psi_out",1,1,1),
   pz4c_amr(new Z4c_AMR(this,pin)) {
   // (1) read time-evolution option [already error checked in driver constructor]
@@ -84,6 +86,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::realloc(u1,    nmb, (nz4c), ncells3, ncells2, ncells1);
   Kokkos::realloc(u_rhs, nmb, (nz4c), ncells3, ncells2, ncells1);
   Kokkos::realloc(u_weyl,    nmb, (2), ncells3, ncells2, ncells1);
+  Kokkos::realloc(u_adm_ints,    nmb, (1), ncells3, ncells2, ncells1);
 
   con.C.InitWithShallowSlice(u_con, I_CON_C);
   con.H.InitWithShallowSlice(u_con, I_CON_H);
@@ -118,6 +121,8 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
 
   weyl.rpsi4.InitWithShallowSlice (u_weyl, 0);
   weyl.ipsi4.InitWithShallowSlice (u_weyl, 1);
+
+  adm_ints.eadm.InitWithShallowSlice (u_adm_ints, 0);
 
   opt.chi_psi_power = pin->GetOrAddReal("z4c", "chi_psi_power", -4.0);
   opt.chi_div_floor = pin->GetOrAddReal("z4c", "chi_div_floor", -1000.0);
@@ -156,6 +161,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
     int nccells3 = (indcs.cnx3 > 1)? (indcs.cnx3 + 2*(indcs.ng)) : 1;
     Kokkos::realloc(coarse_u0, nmb, (nz4c), nccells3, nccells2, nccells1);
     Kokkos::realloc(coarse_u_weyl, nmb, (2), nccells3, nccells2, nccells1);
+    Kokkos::realloc(coarse_u_adm_ints, nmb, (1), nccells3, nccells2, nccells1);
   }
   Kokkos::Profiling::popRegion();
 
@@ -168,7 +174,6 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   Kokkos::Profiling::popRegion();
 
   // wave extraction spheres
-  // TODO(@hzhu): Read radii from input file
   auto &grids = spherical_grids;
   // set nrad_wave_extraction = 0 to turn off wave extraction
   nrad = pin->GetOrAddReal("z4c", "nrad_wave_extraction", 1);
@@ -181,6 +186,18 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   mkdir("waveforms",0775);
   waveform_dt = pin->GetOrAddReal("z4c", "waveform_dt", 1);
   last_output_time = 0;
+
+  // adm energy spheres
+  auto &adm_grids = adm_spherical_grids;
+  // set nrad_adm_energy = 0 to turn off adm energy calculation
+  // for now evaluate the adm quantities whenever the waveforms are calculated
+  nrad_adm = pin->GetOrAddReal("z4c", "nrad_adm", 1);
+  int nlev_adm = pin->GetOrAddReal("z4c", "adm_nlev", 10);
+  for (int i=1; i<=nrad; i++) {
+    Real rad = pin->GetOrAddReal("z4c", "adm_radius_"+std::to_string(i), 10);
+    adm_grids.push_back(std::make_unique<SphericalGrid>(ppack, nlev_adm, rad));
+  }
+  mkdir("adm_quantities",0775);
 }
 
 //----------------------------------------------------------------------------------------
