@@ -137,9 +137,11 @@ add_executable(
         z4c/z4c_gauge.cpp
         z4c/z4c_Sbc.cpp
         z4c/z4c_calculate_weyl_scalars.cpp
+        z4c/z4c_calc_adm_integrands.cpp
         z4c/z4c_wave_extr.cpp
         z4c/z4c_puncture_tracker.cpp
         z4c/z4c_amr.cpp
+        z4c/z4c_adm_quantities.cpp
 )
 
 # custom problem generator to be included in compile

@@ -56,6 +56,8 @@ struct Z4cTaskIDs {
   TaskID weyl_recv;
   TaskID csendweyl;
   TaskID crecvweyl;
+  TaskID adm_integrand;
+  TaskID adm_quantities;
 };
 
 namespace z4c {
@@ -115,6 +117,8 @@ class Z4c {
   DvceArray5D<Real> coarse_u0; // coarse representation of z4c solution
   DvceArray5D<Real> u_weyl; // weyl scalars
   DvceArray5D<Real> coarse_u_weyl; // coarse representation of weyl scalars
+  DvceArray5D<Real> u_adm_ints; // adm integrands
+  DvceArray5D<Real> coarse_u_adm_ints; // coarse representation of adm integrands
 
   // puncture location
   Real ppos[3] = {0.,0.,0.}; // later on initiate from input file
@@ -140,6 +144,11 @@ class Z4c {
     AthenaTensor<Real, TensorSymm::NONE, 3, 0> ipsi4;
   };
   Wave_Extr_vars weyl;
+
+  struct ADM_INTEGRANDs {
+    AthenaTensor<Real, TensorSymm::NONE, 3, 0> eadm;
+  };
+  ADM_INTEGRANDs adm_ints;
 
   struct Z4c_vars {
     AthenaTensor<Real, TensorSymm::NONE, 3, 0> chi;     // conf. factor
@@ -212,11 +221,15 @@ class Z4c {
 
   // geodesic grid for wave extr
   std::vector<std::unique_ptr<SphericalGrid>> spherical_grids;
+  // geodesic grid for wave extr
+  std::vector<std::unique_ptr<SphericalGrid>> adm_spherical_grids;
+
   // array storing waveform at each radii
   HostArray3D<Real> psi_out;
   Real waveform_dt;
   Real last_output_time;
   int nrad; // number of radii to perform wave extraction
+  int nrad_adm; // number of radii to calculate adm quantities
 
   // functions
   void AssembleZ4cTasks(std::map<std::string, std::shared_ptr<TaskList>> tl);
@@ -245,7 +258,9 @@ class Z4c {
   TaskStatus RestrictWeyl(Driver *d, int stage);
   TaskStatus PunctureTracker(Driver *d, int stage);
   TaskStatus CalcWeylScalar(Driver *d, int stage);
+  TaskStatus CalcAdmIntegrands(Driver *d, int stage);
   TaskStatus CalcWaveForm(Driver *d, int stage);
+  TaskStatus CalcAdmQuantities(Driver *d, int stage);
 
   template <int NGHOST>
   TaskStatus CalcRHS(Driver *d, int stage);
@@ -257,7 +272,10 @@ class Z4c {
   void ADMConstraints(MeshBlockPack *pmbp);
   template <int NGHOST>
   void Z4cWeyl(MeshBlockPack *pmbp);
+  template <int NGHOST>
+  void Z4cAdmIntegrand(MeshBlockPack *pmbp);
   void WaveExtr(MeshBlockPack *pmbp);
+  void ADMQuantities(MeshBlockPack *pmbp);
   void AlgConstr(MeshBlockPack *pmbp);
 
   // amr criteria

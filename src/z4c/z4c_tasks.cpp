@@ -62,6 +62,7 @@ void Z4c::AssembleZ4cTasks(std::map<std::string, std::shared_ptr<TaskList>> tl) 
   id.z4tad = tl["after_stagen"]->AddTask(&Z4c::Z4cToADM_, this, id.crecv);
   id.admc  = tl["after_stagen"]->AddTask(&Z4c::ADMConstraints_, this, id.z4tad);
   id.weyl_scalar  = tl["after_stagen"]->AddTask(&Z4c::CalcWeylScalar, this, id.z4tad);
+  id.adm_integrand  = tl["after_stagen"]->AddTask(&Z4c::CalcAdmIntegrands, this, id.z4tad);
   id.weyl_rest = tl["after_stagen"]->AddTask(&Z4c::RestrictWeyl, this, id.weyl_scalar);
   id.weyl_send = tl["after_stagen"]->AddTask(&Z4c::SendWeyl, this, id.weyl_rest);
   id.weyl_recv = tl["after_stagen"]->AddTask(&Z4c::RecvWeyl, this, id.weyl_send);
@@ -69,6 +70,7 @@ void Z4c::AssembleZ4cTasks(std::map<std::string, std::shared_ptr<TaskList>> tl) 
   id.csendweyl = tl["after_stagen"]->AddTask(&Z4c::ClearSendWeyl, this, id.weyl_prol);
   id.crecvweyl = tl["after_stagen"]->AddTask(&Z4c::ClearRecvWeyl, this, id.csendweyl);
   id.wave_extr = tl["after_stagen"]->AddTask(&Z4c::CalcWaveForm, this, id.crecvweyl);
+  id.adm_quantities = tl["after_stagen"]->AddTask(&Z4c::CalcAdmQuantities, this, id.adm_integrand);
   id.ptrck = tl["after_stagen"]->AddTask(&Z4c::PunctureTracker, this, id.z4tad);
   return;
 }
@@ -279,6 +281,26 @@ TaskStatus Z4c::CalcWeylScalar(Driver *pdrive, int stage) {
   }
 }
 
+TaskStatus Z4c::CalcAdmIntegrands(Driver *pdrive, int stage) {
+  if (pmy_pack->pz4c->nrad == 0) {
+    return TaskStatus::complete;
+  } else {
+    float time_32 = static_cast<float>(pmy_pack->pmesh->time);
+    if (last_output_time==time_32 && stage == pdrive->nexp_stages) {
+      auto &indcs = pmy_pack->pmesh->mb_indcs;
+      switch (indcs.ng) {
+        case 2: Z4cAdmIntegrand<2>(pmy_pack);
+                break;
+        case 3: Z4cAdmIntegrand<3>(pmy_pack);
+                break;
+        case 4: Z4cAdmIntegrand<4>(pmy_pack);
+                break;
+      }
+    }
+    return TaskStatus::complete;
+  }
+}
+
 TaskStatus Z4c::CalcWaveForm(Driver *pdrive, int stage) {
   if (pmy_pack->pz4c->nrad == 0) {
     return TaskStatus::complete;
@@ -286,6 +308,18 @@ TaskStatus Z4c::CalcWaveForm(Driver *pdrive, int stage) {
     float time_32 = static_cast<float>(pmy_pack->pmesh->time);
     if ((last_output_time==time_32) && (stage == pdrive->nexp_stages)) {
       WaveExtr(pmy_pack);
+    }
+    return TaskStatus::complete;
+  }
+}
+
+TaskStatus Z4c::CalcAdmQuantities(Driver *pdrive, int stage) {
+  if (pmy_pack->pz4c->nrad == 0) {
+    return TaskStatus::complete;
+  } else {
+    float time_32 = static_cast<float>(pmy_pack->pmesh->time);
+    if ((last_output_time==time_32) && (stage == pdrive->nexp_stages)) {
+      ADMQuantities(pmy_pack);
     }
     return TaskStatus::complete;
   }
