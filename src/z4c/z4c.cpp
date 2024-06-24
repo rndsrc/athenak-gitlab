@@ -193,7 +193,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   // for now evaluate the adm quantities whenever the waveforms are calculated
   nrad_adm = pin->GetOrAddReal("z4c", "nrad_adm", 1);
   int nlev_adm = pin->GetOrAddReal("z4c", "adm_nlev", 10);
-  for (int i=1; i<=nrad; i++) {
+  for (int i=1; i<=nrad_adm; i++) {
     Real rad = pin->GetOrAddReal("z4c", "adm_radius_"+std::to_string(i), 10);
     adm_grids.push_back(std::make_unique<SphericalGrid>(ppack, nlev_adm, rad));
   }
