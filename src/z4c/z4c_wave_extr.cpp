@@ -69,12 +69,13 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
   // Spherical Grid for user-defined history
   auto &grids = pmbp->pz4c->spherical_grids;
   auto &u_weyl = pmbp->pz4c->u_weyl;
-  auto &psi_out = pmbp->pz4c->psi_out;
+  //auto &psi_out = pmbp->pz4c->psi_out;
   // TODO(@hzhu): add an mpi call here to fill in the ghost before interpolation to sphere
 
   // number of radii
   int nradii = grids.size();
-
+  Real psi_out[nradii][77][2];
+  int nvars = nradii*77*2;
   // maximum l; TODO(@hzhu): read in from input file
   int lmax = 8;
   bool bitant = false;
@@ -105,37 +106,15 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
             psilmR += weight*(datareal*ylmR + dataim*ylmI);
             psilmI += weight*(dataim*ylmR - datareal*ylmI);
           }
-        psi_out(g,LmIndex(l,m),0) = psilmR;
-        psi_out(g,LmIndex(l,m),1) = psilmI;
+        psi_out[g][LmIndex(l,m)][0] = psilmR;
+        psi_out[g][LmIndex(l,m)][1] = psilmI;
       }
     }
   }
 
   // write output
   #if MPI_PARALLEL_ENABLED
-  if (0 == global_variable::my_rank) {
-    for (int g=0; g<nradii; ++g) {
-      for(int l=2; l<lmax+1; ++l) {
-        for(int m=-l; m<l+1; ++m) {
-        MPI_Reduce(MPI_IN_PLACE, &psi_out(g,LmIndex(l,m),0), 1,
-          MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-        MPI_Reduce(MPI_IN_PLACE, &psi_out(g,LmIndex(l,m),1), 1,
-          MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-        }
-      }
-    }
-  } else {
-    for (int g=0; g<nradii; ++g) {
-      for(int l=2; l<lmax+1; ++l) {
-        for(int m=-l; m<l+1; ++m) {
-        MPI_Reduce(&psi_out(g,LmIndex(l,m),0), &psi_out(g,LmIndex(l,m),0), 1,
-          MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-        MPI_Reduce(&psi_out(g,LmIndex(l,m),1), &psi_out(g,LmIndex(l,m),1), 1,
-          MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-        }
-      }
-    }
-  }
+    MPI_Allreduce(MPI_IN_PLACE, &psi_out, nvars, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
   #endif
   if (0 == global_variable::my_rank) {
     for (int g=0; g<nradii; ++g) {
@@ -220,8 +199,8 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
       // append waveform
       for (int l = 2; l < lmax+1; ++l) {
         for (int m = -l; m < l+1 ; ++m) {
-          outFile << std::setprecision(15) << psi_out(g,LmIndex(l,m),0) << '\t';
-          outFile2 << std::setprecision(15) << psi_out(g,LmIndex(l,m),1) << '\t';
+          outFile << std::setprecision(15) << psi_out[g][LmIndex(l,m)][0] << '\t';
+          outFile2 << std::setprecision(15) << psi_out[g][LmIndex(l,m)][1] << '\t';
         }
       }
       outFile << '\n';
