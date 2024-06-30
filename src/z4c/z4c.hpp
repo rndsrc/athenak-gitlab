@@ -237,6 +237,7 @@ class Z4c {
 
   // array storing waveform at each radii
   HostArray3D<Real> psi_out;
+  HostArray2D<Real> eadm_out;
   Real waveform_dt;
   Real last_output_time;
   int nrad; // number of radii to perform wave extraction

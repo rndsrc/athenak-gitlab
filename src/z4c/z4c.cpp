@@ -66,6 +66,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u_adm_ints("u_adm_ints",1,1,1,1,1),
   coarse_u_adm_ints("coarse_u_adm_ints",1,1,1,1,1),
   psi_out("psi_out",1,1,1),
+  eadm_out("eadm_out",1,1),
   pz4c_amr(new Z4c_AMR(this,pin)) {
   // (1) read time-evolution option [already error checked in driver constructor]
   // Then initialize memory and algorithms for reconstruction and Riemann solvers
@@ -193,11 +194,12 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   // for now evaluate the adm quantities whenever the waveforms are calculated
   nrad_adm = pin->GetOrAddReal("z4c", "nrad_adm", 1);
   int nlev_adm = pin->GetOrAddReal("z4c", "adm_nlev", 10);
+  Kokkos::realloc(eadm_out,nrad_adm,1);
   for (int i=1; i<=nrad_adm; i++) {
     Real rad = pin->GetOrAddReal("z4c", "adm_radius_"+std::to_string(i), 10);
     adm_grids.push_back(std::make_unique<SphericalGrid>(ppack, nlev_adm, rad));
   }
-  mkdir("adm_quantities",0775);
+  // mkdir("adm_quantities",0775);
 }
 
 //----------------------------------------------------------------------------------------
