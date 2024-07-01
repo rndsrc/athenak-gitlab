@@ -113,10 +113,22 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
   }
 
   // write output
+  /*
   #if MPI_PARALLEL_ENABLED
-    MPI_Allreduce(MPI_IN_PLACE, &psi_out, nvars, MPI_ATHENA_REAL, MPI_SUM, MPI_COMM_WORLD);
+    if (global_variable::my_rank == 0) {
+      MPI_Reduce(MPI_IN_PLACE, psi_out, nvars, MPI_DOUBLE, MPI_SUM, 0,
+                 MPI_COMM_WORLD);
+    } else {
+      MPI_Reduce(psi_out, psi_out, nvars, MPI_DOUBLE, MPI_SUM, 0,
+                 MPI_COMM_WORLD);
+    }
+
+    //std::cout << "before mpi" << std::endl;
+    //MPI_Reduce(&psi_out, &psi_out, nvars, MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
+    //std::cout << "after mpi" << std::endl;
   #endif
-  if (0 == global_variable::my_rank) {
+  */
+  // if (0 == global_variable::my_rank) {
     for (int g=0; g<nradii; ++g) {
       // Output file names
       std::string filename = "waveforms/rpsi4_real_";
@@ -124,8 +136,12 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
       std::stringstream strObj;
       strObj << std::setfill('0') << std::setw(4) << grids[g]->radius;
       filename += strObj.str();
+      filename += "_";
+      filename += std::to_string(global_variable::my_rank);
       filename += ".txt";
       filename2 += strObj.str();
+      filename2 += "_";
+      filename2 += std::to_string(global_variable::my_rank);
       filename2 += ".txt";
 
       // Check if the file already exists
@@ -210,7 +226,7 @@ void Z4c::WaveExtr(MeshBlockPack *pmbp) {
       outFile.close();
       outFile2.close();
     }
-  }
+  //}
 }
 
 
