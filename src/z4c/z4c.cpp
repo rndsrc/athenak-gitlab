@@ -63,6 +63,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u_rhs("u_rhs z4c",1,1,1,1,1),
   u_weyl("u_weyl",1,1,1,1,1),
   u_dg("u_dg",1,1,1,1,1),
+  coarse_u_weyl("coarse_u_weyl",1,1,1,1,1),
   psi_out("psi_out",1,1,1),
   pz4c_amr(new Z4c_AMR(this,pin)) {
   // (1) read time-evolution option [already error checked in driver constructor]
@@ -163,19 +164,23 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
     int nccells2 = (indcs.cnx2 > 1)? (indcs.cnx2 + 2*(indcs.ng)) : 1;
     int nccells3 = (indcs.cnx3 > 1)? (indcs.cnx3 + 2*(indcs.ng)) : 1;
     Kokkos::realloc(coarse_u0, nmb, (nz4c), nccells3, nccells2, nccells1);
+    Kokkos::realloc(coarse_u_weyl, nmb, (2), nccells3, nccells2, nccells1);
   }
   Kokkos::Profiling::popRegion();
 
   // allocate boundary buffers for conserved (cell-centered) variables
   Kokkos::Profiling::pushRegion("Buffers");
-  pbval_u = new BoundaryValuesCC(ppack, pin, true);
+  pbval_u = new MeshBoundaryValuesCC(ppack, pin, true);
   pbval_u->InitializeBuffers((nz4c));
+  pbval_weyl = new MeshBoundaryValuesCC(ppack, pin, true);
+  pbval_weyl->InitializeBuffers((2));
   Kokkos::Profiling::popRegion();
 
   // wave extraction spheres
   // TODO(@hzhu): Read radii from input file
   auto &grids = spherical_grids;
-  int nrad = pin->GetOrAddReal("z4c", "nrad_wave_extraction", 1);
+  // set nrad_wave_extraction = 0 to turn off wave extraction
+  nrad = pin->GetOrAddReal("z4c", "nrad_wave_extraction", 1);
   int nlev = pin->GetOrAddReal("z4c", "extraction_nlev", 10);
   for (int i=1; i<=nrad; i++) {
     Real rad = pin->GetOrAddReal("z4c", "extraction_radius_"+std::to_string(i), 10);
@@ -214,9 +219,10 @@ void Z4c::AlgConstr(MeshBlockPack *pmbp) {
                               z4c.g_dd(m,0,2,k,j,i),z4c.g_dd(m,1,1,k,j,i),
                               z4c.g_dd(m,1,2,k,j,i), z4c.g_dd(m,2,2,k,j,i));
     detg = detg > 0. ? detg : 1.;
-    Real eps = detg - 1.;
-    Real oopsi4 = (eps < opt.eps_floor) ? (1. - opt.eps_floor/3.) :
-                (std::pow(1./detg, 1./3.));
+    // Real eps = detg - 1.;
+    // Real oopsi4 = (eps < opt.eps_floor) ? (1. - opt.eps_floor/3.) :
+    //             (std::pow(1./detg, 1./3.));
+    Real oopsi4 = std::cbrt(1./detg);
 
     for(int a = 0; a < 3; ++a)
     for(int b = a; b < 3; ++b) {
@@ -285,6 +291,7 @@ template void Z4c::MetricPartial<4>(MeshBlockPack *pmbp);
 // destructor
 Z4c::~Z4c() {
   delete pbval_u;
+  delete pbval_weyl;
   delete pz4c_amr;
 }
 
