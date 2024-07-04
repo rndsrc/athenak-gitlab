@@ -62,6 +62,7 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
   u1("u1 z4c",1,1,1,1,1),
   u_rhs("u_rhs z4c",1,1,1,1,1),
   u_weyl("u_weyl",1,1,1,1,1),
+  u_dg("u_dg",1,1,1,1,1),
   coarse_u_weyl("coarse_u_weyl",1,1,1,1,1),
   u_adm_ints("u_adm_ints",1,1,1,1,1),
   coarse_u_adm_ints("coarse_u_adm_ints",1,1,1,1,1),
@@ -153,7 +154,15 @@ Z4c::Z4c(MeshBlockPack *ppack, ParameterInput *pin) :
       pin->GetOrAddInteger("z4c", "extrap_order", 2))));
 
   diss = opt.diss*pow(2., -2.*indcs.ng)*(indcs.ng % 2 == 0 ? -1. : 1.);
+
+
+  // for now hard wire ahfind to be true for testing
+  opt.ahfind = true;
+  if (opt.ahfind) Kokkos::realloc(u_dg,nmb, (6), ncells3, ncells2, ncells1);
+  dg_ddd.InitWithShallowSlice (u_dg, 0, 5);
   }
+
+
 
   // allocate memory for conserved variables on coarse mesh
   if (ppack->pmesh->multilevel) {
@@ -255,6 +264,49 @@ void Z4c::AlgConstr(MeshBlockPack *pmbp) {
     }
   });
 }
+
+
+template <int NGHOST>
+void Z4c::MetricPartial(MeshBlockPack *pmbp) {
+  // capture variables for the kernel
+  auto &indcs = pmbp->pmesh->mb_indcs;
+  auto &size = pmbp->pmb->mb_size;
+  int &is = indcs.is; int &ie = indcs.ie;
+  int &js = indcs.js; int &je = indcs.je;
+  int &ks = indcs.ks; int &ke = indcs.ke;
+  int &nghost = indcs.ng;
+  auto &u_dg = pmbp->pz4c->dg_ddd;
+
+  //For GLOOPS
+  int nmb = pmbp->nmb_thispack;
+
+  // Initialize dg_ddd container
+  int ncells1 = indcs.nx1 + 2*nghost;
+  int ncells2 = indcs.nx2 + 2*nghost;
+  int ncells3 = indcs.nx3 + 2*nghost;
+
+  auto &adm = pmbp->padm->adm;
+  par_for("compute metric derivative",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
+  KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+    Real idx[] = {size.d_view(m).dx1, size.d_view(m).dx2, size.d_view(m).dx3};
+    // -----------------------------------------------------------------------------------
+    // derivatives
+    //
+    // first derivatives of g
+    for(int c = 0; c < 3; ++c)
+    for(int a = 0; a < 3; ++a)
+    for(int b = a; b < 3; ++b) {
+      dg_ddd(m,a,b,c,k,j,i) = Dx<NGHOST>(c, idx, adm.g_dd, m,a,b,k,j,i);
+    }
+  });
+}
+
+template void Z4c::MetricPartial<2>(MeshBlockPack *pmbp);
+template void Z4c::MetricPartial<3>(MeshBlockPack *pmbp);
+template void Z4c::MetricPartial<4>(MeshBlockPack *pmbp);
+
+
+
 //----------------------------------------------------------------------------------------
 // destructor
 Z4c::~Z4c() {

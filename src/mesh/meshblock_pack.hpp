@@ -27,6 +27,7 @@ class TurbulenceDriver;
 namespace radiation {class Radiation;}
 namespace z4c {class Z4c;}
 namespace z4c {class PunctureTracker;}
+namespace z4c {class AHF;}
 namespace adm {class ADM;}
 namespace particles {class Particles;}
 namespace units {class Units;}
@@ -65,6 +66,7 @@ class MeshBlockPack {
   z4c::Z4c *pz4c=nullptr;
   adm::ADM *padm=nullptr;
   std::vector<z4c::PunctureTracker *> pz4c_ptracker;
+  std::vector<z4c::AHF *> pz4c_ahfind;
   particles::Particles *ppart=nullptr;
 
   // units (needed to convert code units to cgs for, e.g., cooling or radiation)
