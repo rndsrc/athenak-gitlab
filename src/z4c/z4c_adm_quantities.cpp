@@ -41,43 +41,40 @@ void Z4c::ADMQuantities(MeshBlockPack *pmbp) {
   // Spherical Grid for user-defined history
   auto &grids = pmbp->pz4c->adm_spherical_grids;
   auto &u_adm_ints = pmbp->pz4c->u_adm_ints;
-  auto &eadm_out = pmbp->pz4c->eadm_out;
-
-  // number of radii
   int nradii = grids.size();
+  Real eadm_out[nradii][4];
 
-  // maximum l; TODO(@hzhu): read in from input file
-  int lmax = 8;
-  bool bitant = false;
-
-  Real ylmR,ylmI;
   for (int g=0; g<nradii; ++g) {
     // Interpolate Adm Integrands to the surface
-    grids[g]->InterpolateToSphere(1, u_adm_ints);
+    grids[g]->InterpolateToSphere(4, u_adm_ints);
     Real radius = grids[g]->radius;
     Real eadm_ = 0.0;
+    Real padmx_ = 0.0;
+    Real padmy_ = 0.0;
+    Real padmz_ = 0.0;
+
     for (int ip = 0; ip < grids[g]->nangles; ++ip) {
       Real weight = grids[g]->solid_angles.h_view(ip);
       Real data = grids[g]->interp_vals.h_view(ip,0);
+      Real px = grids[g]->interp_vals.h_view(ip,1);
+      Real py = grids[g]->interp_vals.h_view(ip,2);
+      Real pz = grids[g]->interp_vals.h_view(ip,3);
+
       eadm_ += weight * data * radius * radius;
+      padmx_ += weight * px * radius * radius;
+      padmy_ += weight * py * radius * radius;
+      padmz_ += weight * pz * radius * radius;
     }
-    eadm_out(g,0) = eadm_;
+    eadm_out[g][0] = eadm_;
+    eadm_out[g][1] = padmx_;
+    eadm_out[g][2] = padmy_;
+    eadm_out[g][3] = padmz_;
   }
 
   // write output
   #if MPI_PARALLEL_ENABLED
-  if (0 == global_variable::my_rank) {
-    for (int g=0; g<nradii; ++g) {
-      MPI_Reduce(MPI_IN_PLACE, &eadm_out(g,0), 1,
-        MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-    }
-  } else {
-    for (int g=0; g<nradii; ++g) {
-      MPI_Reduce(&eadm_out(g,0), &eadm_out(g,0), 1,
-        MPI_ATHENA_REAL, MPI_SUM, 0, MPI_COMM_WORLD);
-    }
-  }
   #endif
+
   if (0 == global_variable::my_rank) {
     for (int g=0; g<nradii; ++g) {
       // Output file names
@@ -102,7 +99,7 @@ void Z4c::ADMQuantities(MeshBlockPack *pmbp) {
         // append mode
         outFile.open(filename, std::ios::out | std::ios::app);
         // first append time
-        outFile << "# 1:time" << "\t" << "2:Eadm";
+        outFile << "# 1:time" << "\t" << "2:Eadm" << "\t" << "3:Px"<< "\t" << "4:Py"<< "\t" << "5:Pz";
         outFile << '\n';
 
         // Close the file stream
@@ -119,7 +116,8 @@ void Z4c::ADMQuantities(MeshBlockPack *pmbp) {
       outFile << pmbp->pmesh->time << "\t";
 
       // append waveform
-      outFile << std::setprecision(15) << eadm_out(g,0) << '\t';
+      outFile << std::setprecision(15) << eadm_out[g][0] << '\t' << eadm_out[g][1] 
+      << '\t' << eadm_out[g][2] << '\t' << eadm_out[g][3] << '\t';
 
       outFile << '\n';
 
@@ -128,6 +126,4 @@ void Z4c::ADMQuantities(MeshBlockPack *pmbp) {
     }
   }
 }
-
-
 }  // namespace z4c

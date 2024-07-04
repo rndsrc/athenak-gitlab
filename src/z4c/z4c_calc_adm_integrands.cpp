@@ -151,7 +151,7 @@ void Z4c::Z4cAdmIntegrand(MeshBlockPack *pmbp) {
 
     for(int a = 0; a < 3; ++a) {
       for(int b = 0; b < 3; ++b) {
-        uvec_d(a) += adm_g_dd(m,a,b,k,j,i)*uvec(b);
+        uvec_d(a) += adm.g_dd(m,a,b,k,j,i)*uvec(b);
       }
     }
 
@@ -161,12 +161,13 @@ void Z4c::Z4cAdmIntegrand(MeshBlockPack *pmbp) {
         adm_ints.eadm(m,k,j,i) += (dg_ddd(b,a,b) - dg_ddd(a,b,b)) * uvec(a);
       }
     }
-    adm_ints.eadm(m,k,j,i) /= 16 * M_PI;
+    //adm_ints.eadm(m,k,j,i) /= 16 * M_PI;
+    adm_ints.eadm(m,k,j,i) = 1/(16 * M_PI);
 
     for(int c = 0; c < 3; ++ c) {
       adm_ints.padm(m,c,k,j,i) = 0;
       for(int a = 0; a < 3; ++a) {
-        adm_ints.padm(m,c,k,j,i) += adm.vK_dd(m,a,c,k,j,i) * uvec(a) - K*uvec_d(c);
+        adm_ints.padm(m,c,k,j,i) += K_ud(a,c) * uvec_d(a) - K*uvec_d(c);
       }
       adm_ints.padm(m,c,k,j,i) /= 8 * M_PI;
     }

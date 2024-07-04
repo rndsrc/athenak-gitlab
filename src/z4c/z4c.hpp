@@ -148,6 +148,7 @@ class Z4c {
 
   struct ADM_INTEGRANDs {
     AthenaTensor<Real, TensorSymm::NONE, 3, 0> eadm;
+    AthenaTensor<Real, TensorSymm::NONE, 3, 1> padm;
   };
   ADM_INTEGRANDs adm_ints;
 
