@@ -128,6 +128,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
   par_for("mri3d-u", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x2min = size.d_view(m).x2min;
+    Real &x2max = size.d_view(m).x2max;
+    int nx2 = indcs.nx2;
+    Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
+
     Real rd = d0;
     Real rp = p0;
     auto rand_gen = rand_pool64.get_state();  // get random number state this thread
@@ -137,7 +142,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     } else {
       rd = rval*d0;
     }
-    u0(m,IDN,k,j,i) = rd;
+    u0(m,IDN,k,j,i) = rd + exp(-x2v*x2v/2.0);
     u0(m,IM1,k,j,i) = 0.0;
     u0(m,IM2,k,j,i) = 0.0;
     u0(m,IM3,k,j,i) = 0.0;
