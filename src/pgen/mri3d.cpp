@@ -67,6 +67,9 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   int nwx    = pin->GetOrAddInteger("problem","nwx",1);
   int ifield = pin->GetOrAddInteger("problem","ifield",1);
 
+  Real qshear = pin->GetReal("shearing_box","qshear");
+  Real omega0 = pin->GetReal("shearing_box","omega0");
+
   // background density, pressure, and magnetic field
   Real d0 = 1.0;
   Real p0 = 1.0;
@@ -124,16 +127,33 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // Only sets up random perturbations in pressure to seed MRI
   EOS_Data &eos = pmbp->pmhd->peos->eos_data;
   Real gm1 = eos.gamma - 1.0;
+
+  Real qo  = qshear * omega0;
+
   auto u0 = pmbp->pmhd->u0;
   Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
   par_for("mri3d-u", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
+    Real &x1min = size.d_view(m).x1min;
+    Real &x1max = size.d_view(m).x1max;
+    int nx1 = indcs.nx1;
+    Real x1v = CellCenterX(i-is, nx1, x1min, x1max);
+
     Real &x2min = size.d_view(m).x2min;
     Real &x2max = size.d_view(m).x2max;
     int nx2 = indcs.nx2;
     Real x2v = CellCenterX(j-js, nx2, x2min, x2max);
 
-    Real rd = d0;
+    Real vy;
+    if(x1v > 0.0) {
+      vy = -qo * (x1max - x1v);
+    } else if (x1v < 0.0) {
+      vy = -qo * (x1min - x1v);
+    } else {
+      vy =  0.0;
+    }
+
+    Real rd = d0 + exp(-x2v*x2v/2.0);
     Real rp = p0;
     auto rand_gen = rand_pool64.get_state();  // get random number state this thread
     Real rval = 1.0 + amp*(rand_gen.frand() - 0.5);
@@ -142,13 +162,14 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     } else {
       rd = rval*d0;
     }
-    u0(m,IDN,k,j,i) = rd + exp(-x2v*x2v/2.0);
+    u0(m,IDN,k,j,i) = rd;
     u0(m,IM1,k,j,i) = 0.0;
-    u0(m,IM2,k,j,i) = 0.0;
+    u0(m,IM2,k,j,i) = rd * vy;
     u0(m,IM3,k,j,i) = 0.0;
     if (eos.is_ideal) {
-      u0(m,IEN,k,j,i) = rp/gm1 + 0.5*SQR(0.5*(b0.x2f(m,k,j,i) + b0.x2f(m,k,j+1,i))) +
-                                 0.5*SQR(0.5*(b0.x3f(m,k,j,i) + b0.x3f(m,k+1,j,i)));
+      u0(m,IEN,k,j,i) = rp/gm1 + 0.5 * SQR(0.5*(b0.x2f(m,k,j,i) + b0.x2f(m,k,j+1,i))) +
+                                 0.5 * SQR(0.5*(b0.x3f(m,k,j,i) + b0.x3f(m,k+1,j,i))) +
+	                         0.5 * rd * vy * vy;
     }
     rand_pool64.free_state(rand_gen);  // free state for use by other threads
   });
